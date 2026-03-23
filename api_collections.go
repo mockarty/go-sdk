@@ -30,18 +30,18 @@ type Collection struct {
 
 // TestRunResult represents the result of executing a test collection.
 type TestRunResult struct {
-	ID            string         `json:"id"`
-	CollectionID  string         `json:"collectionId"`
-	Status        string         `json:"status"` // "running", "completed", "failed"
-	TotalTests    int            `json:"totalTests"`
-	PassedTests   int            `json:"passedTests"`
-	FailedTests   int            `json:"failedTests"`
-	SkippedTests  int            `json:"skippedTests"`
-	Duration      int64          `json:"duration"` // milliseconds
-	Results       []TestResult   `json:"results,omitempty"`
-	Metadata      map[string]any `json:"metadata,omitempty"`
-	StartedAt     string         `json:"startedAt"`
-	CompletedAt   string         `json:"completedAt,omitempty"`
+	ID           string         `json:"id"`
+	CollectionID string         `json:"collectionId"`
+	Status       string         `json:"status"` // "running", "completed", "failed"
+	TotalTests   int            `json:"totalTests"`
+	PassedTests  int            `json:"passedTests"`
+	FailedTests  int            `json:"failedTests"`
+	SkippedTests int            `json:"skippedTests"`
+	Duration     int64          `json:"duration"` // milliseconds
+	Results      []TestResult   `json:"results,omitempty"`
+	Metadata     map[string]any `json:"metadata,omitempty"`
+	StartedAt    string         `json:"startedAt"`
+	CompletedAt  string         `json:"completedAt,omitempty"`
 }
 
 // TestResult represents the result of a single test step.
@@ -122,4 +122,47 @@ func (a *CollectionAPI) Export(ctx context.Context, id string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// Create creates a new collection.
+func (a *CollectionAPI) Create(ctx context.Context, col *Collection) (*Collection, error) {
+	if col.Namespace == "" && a.client.namespace != "" {
+		col.Namespace = a.client.namespace
+	}
+	var result Collection
+	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections", col, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Update updates an existing collection by ID.
+func (a *CollectionAPI) Update(ctx context.Context, id string, col *Collection) (*Collection, error) {
+	var result Collection
+	if err := a.client.do(ctx, "PUT", "/ui/api/api-tester/collections/"+url.PathEscape(id), col, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Delete deletes a collection by ID.
+func (a *CollectionAPI) Delete(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/ui/api/api-tester/collections/"+url.PathEscape(id), nil, nil)
+}
+
+// Duplicate duplicates a collection by ID.
+func (a *CollectionAPI) Duplicate(ctx context.Context, id string) (*Collection, error) {
+	var result Collection
+	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections/"+url.PathEscape(id)+"/duplicate", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// BatchDelete deletes multiple collections by their IDs.
+func (a *CollectionAPI) BatchDelete(ctx context.Context, ids []string) error {
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: ids}
+	return a.client.do(ctx, "POST", "/ui/api/api-tester/collections/batch-delete", body, nil)
 }

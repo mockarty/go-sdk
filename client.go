@@ -40,6 +40,14 @@ type Client struct {
 	collectionAPI *CollectionAPI
 	perfAPI       *PerfAPI
 	healthAPI     *HealthAPI
+	generatorAPI  *GeneratorAPI
+	fuzzingAPI    *FuzzingAPI
+	contractAPI   *ContractAPI
+	recorderAPI   *RecorderAPI
+	templateAPI   *TemplateAPI
+	importAPI     *ImportAPI
+	testRunAPI    *TestRunAPI
+	adminAPI      *AdminAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -123,6 +131,70 @@ func (c *Client) Health() *HealthAPI {
 		c.healthAPI = &HealthAPI{client: c}
 	}
 	return c.healthAPI
+}
+
+// Generator returns the Generator API for creating mocks from specifications.
+func (c *Client) Generator() *GeneratorAPI {
+	if c.generatorAPI == nil {
+		c.generatorAPI = &GeneratorAPI{client: c}
+	}
+	return c.generatorAPI
+}
+
+// Fuzzing returns the Fuzzing API for security and fuzz testing.
+func (c *Client) Fuzzing() *FuzzingAPI {
+	if c.fuzzingAPI == nil {
+		c.fuzzingAPI = &FuzzingAPI{client: c}
+	}
+	return c.fuzzingAPI
+}
+
+// Contracts returns the Contract Testing API.
+func (c *Client) Contracts() *ContractAPI {
+	if c.contractAPI == nil {
+		c.contractAPI = &ContractAPI{client: c}
+	}
+	return c.contractAPI
+}
+
+// Recorder returns the Recorder API for traffic recording.
+func (c *Client) Recorder() *RecorderAPI {
+	if c.recorderAPI == nil {
+		c.recorderAPI = &RecorderAPI{client: c}
+	}
+	return c.recorderAPI
+}
+
+// Templates returns the Template API for managing response templates.
+func (c *Client) Templates() *TemplateAPI {
+	if c.templateAPI == nil {
+		c.templateAPI = &TemplateAPI{client: c}
+	}
+	return c.templateAPI
+}
+
+// Import returns the Import API for importing API definitions.
+func (c *Client) Import() *ImportAPI {
+	if c.importAPI == nil {
+		c.importAPI = &ImportAPI{client: c}
+	}
+	return c.importAPI
+}
+
+// TestRuns returns the Test Run API for managing test executions.
+func (c *Client) TestRuns() *TestRunAPI {
+	if c.testRunAPI == nil {
+		c.testRunAPI = &TestRunAPI{client: c}
+	}
+	return c.testRunAPI
+}
+
+// Admin returns the Admin API for platform administration.
+func (c *Client) Admin() *AdminAPI {
+	if c.adminAPI == nil {
+		c.adminAPI = &AdminAPI{client: c}
+	}
+	return c.adminAPI
 }
 
 // ---------------------------------------------------------------------------
