@@ -275,7 +275,7 @@ func TestGeneratorAPI_ServerError(t *testing.T) {
 func TestFuzzingAPI_Start(t *testing.T) {
 	var gotBody FuzzingConfig
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/start": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -306,7 +306,7 @@ func TestFuzzingAPI_Start(t *testing.T) {
 func TestFuzzingAPI_Start_DefaultNamespace(t *testing.T) {
 	var gotBody FuzzingConfig
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/start": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -401,7 +401,7 @@ func TestFuzzingAPI_DeleteResult(t *testing.T) {
 
 func TestFuzzingAPI_CreateConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/config": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/fuzzing/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","targetUrl":"https://api.example.com"}`))
 		},
@@ -421,7 +421,7 @@ func TestFuzzingAPI_CreateConfig(t *testing.T) {
 
 func TestFuzzingAPI_GetConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/fuzzing/config/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/fuzzing/configs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","workers":8}`))
 		},
@@ -440,113 +440,21 @@ func TestFuzzingAPI_GetConfig(t *testing.T) {
 // Contract API Tests
 // ---------------------------------------------------------------------------
 
-func TestContractAPI_Create(t *testing.T) {
-	var gotBody Contract
+func TestContractAPI_ValidateMocks(t *testing.T) {
+	var gotBody ContractValidationRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/contract": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/contract/validate-mocks": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"contract-1","name":"User API Contract"}`))
+			_, _ = w.Write([]byte(`{"id":"result-1","status":"fail","violations":2}`))
 		},
 	})
 
-	contract, err := client.Contracts().Create(context.Background(), &Contract{
-		Name:      "User API Contract",
+	result, err := client.Contracts().ValidateMocks(context.Background(), &ContractValidationRequest{
 		SpecURL:   "https://example.com/openapi.yaml",
 		TargetURL: "https://api.example.com",
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if contract.ID != "contract-1" {
-		t.Errorf("expected ID contract-1, got %q", contract.ID)
-	}
-	if gotBody.Namespace != "sandbox" {
-		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
-	}
-}
-
-func TestContractAPI_Get(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/contract/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"contract-1","name":"User API Contract","targetUrl":"https://api.example.com"}`))
-		},
-	})
-
-	contract, err := client.Contracts().Get(context.Background(), "contract-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if contract.Name != "User API Contract" {
-		t.Errorf("expected name 'User API Contract', got %q", contract.Name)
-	}
-}
-
-func TestContractAPI_Update(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /ui/api/contract/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"contract-1","name":"Updated Contract"}`))
-		},
-	})
-
-	contract, err := client.Contracts().Update(context.Background(), "contract-1", &Contract{
-		Name: "Updated Contract",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if contract.Name != "Updated Contract" {
-		t.Errorf("expected name 'Updated Contract', got %q", contract.Name)
-	}
-}
-
-func TestContractAPI_Delete(t *testing.T) {
-	var gotPath string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/contract/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Contracts().Delete(context.Background(), "contract-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(gotPath, "contract-1") {
-		t.Errorf("expected path to contain contract-1, got %s", gotPath)
-	}
-}
-
-func TestContractAPI_List(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/contract": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"c1","name":"Contract A"},{"id":"c2","name":"Contract B"}]`))
-		},
-	})
-
-	contracts, err := client.Contracts().List(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(contracts) != 2 {
-		t.Errorf("expected 2 contracts, got %d", len(contracts))
-	}
-}
-
-func TestContractAPI_Validate(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/contract/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"result-1","contractId":"contract-1","status":"fail","violations":2}`))
-		},
-	})
-
-	result, err := client.Contracts().Validate(context.Background(), "contract-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -556,22 +464,75 @@ func TestContractAPI_Validate(t *testing.T) {
 	if result.Violations != 2 {
 		t.Errorf("expected 2 violations, got %d", result.Violations)
 	}
+	if gotBody.Namespace != "sandbox" {
+		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
+	}
 }
 
-func TestContractAPI_Results(t *testing.T) {
+func TestContractAPI_ListConfigs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/contract/": func(w http.ResponseWriter, r *http.Request) {
-			// Route to results if path ends with /results
-			if strings.HasSuffix(r.URL.Path, "/results") {
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`[{"id":"r1","status":"pass"},{"id":"r2","status":"fail","violations":1}]`))
-				return
-			}
-			w.WriteHeader(http.StatusNotFound)
+		"GET /ui/api/contract/configs": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"c1","name":"Config A"},{"id":"c2","name":"Config B"}]`))
 		},
 	})
 
-	results, err := client.Contracts().Results(context.Background(), "contract-1")
+	configs, err := client.Contracts().ListConfigs(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(configs) != 2 {
+		t.Errorf("expected 2 configs, got %d", len(configs))
+	}
+}
+
+func TestContractAPI_SaveConfig(t *testing.T) {
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /ui/api/contract/configs": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"My Contract Config"}`))
+		},
+	})
+
+	config, err := client.Contracts().SaveConfig(context.Background(), &ContractConfig{
+		Name:    "My Contract Config",
+		SpecURL: "https://example.com/openapi.yaml",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if config.ID != "cfg-1" {
+		t.Errorf("expected ID cfg-1, got %q", config.ID)
+	}
+}
+
+func TestContractAPI_DeleteConfig(t *testing.T) {
+	var gotPath string
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"DELETE /ui/api/contract/configs/": func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			w.WriteHeader(http.StatusOK)
+		},
+	})
+
+	err := client.Contracts().DeleteConfig(context.Background(), "cfg-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(gotPath, "cfg-1") {
+		t.Errorf("expected path to contain cfg-1, got %s", gotPath)
+	}
+}
+
+func TestContractAPI_ListResults(t *testing.T) {
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"GET /ui/api/contract/results": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"r1","status":"pass"},{"id":"r2","status":"fail","violations":1}]`))
+		},
+	})
+
+	results, err := client.Contracts().ListResults(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -584,18 +545,18 @@ func TestContractAPI_Results(t *testing.T) {
 // Recorder API Tests
 // ---------------------------------------------------------------------------
 
-func TestRecorderAPI_CreateSession(t *testing.T) {
+func TestRecorderAPI_StartRecording(t *testing.T) {
 	var gotBody RecorderSession
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/sessions": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/recorder/start": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"idle"}`))
+			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"recording"}`))
 		},
 	})
 
-	session, err := client.Recorder().CreateSession(context.Background(), &RecorderSession{
+	session, err := client.Recorder().StartRecording(context.Background(), &RecorderSession{
 		Name:      "My Recording",
 		TargetURL: "https://api.example.com",
 	})
@@ -605,9 +566,6 @@ func TestRecorderAPI_CreateSession(t *testing.T) {
 	if session.ID != "session-1" {
 		t.Errorf("expected ID session-1, got %q", session.ID)
 	}
-	if session.Status != "idle" {
-		t.Errorf("expected status idle, got %q", session.Status)
-	}
 	if gotBody.Namespace != "sandbox" {
 		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
 	}
@@ -615,7 +573,7 @@ func TestRecorderAPI_CreateSession(t *testing.T) {
 
 func TestRecorderAPI_GetSession(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"recording","entryCount":42}`))
 		},
@@ -647,28 +605,10 @@ func TestRecorderAPI_ListSessions(t *testing.T) {
 	}
 }
 
-func TestRecorderAPI_StartRecording(t *testing.T) {
-	var gotPath string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Recorder().StartRecording(context.Background(), "session-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(gotPath, "session-1/start") {
-		t.Errorf("expected path to contain session-1/start, got %s", gotPath)
-	}
-}
-
 func TestRecorderAPI_StopRecording(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -686,7 +626,7 @@ func TestRecorderAPI_StopRecording(t *testing.T) {
 func TestRecorderAPI_DeleteSession(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -703,7 +643,7 @@ func TestRecorderAPI_DeleteSession(t *testing.T) {
 
 func TestRecorderAPI_GetEntries(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"e1","method":"GET","path":"/api/users","statusCode":200},{"id":"e2","method":"POST","path":"/api/users","statusCode":201}]`))
 		},
@@ -721,31 +661,31 @@ func TestRecorderAPI_GetEntries(t *testing.T) {
 	}
 }
 
-func TestRecorderAPI_CreateMockFromEntry(t *testing.T) {
+func TestRecorderAPI_CreateMocksFromSession(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"mock-from-entry","http":{"route":"/api/users","httpMethod":"GET"}}`))
+			_, _ = w.Write([]byte(`[{"id":"mock-1","http":{"route":"/api/users","httpMethod":"GET"}}]`))
 		},
 	})
 
-	mock, err := client.Recorder().CreateMockFromEntry(context.Background(), "session-1", "entry-1")
+	mocks, err := client.Recorder().CreateMocksFromSession(context.Background(), "session-1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if mock.ID != "mock-from-entry" {
-		t.Errorf("expected ID mock-from-entry, got %q", mock.ID)
+	if len(mocks) != 1 {
+		t.Errorf("expected 1 mock, got %d", len(mocks))
 	}
-	if !strings.Contains(gotPath, "session-1/entries/entry-1/create-mock") {
-		t.Errorf("expected path to contain session-1/entries/entry-1/create-mock, got %s", gotPath)
+	if !strings.Contains(gotPath, "session-1/mocks") {
+		t.Errorf("expected path to contain session-1/mocks, got %s", gotPath)
 	}
 }
 
 func TestRecorderAPI_ExportSession(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/sessions/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"log":{"entries":[]}}`))
 		},
@@ -1348,7 +1288,7 @@ func TestAdminAPI_NamespaceUsers(t *testing.T) {
 
 func TestAdminAPI_ListBackupConfigs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"cfg-1","name":"daily","schedule":"0 2 * * *","retention":30,"enabled":true}]`))
 		},
@@ -1365,7 +1305,7 @@ func TestAdminAPI_ListBackupConfigs(t *testing.T) {
 
 func TestAdminAPI_GetBackupConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/backups/configs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/backups/configs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"daily"}`))
 		},
@@ -1382,7 +1322,7 @@ func TestAdminAPI_GetBackupConfig(t *testing.T) {
 
 func TestAdminAPI_CreateBackupConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-2","name":"weekly"}`))
 		},
@@ -1402,18 +1342,18 @@ func TestAdminAPI_CreateBackupConfig(t *testing.T) {
 
 func TestAdminAPI_Backup(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/admin/backups/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/admin/backups/create": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"bkp-1","configId":"cfg-1","status":"completed"}`))
 		},
-		"GET /api/admin/backups/download": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/backups/download": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`backup-binary-data`))
 		},
-		"POST /api/admin/backups/restore": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/admin/backups/restore": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
-		"POST /api/admin/backups/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/admin/backups/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -1447,7 +1387,7 @@ func TestAdminAPI_Backup(t *testing.T) {
 
 func TestAdminAPI_LicenseStatus(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/licenses/status": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/licenses/status": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"active":true,"type":"enterprise","maxUsers":100,"maxMocks":10000}`))
 		},
@@ -1467,7 +1407,7 @@ func TestAdminAPI_LicenseStatus(t *testing.T) {
 
 func TestAdminAPI_ListLicenses(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/licenses": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/licenses": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"lic-1","type":"enterprise","status":"active"}]`))
 		},
@@ -1485,7 +1425,7 @@ func TestAdminAPI_ListLicenses(t *testing.T) {
 func TestAdminAPI_ActivateLicense(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/admin/licenses/activate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /ui/api/admin/licenses/activate": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1503,7 +1443,7 @@ func TestAdminAPI_ActivateLicense(t *testing.T) {
 
 func TestAdminAPI_LicenseUsage(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/licenses/usage": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/licenses/usage": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"users":5,"mocks":250,"namespaces":3}`))
 		},
@@ -1523,7 +1463,7 @@ func TestAdminAPI_LicenseUsage(t *testing.T) {
 
 func TestAdminAPI_CombinedLimits(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/admin/licenses/combined-limits": func(w http.ResponseWriter, r *http.Request) {
+		"GET /ui/api/admin/licenses/combined-limits": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"maxUsers":100,"maxMocks":10000,"aiEnabled":true,"perfEnabled":true,"fuzzEnabled":false}`))
 		},

@@ -8,13 +8,13 @@ import (
 	"net/url"
 )
 
-// ContractAPI provides methods for managing contract tests.
+// ContractAPI provides methods for contract testing.
 type ContractAPI struct {
 	client *Client
 }
 
-// Contract represents a contract test definition.
-type Contract struct {
+// ContractConfig represents a saved contract testing configuration.
+type ContractConfig struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Spec      string `json:"spec,omitempty"`
@@ -26,10 +26,18 @@ type Contract struct {
 	UpdatedAt int64  `json:"updatedAt,omitempty"`
 }
 
+// ContractValidationRequest is the payload for validation endpoints.
+type ContractValidationRequest struct {
+	Spec      string `json:"spec,omitempty"`
+	SpecURL   string `json:"specUrl,omitempty"`
+	TargetURL string `json:"targetUrl,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // ContractValidationResult holds the result of a contract validation.
 type ContractValidationResult struct {
 	ID          string              `json:"id,omitempty"`
-	ContractID  string              `json:"contractId,omitempty"`
+	ConfigID    string              `json:"configId,omitempty"`
 	Status      string              `json:"status,omitempty"` // pass, fail
 	Violations  int                 `json:"violations,omitempty"`
 	Details     []ContractViolation `json:"details,omitempty"`
@@ -45,67 +53,100 @@ type ContractViolation struct {
 	Actual   string `json:"actual,omitempty"`
 }
 
-// Create creates a new contract.
-func (a *ContractAPI) Create(ctx context.Context, contract *Contract) (*Contract, error) {
-	if contract.Namespace == "" && a.client.namespace != "" {
-		contract.Namespace = a.client.namespace
-	}
-	var result Contract
-	if err := a.client.do(ctx, "POST", "/ui/api/contract", contract, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
+// ---------------------------------------------------------------------------
+// Validation endpoints
+// ---------------------------------------------------------------------------
 
-// Get retrieves a contract by ID.
-func (a *ContractAPI) Get(ctx context.Context, id string) (*Contract, error) {
-	var contract Contract
-	if err := a.client.do(ctx, "GET", "/ui/api/contract/"+url.PathEscape(id), nil, &contract); err != nil {
-		return nil, err
+// ValidateMocks validates mocks against a spec.
+func (a *ContractAPI) ValidateMocks(ctx context.Context, req *ContractValidationRequest) (*ContractValidationResult, error) {
+	if req.Namespace == "" && a.client.namespace != "" {
+		req.Namespace = a.client.namespace
 	}
-	return &contract, nil
-}
-
-// Update updates an existing contract by ID.
-func (a *ContractAPI) Update(ctx context.Context, id string, contract *Contract) (*Contract, error) {
-	if contract.Namespace == "" && a.client.namespace != "" {
-		contract.Namespace = a.client.namespace
-	}
-	var result Contract
-	if err := a.client.do(ctx, "PUT", "/ui/api/contract/"+url.PathEscape(id), contract, &result); err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
-// Delete deletes a contract by ID.
-func (a *ContractAPI) Delete(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/contract/"+url.PathEscape(id), nil, nil)
-}
-
-// List returns all contracts.
-func (a *ContractAPI) List(ctx context.Context) ([]Contract, error) {
-	var contracts []Contract
-	if err := a.client.do(ctx, "GET", "/ui/api/contract", nil, &contracts); err != nil {
-		return nil, err
-	}
-	return contracts, nil
-}
-
-// Validate triggers validation of a contract by ID.
-func (a *ContractAPI) Validate(ctx context.Context, id string) (*ContractValidationResult, error) {
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/"+url.PathEscape(id)+"/validate", nil, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/ui/api/contract/validate-mocks", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
-// Results retrieves all validation results for a contract by ID.
-func (a *ContractAPI) Results(ctx context.Context, id string) ([]ContractValidationResult, error) {
+// VerifyProvider verifies a provider against a contract spec.
+func (a *ContractAPI) VerifyProvider(ctx context.Context, req *ContractValidationRequest) (*ContractValidationResult, error) {
+	if req.Namespace == "" && a.client.namespace != "" {
+		req.Namespace = a.client.namespace
+	}
+	var result ContractValidationResult
+	if err := a.client.do(ctx, "POST", "/ui/api/contract/verify-provider", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CheckCompatibility checks compatibility between specs.
+func (a *ContractAPI) CheckCompatibility(ctx context.Context, req any) (*ContractValidationResult, error) {
+	var result ContractValidationResult
+	if err := a.client.do(ctx, "POST", "/ui/api/contract/check-compatibility", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ValidatePayload validates a payload against a spec.
+func (a *ContractAPI) ValidatePayload(ctx context.Context, req any) (*ContractValidationResult, error) {
+	var result ContractValidationResult
+	if err := a.client.do(ctx, "POST", "/ui/api/contract/validate-payload", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Config CRUD
+// ---------------------------------------------------------------------------
+
+// ListConfigs returns all contract testing configurations.
+func (a *ContractAPI) ListConfigs(ctx context.Context) ([]ContractConfig, error) {
+	var configs []ContractConfig
+	if err := a.client.do(ctx, "GET", "/ui/api/contract/configs", nil, &configs); err != nil {
+		return nil, err
+	}
+	return configs, nil
+}
+
+// SaveConfig creates or updates a contract testing configuration.
+func (a *ContractAPI) SaveConfig(ctx context.Context, config *ContractConfig) (*ContractConfig, error) {
+	if config.Namespace == "" && a.client.namespace != "" {
+		config.Namespace = a.client.namespace
+	}
+	var result ContractConfig
+	if err := a.client.do(ctx, "POST", "/ui/api/contract/configs", config, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteConfig deletes a contract testing configuration by ID.
+func (a *ContractAPI) DeleteConfig(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/ui/api/contract/configs/"+url.PathEscape(id), nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Results
+// ---------------------------------------------------------------------------
+
+// ListResults returns all contract validation results.
+func (a *ContractAPI) ListResults(ctx context.Context) ([]ContractValidationResult, error) {
 	var results []ContractValidationResult
-	if err := a.client.do(ctx, "GET", "/ui/api/contract/"+url.PathEscape(id)+"/results", nil, &results); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/contract/results", nil, &results); err != nil {
 		return nil, err
 	}
 	return results, nil
+}
+
+// GetResult retrieves a specific validation result by ID.
+func (a *ContractAPI) GetResult(ctx context.Context, id string) (*ContractValidationResult, error) {
+	var result ContractValidationResult
+	if err := a.client.do(ctx, "GET", "/ui/api/contract/results/"+url.PathEscape(id), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
