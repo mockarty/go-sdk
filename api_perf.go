@@ -67,7 +67,7 @@ type PerfComparison struct {
 // Run starts a new performance test.
 func (a *PerfAPI) Run(ctx context.Context, config *PerfConfig) (*PerfTask, error) {
 	var task PerfTask
-	if err := a.client.do(ctx, "POST", "/ui/api/performance/run", config, &task); err != nil {
+	if err := a.client.do(ctx, "POST", "/ui/api/perf/run", config, &task); err != nil {
 		return nil, err
 	}
 	return &task, nil
@@ -75,13 +75,13 @@ func (a *PerfAPI) Run(ctx context.Context, config *PerfConfig) (*PerfTask, error
 
 // Stop stops a running performance test.
 func (a *PerfAPI) Stop(ctx context.Context, taskID string) error {
-	return a.client.do(ctx, "POST", "/ui/api/performance/stop/"+url.PathEscape(taskID), nil, nil)
+	return a.client.do(ctx, "POST", "/ui/api/perf/stop/"+url.PathEscape(taskID), nil, nil)
 }
 
 // Results returns all performance test results.
 func (a *PerfAPI) Results(ctx context.Context) ([]PerfResult, error) {
 	var results []PerfResult
-	if err := a.client.do(ctx, "GET", "/ui/api/performance/results", nil, &results); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/perf-results", nil, &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -90,7 +90,7 @@ func (a *PerfAPI) Results(ctx context.Context) ([]PerfResult, error) {
 // GetResult retrieves a single performance test result by ID.
 func (a *PerfAPI) GetResult(ctx context.Context, id string) (*PerfResult, error) {
 	var result PerfResult
-	if err := a.client.do(ctx, "GET", "/ui/api/performance/results/"+url.PathEscape(id), nil, &result); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/perf-results/"+url.PathEscape(id), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -102,7 +102,7 @@ func (a *PerfAPI) Compare(ctx context.Context, ids []string) (*PerfComparison, e
 	params.Set("ids", strings.Join(ids, ","))
 
 	var comparison PerfComparison
-	if err := a.client.do(ctx, "GET", "/ui/api/performance/compare?"+params.Encode(), nil, &comparison); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/perf-results/compare?"+params.Encode(), nil, &comparison); err != nil {
 		return nil, err
 	}
 	return &comparison, nil

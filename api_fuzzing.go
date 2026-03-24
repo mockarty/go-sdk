@@ -48,7 +48,7 @@ func (a *FuzzingAPI) Start(ctx context.Context, config *FuzzingConfig) (*Fuzzing
 		config.Namespace = a.client.namespace
 	}
 	var run FuzzingRun
-	if err := a.client.do(ctx, "POST", "/ui/api/fuzzing/start", config, &run); err != nil {
+	if err := a.client.do(ctx, "POST", "/ui/api/fuzzing/run", config, &run); err != nil {
 		return nil, err
 	}
 	return &run, nil
@@ -56,13 +56,13 @@ func (a *FuzzingAPI) Start(ctx context.Context, config *FuzzingConfig) (*Fuzzing
 
 // Stop stops a running fuzzing run by ID.
 func (a *FuzzingAPI) Stop(ctx context.Context, id string) error {
-	return a.client.do(ctx, "POST", "/ui/api/fuzzing/"+url.PathEscape(id)+"/stop", nil, nil)
+	return a.client.do(ctx, "POST", "/ui/api/fuzzing/run/"+url.PathEscape(id)+"/stop", nil, nil)
 }
 
 // GetResult retrieves the result of a fuzzing run by ID.
 func (a *FuzzingAPI) GetResult(ctx context.Context, id string) (*FuzzingResult, error) {
 	var result FuzzingResult
-	if err := a.client.do(ctx, "GET", "/ui/api/fuzzing/"+url.PathEscape(id), nil, &result); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/fuzzing/results/"+url.PathEscape(id), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -79,7 +79,7 @@ func (a *FuzzingAPI) ListResults(ctx context.Context) ([]FuzzingResult, error) {
 
 // DeleteResult deletes a fuzzing result by ID.
 func (a *FuzzingAPI) DeleteResult(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/fuzzing/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/ui/api/fuzzing/results/"+url.PathEscape(id), nil, nil)
 }
 
 // CreateConfig creates a new fuzzing configuration.
@@ -88,7 +88,7 @@ func (a *FuzzingAPI) CreateConfig(ctx context.Context, config *FuzzingConfig) (*
 		config.Namespace = a.client.namespace
 	}
 	var result FuzzingConfig
-	if err := a.client.do(ctx, "POST", "/ui/api/fuzzing/config", config, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/ui/api/fuzzing/configs", config, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -97,7 +97,7 @@ func (a *FuzzingAPI) CreateConfig(ctx context.Context, config *FuzzingConfig) (*
 // GetConfig retrieves a fuzzing configuration by ID.
 func (a *FuzzingAPI) GetConfig(ctx context.Context, id string) (*FuzzingConfig, error) {
 	var config FuzzingConfig
-	if err := a.client.do(ctx, "GET", "/ui/api/fuzzing/config/"+url.PathEscape(id), nil, &config); err != nil {
+	if err := a.client.do(ctx, "GET", "/ui/api/fuzzing/configs/"+url.PathEscape(id), nil, &config); err != nil {
 		return nil, err
 	}
 	return &config, nil
