@@ -16,20 +16,20 @@ import (
 
 // newTestServer creates a test server with a simple path-prefix router.
 // Handlers are matched by "METHOD /path-prefix" — for example
-// "POST /mock/create" matches POST requests to /mock/create exactly,
-// and "GET /mock/get/" matches GET requests to any path starting with /mock/get/.
+// "POST /api/v1/mocks" matches POST requests to /api/v1/mocks exactly,
+// and "GET /api/v1/mocks/" matches GET requests to any path starting with /api/v1/mocks/.
 func newTestServer(t *testing.T, handlers map[string]http.HandlerFunc) (*httptest.Server, *Client) {
 	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try exact match first (e.g., "POST /mock/create")
+		// Try exact match first (e.g., "POST /api/v1/mocks")
 		key := r.Method + " " + r.URL.Path
 		if h, ok := handlers[key]; ok {
 			h(w, r)
 			return
 		}
 
-		// Try prefix match (e.g., "GET /mock/get/" matches /mock/get/some-id)
+		// Try prefix match (e.g., "GET /api/v1/mocks/" matches /api/v1/mocks/some-id)
 		for pattern, h := range handlers {
 			parts := strings.SplitN(pattern, " ", 2)
 			if len(parts) != 2 {
@@ -116,7 +116,7 @@ func TestMockAPI_Create(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, client := newTestServer(t, map[string]http.HandlerFunc{
-				"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+				"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 					body, _ := io.ReadAll(r.Body)
 					var mock Mock
 					if err := json.Unmarshal(body, &mock); err != nil {
@@ -152,7 +152,7 @@ func TestMockAPI_Create(t *testing.T) {
 func TestMockAPI_Create_DefaultNamespace(t *testing.T) {
 	var gotNamespace string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			var mock Mock
 			_ = json.Unmarshal(body, &mock)
@@ -196,7 +196,7 @@ func TestMockAPI_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, client := newTestServer(t, map[string]http.HandlerFunc{
-				"GET /mock/get/": func(w http.ResponseWriter, r *http.Request) {
+				"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(tt.serverCode)
 					_, _ = w.Write([]byte(tt.serverResp))
 				},
@@ -250,7 +250,7 @@ func TestMockAPI_List(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotPath string
 			_, client := newTestServer(t, map[string]http.HandlerFunc{
-				"GET /mock/list": func(w http.ResponseWriter, r *http.Request) {
+				"GET /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 					gotPath = r.URL.String()
 					w.WriteHeader(http.StatusOK)
 					_, _ = w.Write([]byte(tt.serverResp))
@@ -302,7 +302,7 @@ func TestMockAPI_Delete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var gotMethod string
 			_, client := newTestServer(t, map[string]http.HandlerFunc{
-				"DELETE /mock/delete/": func(w http.ResponseWriter, r *http.Request) {
+				"DELETE /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 					gotMethod = r.Method
 					w.WriteHeader(tt.serverCode)
 					if tt.serverCode != http.StatusOK {
@@ -331,7 +331,7 @@ func TestMockAPI_Delete(t *testing.T) {
 func TestMockAPI_Restore(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/restore/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -349,7 +349,7 @@ func TestMockAPI_Restore(t *testing.T) {
 func TestMockAPI_Purge(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /mock/purge/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -367,7 +367,7 @@ func TestMockAPI_Purge(t *testing.T) {
 func TestMockAPI_Update(t *testing.T) {
 	var gotBody Mock
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -398,7 +398,7 @@ func TestMockAPI_Update(t *testing.T) {
 func TestMockAPI_BatchCreate(t *testing.T) {
 	var createCount int
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 			createCount++
 			body, _ := io.ReadAll(r.Body)
 			var mock Mock
@@ -428,7 +428,7 @@ func TestMockAPI_BatchCreate(t *testing.T) {
 func TestMockAPI_BatchDelete(t *testing.T) {
 	var deleteCount int
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /mock/delete/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			deleteCount++
 			w.WriteHeader(http.StatusOK)
 		},
@@ -446,7 +446,7 @@ func TestMockAPI_BatchDelete(t *testing.T) {
 func TestMockAPI_BatchRestore(t *testing.T) {
 	var restoreCount int
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/restore/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			restoreCount++
 			w.WriteHeader(http.StatusOK)
 		},
@@ -463,7 +463,7 @@ func TestMockAPI_BatchRestore(t *testing.T) {
 
 func TestMockAPI_Logs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/logs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			resp := MockLogs{
 				ID: "log-mock",
 				Requests: []RequestLog{
@@ -495,7 +495,7 @@ func TestMockAPI_Logs(t *testing.T) {
 func TestMockAPI_Logs_NoOptions(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/logs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.String()
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"test","requests":[]}`))
@@ -513,7 +513,7 @@ func TestMockAPI_Logs_NoOptions(t *testing.T) {
 
 func TestMockAPI_Versions(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/chain/get/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/mocks/chains/": func(w http.ResponseWriter, r *http.Request) {
 			mocks := []*Mock{
 				{ID: "v1", ChainID: "chain-1"},
 				{ID: "v2", ChainID: "chain-1"},
@@ -536,7 +536,7 @@ func TestMockAPI_Versions(t *testing.T) {
 func TestMockAPI_BatchCreate_PartialFailure(t *testing.T) {
 	callCount := 0
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 			callCount++
 			if callCount == 2 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -572,7 +572,7 @@ func TestMockAPI_BatchCreate_PartialFailure(t *testing.T) {
 func TestNamespaceAPI_Create(t *testing.T) {
 	var gotName string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/namespace/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/namespaces": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			var req struct {
 				Name string `json:"name"`
@@ -594,7 +594,7 @@ func TestNamespaceAPI_Create(t *testing.T) {
 
 func TestNamespaceAPI_List(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/namespace/list": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/namespaces": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`["sandbox","production","staging"]`))
 		},
@@ -615,7 +615,7 @@ func TestNamespaceAPI_List(t *testing.T) {
 // TestStoreAPI tests store operations.
 func TestStoreAPI_GlobalGet(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/store/global": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/stores/global": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"counter":42,"name":"test"}`))
 		},
@@ -633,7 +633,7 @@ func TestStoreAPI_GlobalGet(t *testing.T) {
 func TestStoreAPI_GlobalSet(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/store/global": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/stores/global": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -652,7 +652,7 @@ func TestStoreAPI_GlobalSet(t *testing.T) {
 func TestStoreAPI_GlobalDelete(t *testing.T) {
 	var gotKeys []string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /mock/store/global": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/stores/global": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			var req deleteFromStoreRequest
 			_ = json.Unmarshal(body, &req)
@@ -672,7 +672,7 @@ func TestStoreAPI_GlobalDelete(t *testing.T) {
 
 func TestStoreAPI_ChainGet(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /mock/store/chain/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"orderStatus":"pending"}`))
 		},
@@ -690,7 +690,7 @@ func TestStoreAPI_ChainGet(t *testing.T) {
 func TestStoreAPI_ChainSet(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/store/chain/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -709,7 +709,7 @@ func TestStoreAPI_ChainSet(t *testing.T) {
 func TestStoreAPI_ChainDelete(t *testing.T) {
 	var gotKeys []string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /mock/store/chain/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			var req deleteFromStoreRequest
 			_ = json.Unmarshal(body, &req)
@@ -796,7 +796,7 @@ func TestHealthAPI_Ready_NotReady(t *testing.T) {
 func TestMockAPI_Create_FullRoundtrip(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /mock/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)

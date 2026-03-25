@@ -20,7 +20,7 @@ type StoreAPI struct {
 // GlobalGet retrieves the entire global store.
 func (a *StoreAPI) GlobalGet(ctx context.Context) (map[string]any, error) {
 	var store map[string]any
-	if err := a.client.do(ctx, "GET", "/mock/store/global", nil, &store); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/global", nil, &store); err != nil {
 		return nil, err
 	}
 	return store, nil
@@ -29,13 +29,13 @@ func (a *StoreAPI) GlobalGet(ctx context.Context) (map[string]any, error) {
 // GlobalSet sets a key-value pair in the global store.
 func (a *StoreAPI) GlobalSet(ctx context.Context, key string, value any) error {
 	body := map[string]any{key: value}
-	return a.client.do(ctx, "POST", "/mock/store/global", body, nil)
+	return a.client.do(ctx, "POST", "/api/v1/stores/global", body, nil)
 }
 
 // GlobalDelete deletes one or more keys from the global store.
 func (a *StoreAPI) GlobalDelete(ctx context.Context, keys ...string) error {
 	body := deleteFromStoreRequest{Keys: keys}
-	return a.client.do(ctx, "DELETE", "/mock/store/global", body, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/global", body, nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ func (a *StoreAPI) GlobalDelete(ctx context.Context, keys ...string) error {
 // ChainGet retrieves the chain store for a specific chain ID.
 func (a *StoreAPI) ChainGet(ctx context.Context, chainID string) (map[string]any, error) {
 	var store map[string]any
-	if err := a.client.do(ctx, "GET", "/mock/store/chain/"+url.PathEscape(chainID), nil, &store); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/chain/"+url.PathEscape(chainID), nil, &store); err != nil {
 		return nil, err
 	}
 	return store, nil
@@ -54,13 +54,13 @@ func (a *StoreAPI) ChainGet(ctx context.Context, chainID string) (map[string]any
 // ChainSet sets a key-value pair in a chain store.
 func (a *StoreAPI) ChainSet(ctx context.Context, chainID, key string, value any) error {
 	body := map[string]any{key: value}
-	return a.client.do(ctx, "POST", "/mock/store/chain/"+url.PathEscape(chainID), body, nil)
+	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
 }
 
 // ChainDelete deletes one or more keys from a chain store.
 func (a *StoreAPI) ChainDelete(ctx context.Context, chainID string, keys ...string) error {
 	body := deleteFromStoreRequest{Keys: keys}
-	return a.client.do(ctx, "DELETE", "/mock/store/chain/"+url.PathEscape(chainID), body, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
 }
 
 // deleteFromStoreRequest mirrors the server's DeleteFromStoreRequest.

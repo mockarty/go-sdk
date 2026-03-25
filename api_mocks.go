@@ -38,7 +38,7 @@ func (a *MockAPI) Create(ctx context.Context, mock *Mock) (*SaveMockResponse, er
 	}
 
 	var resp SaveMockResponse
-	if err := a.client.do(ctx, "POST", "/mock/create", mock, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/mocks", mock, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -47,7 +47,7 @@ func (a *MockAPI) Create(ctx context.Context, mock *Mock) (*SaveMockResponse, er
 // Get retrieves a mock by ID.
 func (a *MockAPI) Get(ctx context.Context, id string) (*Mock, error) {
 	var mock Mock
-	if err := a.client.do(ctx, "GET", "/mock/get/"+url.PathEscape(id), nil, &mock); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id), nil, &mock); err != nil {
 		return nil, err
 	}
 	return &mock, nil
@@ -80,7 +80,7 @@ func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListRe
 		}
 	}
 
-	path := "/mock/list"
+	path := "/api/v1/mocks"
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -106,17 +106,17 @@ func (a *MockAPI) Update(ctx context.Context, id string, mock *Mock) (*Mock, err
 
 // Delete soft-deletes a mock by ID.
 func (a *MockAPI) Delete(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/mock/delete/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id), nil, nil)
 }
 
 // Restore restores a soft-deleted mock by ID.
 func (a *MockAPI) Restore(ctx context.Context, id string) error {
-	return a.client.do(ctx, "GET", "/mock/restore/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/restore", nil, nil)
 }
 
 // Purge permanently deletes a mock by ID.
 func (a *MockAPI) Purge(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/mock/purge/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id)+"/purge", nil, nil)
 }
 
 // BatchCreate creates multiple mocks in one call.
@@ -167,7 +167,7 @@ func (a *MockAPI) Logs(ctx context.Context, id string, opts *LogsOptions) (*Mock
 		}
 	}
 
-	path := "/mock/logs/" + url.PathEscape(id)
+	path := "/api/v1/mocks/" + url.PathEscape(id) + "/logs"
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -182,7 +182,7 @@ func (a *MockAPI) Logs(ctx context.Context, id string, opts *LogsOptions) (*Mock
 // Versions retrieves the chain mocks (related versions) for a given chain ID.
 func (a *MockAPI) Versions(ctx context.Context, chainID string) ([]*Mock, error) {
 	var mocks []*Mock
-	if err := a.client.do(ctx, "GET", "/mock/chain/get/"+url.PathEscape(chainID), nil, &mocks); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, &mocks); err != nil {
 		return nil, err
 	}
 	return mocks, nil

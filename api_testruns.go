@@ -30,7 +30,7 @@ type TestRun struct {
 // List returns all test runs.
 func (a *TestRunAPI) List(ctx context.Context) ([]TestRun, error) {
 	var runs []TestRun
-	if err := a.client.do(ctx, "GET", "/ui/api/api-tester/test-runs", nil, &runs); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/api-tester/test-runs", nil, &runs); err != nil {
 		return nil, err
 	}
 	return runs, nil
@@ -39,7 +39,7 @@ func (a *TestRunAPI) List(ctx context.Context) ([]TestRun, error) {
 // Get retrieves a test run by ID.
 func (a *TestRunAPI) Get(ctx context.Context, id string) (*TestRun, error) {
 	var run TestRun
-	if err := a.client.do(ctx, "GET", "/ui/api/api-tester/test-runs/"+url.PathEscape(id), nil, &run); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/api-tester/test-runs/"+url.PathEscape(id), nil, &run); err != nil {
 		return nil, err
 	}
 	return &run, nil
@@ -47,17 +47,17 @@ func (a *TestRunAPI) Get(ctx context.Context, id string) (*TestRun, error) {
 
 // Cancel cancels a running test run by ID.
 func (a *TestRunAPI) Cancel(ctx context.Context, id string) error {
-	return a.client.do(ctx, "POST", "/ui/api/api-tester/test-runs/"+url.PathEscape(id)+"/cancel", nil, nil)
+	return a.client.do(ctx, "POST", "/api/v1/api-tester/test-runs/"+url.PathEscape(id)+"/cancel", nil, nil)
 }
 
 // Delete deletes a test run by ID.
 func (a *TestRunAPI) Delete(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/api-tester/test-runs/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/api-tester/test-runs/"+url.PathEscape(id), nil, nil)
 }
 
 // Export exports a test run result as raw bytes.
 func (a *TestRunAPI) Export(ctx context.Context, id string) ([]byte, error) {
-	data, err := a.client.doJSON(ctx, "GET", "/ui/api/api-tester/test-runs/"+url.PathEscape(id)+"/export", nil)
+	data, err := a.client.doJSON(ctx, "GET", "/api/v1/api-tester/test-runs/"+url.PathEscape(id)+"/export", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -69,5 +69,5 @@ func (a *TestRunAPI) ImportReport(ctx context.Context, data []byte) error {
 	body := struct {
 		Data string `json:"data"`
 	}{Data: string(data)}
-	return a.client.do(ctx, "POST", "/ui/api/api-tester/reports/import", body, nil)
+	return a.client.do(ctx, "POST", "/api/v1/api-tester/reports/import", body, nil)
 }

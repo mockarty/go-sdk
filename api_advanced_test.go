@@ -19,7 +19,7 @@ import (
 func TestGeneratorAPI_FromOpenAPI(t *testing.T) {
 	var gotBody GeneratorRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -45,7 +45,7 @@ func TestGeneratorAPI_FromOpenAPI(t *testing.T) {
 func TestGeneratorAPI_FromOpenAPI_DefaultNamespace(t *testing.T) {
 	var gotBody GeneratorRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -63,7 +63,7 @@ func TestGeneratorAPI_FromOpenAPI_DefaultNamespace(t *testing.T) {
 
 func TestGeneratorAPI_FromWSDL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/soap/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/soap/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":2,"message":"2 SOAP mocks generated"}`))
 		},
@@ -82,7 +82,7 @@ func TestGeneratorAPI_FromWSDL(t *testing.T) {
 
 func TestGeneratorAPI_FromProto(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/grpc/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/grpc/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":5}`))
 		},
@@ -101,7 +101,7 @@ func TestGeneratorAPI_FromProto(t *testing.T) {
 
 func TestGeneratorAPI_FromGraphQL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/graphql/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/graphql/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":4}`))
 		},
@@ -120,7 +120,7 @@ func TestGeneratorAPI_FromGraphQL(t *testing.T) {
 
 func TestGeneratorAPI_FromHAR(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/har/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/har/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":10}`))
 		},
@@ -139,7 +139,7 @@ func TestGeneratorAPI_FromHAR(t *testing.T) {
 
 func TestGeneratorAPI_FromSocket(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/socket/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/socket/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":1}`))
 		},
@@ -158,7 +158,7 @@ func TestGeneratorAPI_FromSocket(t *testing.T) {
 
 func TestGeneratorAPI_PreviewOpenAPI(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/openapi/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/openapi/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"preview-1"}],"count":1}`))
 		},
@@ -180,7 +180,7 @@ func TestGeneratorAPI_PreviewOpenAPI(t *testing.T) {
 
 func TestGeneratorAPI_PreviewWSDL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/soap/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/soap/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[],"count":0}`))
 		},
@@ -199,7 +199,7 @@ func TestGeneratorAPI_PreviewWSDL(t *testing.T) {
 
 func TestGeneratorAPI_PreviewProto(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/grpc/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/grpc/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"grpc-1"},{"id":"grpc-2"}],"count":2}`))
 		},
@@ -218,7 +218,7 @@ func TestGeneratorAPI_PreviewProto(t *testing.T) {
 
 func TestGeneratorAPI_PreviewGraphQL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/graphql/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/graphql/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"gql-1"}],"count":1}`))
 		},
@@ -237,7 +237,7 @@ func TestGeneratorAPI_PreviewGraphQL(t *testing.T) {
 
 func TestGeneratorAPI_PreviewHAR(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/har/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/har/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"har-1"}],"count":1}`))
 		},
@@ -256,7 +256,7 @@ func TestGeneratorAPI_PreviewHAR(t *testing.T) {
 
 func TestGeneratorAPI_ServerError(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"error":"invalid spec"}`))
 		},
@@ -275,7 +275,7 @@ func TestGeneratorAPI_ServerError(t *testing.T) {
 func TestFuzzingAPI_Start(t *testing.T) {
 	var gotBody FuzzingConfig
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -306,7 +306,7 @@ func TestFuzzingAPI_Start(t *testing.T) {
 func TestFuzzingAPI_Start_DefaultNamespace(t *testing.T) {
 	var gotBody FuzzingConfig
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -325,7 +325,7 @@ func TestFuzzingAPI_Start_DefaultNamespace(t *testing.T) {
 func TestFuzzingAPI_Stop(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -342,7 +342,7 @@ func TestFuzzingAPI_Stop(t *testing.T) {
 
 func TestFuzzingAPI_GetResult(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"fuzz-1","status":"completed","totalRequests":1000,"findings":3}`))
 		},
@@ -362,7 +362,7 @@ func TestFuzzingAPI_GetResult(t *testing.T) {
 
 func TestFuzzingAPI_ListResults(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/fuzzing/results": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/fuzzing/results": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"r1","status":"completed"},{"id":"r2","status":"running"}]`))
 		},
@@ -380,7 +380,7 @@ func TestFuzzingAPI_ListResults(t *testing.T) {
 func TestFuzzingAPI_DeleteResult(t *testing.T) {
 	var gotMethod, gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
@@ -401,7 +401,7 @@ func TestFuzzingAPI_DeleteResult(t *testing.T) {
 
 func TestFuzzingAPI_CreateConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/fuzzing/configs": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/fuzzing/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","targetUrl":"https://api.example.com"}`))
 		},
@@ -421,7 +421,7 @@ func TestFuzzingAPI_CreateConfig(t *testing.T) {
 
 func TestFuzzingAPI_GetConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/fuzzing/configs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/fuzzing/configs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","workers":8}`))
 		},
@@ -443,7 +443,7 @@ func TestFuzzingAPI_GetConfig(t *testing.T) {
 func TestContractAPI_ValidateMocks(t *testing.T) {
 	var gotBody ContractValidationRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/contract/validate-mocks": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/contract/validate-mocks": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -471,7 +471,7 @@ func TestContractAPI_ValidateMocks(t *testing.T) {
 
 func TestContractAPI_ListConfigs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/contract/configs": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/contract/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"c1","name":"Config A"},{"id":"c2","name":"Config B"}]`))
 		},
@@ -488,7 +488,7 @@ func TestContractAPI_ListConfigs(t *testing.T) {
 
 func TestContractAPI_SaveConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/contract/configs": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/contract/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"My Contract Config"}`))
 		},
@@ -509,7 +509,7 @@ func TestContractAPI_SaveConfig(t *testing.T) {
 func TestContractAPI_DeleteConfig(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/contract/configs/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/contract/configs/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -526,7 +526,7 @@ func TestContractAPI_DeleteConfig(t *testing.T) {
 
 func TestContractAPI_ListResults(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/contract/results": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/contract/results": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"r1","status":"pass"},{"id":"r2","status":"fail","violations":1}]`))
 		},
@@ -548,7 +548,7 @@ func TestContractAPI_ListResults(t *testing.T) {
 func TestRecorderAPI_StartRecording(t *testing.T) {
 	var gotBody RecorderSession
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/start": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/recorder/start": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -573,7 +573,7 @@ func TestRecorderAPI_StartRecording(t *testing.T) {
 
 func TestRecorderAPI_GetSession(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"recording","entryCount":42}`))
 		},
@@ -590,7 +590,7 @@ func TestRecorderAPI_GetSession(t *testing.T) {
 
 func TestRecorderAPI_ListSessions(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/recorder/sessions": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/recorder/sessions": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"s1","status":"idle"},{"id":"s2","status":"recording"}]`))
 		},
@@ -608,7 +608,7 @@ func TestRecorderAPI_ListSessions(t *testing.T) {
 func TestRecorderAPI_StopRecording(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -626,7 +626,7 @@ func TestRecorderAPI_StopRecording(t *testing.T) {
 func TestRecorderAPI_DeleteSession(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -643,7 +643,7 @@ func TestRecorderAPI_DeleteSession(t *testing.T) {
 
 func TestRecorderAPI_GetEntries(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"e1","method":"GET","path":"/api/users","statusCode":200},{"id":"e2","method":"POST","path":"/api/users","statusCode":201}]`))
 		},
@@ -664,7 +664,7 @@ func TestRecorderAPI_GetEntries(t *testing.T) {
 func TestRecorderAPI_CreateMocksFromSession(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"mock-1","http":{"route":"/api/users","httpMethod":"GET"}}]`))
@@ -685,7 +685,7 @@ func TestRecorderAPI_CreateMocksFromSession(t *testing.T) {
 
 func TestRecorderAPI_ExportSession(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/recorder/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"log":{"entries":[]}}`))
 		},
@@ -706,7 +706,7 @@ func TestRecorderAPI_ExportSession(t *testing.T) {
 
 func TestTemplateAPI_List(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/templates": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/templates": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"name":"response.json","size":1024},{"name":"error.xml","size":512}]`))
 		},
@@ -726,7 +726,7 @@ func TestTemplateAPI_List(t *testing.T) {
 
 func TestTemplateAPI_Get(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/templates/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/templates/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"key":"value"}`))
 		},
@@ -744,7 +744,7 @@ func TestTemplateAPI_Get(t *testing.T) {
 func TestTemplateAPI_Upload(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/templates/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/templates/": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -763,7 +763,7 @@ func TestTemplateAPI_Upload(t *testing.T) {
 func TestTemplateAPI_Delete(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/templates/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/templates/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -784,7 +784,7 @@ func TestTemplateAPI_Delete(t *testing.T) {
 
 func TestImportAPI_Postman(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/postman": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/postman": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-1","name":"Postman Collection","imported":15}`))
 		},
@@ -804,7 +804,7 @@ func TestImportAPI_Postman(t *testing.T) {
 
 func TestImportAPI_OpenAPI(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/openapi": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/openapi": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-2","imported":8}`))
 		},
@@ -821,7 +821,7 @@ func TestImportAPI_OpenAPI(t *testing.T) {
 
 func TestImportAPI_WSDL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/wsdl": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/wsdl": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-3","imported":4}`))
 		},
@@ -838,7 +838,7 @@ func TestImportAPI_WSDL(t *testing.T) {
 
 func TestImportAPI_HAR(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/har": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/har": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-4","imported":20}`))
 		},
@@ -855,7 +855,7 @@ func TestImportAPI_HAR(t *testing.T) {
 
 func TestImportAPI_GrpcProto(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/grpc": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/grpc": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-5","imported":6}`))
 		},
@@ -872,7 +872,7 @@ func TestImportAPI_GrpcProto(t *testing.T) {
 
 func TestImportAPI_GraphQL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/graphql": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/graphql": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-6","imported":3}`))
 		},
@@ -889,7 +889,7 @@ func TestImportAPI_GraphQL(t *testing.T) {
 
 func TestImportAPI_MCP(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/mcp": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/mcp": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-7","imported":2}`))
 		},
@@ -906,7 +906,7 @@ func TestImportAPI_MCP(t *testing.T) {
 
 func TestImportAPI_Mockarty(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/mockarty": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/mockarty": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"collectionId":"col-8","imported":12}`))
 		},
@@ -923,7 +923,7 @@ func TestImportAPI_Mockarty(t *testing.T) {
 
 func TestImportAPI_ServerError(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/import/postman": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/import/postman": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"error":"invalid format"}`))
 		},
@@ -941,7 +941,7 @@ func TestImportAPI_ServerError(t *testing.T) {
 
 func TestTestRunAPI_List(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/api-tester/test-runs": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/api-tester/test-runs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"run-1","status":"completed","totalTests":10,"passedTests":8,"failedTests":2}]`))
 		},
@@ -961,7 +961,7 @@ func TestTestRunAPI_List(t *testing.T) {
 
 func TestTestRunAPI_Get(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"run-1","status":"completed","passedTests":8,"failedTests":2}`))
 		},
@@ -979,7 +979,7 @@ func TestTestRunAPI_Get(t *testing.T) {
 func TestTestRunAPI_Cancel(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -997,7 +997,7 @@ func TestTestRunAPI_Cancel(t *testing.T) {
 func TestTestRunAPI_Delete(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1014,7 +1014,7 @@ func TestTestRunAPI_Delete(t *testing.T) {
 
 func TestTestRunAPI_Export(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/api-tester/test-runs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"results":[{"id":"r1","status":"passed"}]}`))
 		},
@@ -1032,7 +1032,7 @@ func TestTestRunAPI_Export(t *testing.T) {
 func TestTestRunAPI_ImportReport(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/reports/import": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/reports/import": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1054,7 +1054,7 @@ func TestTestRunAPI_ImportReport(t *testing.T) {
 
 func TestAdminAPI_ListUsers(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/users": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/users": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"u1","username":"alice","role":"admin"},{"id":"u2","username":"bob","role":"user"}]`))
 		},
@@ -1075,7 +1075,7 @@ func TestAdminAPI_ListUsers(t *testing.T) {
 func TestAdminAPI_CreateUser(t *testing.T) {
 	var gotBody CreateUserRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/users": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/users": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1102,7 +1102,7 @@ func TestAdminAPI_CreateUser(t *testing.T) {
 
 func TestAdminAPI_UpdateUser(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /ui/api/admin/users/": func(w http.ResponseWriter, r *http.Request) {
+		"PUT /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"u1","username":"alice","role":"support"}`))
 		},
@@ -1122,7 +1122,7 @@ func TestAdminAPI_UpdateUser(t *testing.T) {
 func TestAdminAPI_DeleteUser(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/admin/users/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1140,7 +1140,7 @@ func TestAdminAPI_DeleteUser(t *testing.T) {
 func TestAdminAPI_SetUserPassword(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/users/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1159,7 +1159,7 @@ func TestAdminAPI_SetUserPassword(t *testing.T) {
 func TestAdminAPI_DisableEnableUser(t *testing.T) {
 	var gotPaths []string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/users/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
 			gotPaths = append(gotPaths, r.URL.Path)
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1188,7 +1188,7 @@ func TestAdminAPI_DisableEnableUser(t *testing.T) {
 
 func TestAdminAPI_ListNamespaces(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/namespaces": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/namespaces": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"name":"sandbox","mockCount":10,"userCount":3}]`))
 		},
@@ -1209,7 +1209,7 @@ func TestAdminAPI_ListNamespaces(t *testing.T) {
 func TestAdminAPI_DeleteNamespace(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1227,7 +1227,7 @@ func TestAdminAPI_DeleteNamespace(t *testing.T) {
 func TestAdminAPI_RestoreNamespace(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1244,17 +1244,17 @@ func TestAdminAPI_RestoreNamespace(t *testing.T) {
 
 func TestAdminAPI_NamespaceUsers(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"userId":"u1","username":"alice","role":"owner"}]`))
 		},
-		"POST /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
-		"DELETE /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
-		"PUT /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -1288,7 +1288,7 @@ func TestAdminAPI_NamespaceUsers(t *testing.T) {
 
 func TestAdminAPI_ListBackupConfigs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"cfg-1","name":"daily","schedule":"0 2 * * *","retention":30,"enabled":true}]`))
 		},
@@ -1305,7 +1305,7 @@ func TestAdminAPI_ListBackupConfigs(t *testing.T) {
 
 func TestAdminAPI_GetBackupConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/backups/configs/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/backups/configs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"daily"}`))
 		},
@@ -1322,7 +1322,7 @@ func TestAdminAPI_GetBackupConfig(t *testing.T) {
 
 func TestAdminAPI_CreateBackupConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"cfg-2","name":"weekly"}`))
 		},
@@ -1342,18 +1342,18 @@ func TestAdminAPI_CreateBackupConfig(t *testing.T) {
 
 func TestAdminAPI_Backup(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/backups/create": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/backups/create": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"bkp-1","configId":"cfg-1","status":"completed"}`))
 		},
-		"GET /ui/api/admin/backups/download": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/backups/download": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`backup-binary-data`))
 		},
-		"POST /ui/api/admin/backups/restore": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/backups/restore": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
-		"POST /ui/api/admin/backups/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/backups/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -1387,7 +1387,7 @@ func TestAdminAPI_Backup(t *testing.T) {
 
 func TestAdminAPI_LicenseStatus(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/licenses/status": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/licenses/status": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"active":true,"type":"enterprise","maxUsers":100,"maxMocks":10000}`))
 		},
@@ -1407,7 +1407,7 @@ func TestAdminAPI_LicenseStatus(t *testing.T) {
 
 func TestAdminAPI_ListLicenses(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/licenses": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/licenses": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"lic-1","type":"enterprise","status":"active"}]`))
 		},
@@ -1425,7 +1425,7 @@ func TestAdminAPI_ListLicenses(t *testing.T) {
 func TestAdminAPI_ActivateLicense(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/admin/licenses/activate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/licenses/activate": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1443,7 +1443,7 @@ func TestAdminAPI_ActivateLicense(t *testing.T) {
 
 func TestAdminAPI_LicenseUsage(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/licenses/usage": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/licenses/usage": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"users":5,"mocks":250,"namespaces":3}`))
 		},
@@ -1463,7 +1463,7 @@ func TestAdminAPI_LicenseUsage(t *testing.T) {
 
 func TestAdminAPI_CombinedLimits(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/licenses/combined-limits": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/licenses/combined-limits": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"maxUsers":100,"maxMocks":10000,"aiEnabled":true,"perfEnabled":true,"fuzzEnabled":false}`))
 		},
@@ -1483,15 +1483,15 @@ func TestAdminAPI_CombinedLimits(t *testing.T) {
 
 func TestAdminAPI_Webhooks(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"wh-1","url":"https://example.com/hook","events":["mock.create"],"enabled":true}]`))
 		},
-		"POST /ui/api/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"wh-2","url":"https://example.com/hook2","enabled":true}`))
 		},
-		"DELETE /ui/api/admin/webhooks/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/admin/webhooks/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -1523,7 +1523,7 @@ func TestAdminAPI_Webhooks(t *testing.T) {
 
 func TestAdminAPI_ExportAuditLogs(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/audit/export": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/audit/export": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"action":"mock.create","user":"alice","timestamp":"2024-01-01T00:00:00Z"}]`))
 		},
@@ -1540,7 +1540,7 @@ func TestAdminAPI_ExportAuditLogs(t *testing.T) {
 
 func TestAdminAPI_CleanupPolicy(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			if strings.Contains(r.URL.Path, "/cleanup-policy") {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write([]byte(`{"mockRetentionDays":30,"logRetentionDays":7,"autoCleanup":true}`))
@@ -1548,7 +1548,7 @@ func TestAdminAPI_CleanupPolicy(t *testing.T) {
 			}
 			w.WriteHeader(http.StatusNotFound)
 		},
-		"PUT /ui/api/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
+		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -1575,7 +1575,7 @@ func TestAdminAPI_CleanupPolicy(t *testing.T) {
 
 func TestAdminAPI_DatabaseHealth(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /ui/api/admin/database/health": func(w http.ResponseWriter, r *http.Request) {
+		"GET /api/v1/admin/database/health": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"status":"healthy","tables":42,"connections":5}`))
 		},
@@ -1600,7 +1600,7 @@ func TestAdminAPI_DatabaseHealth(t *testing.T) {
 func TestCollectionAPI_Create(t *testing.T) {
 	var gotBody Collection
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/collections": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/collections": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1625,7 +1625,7 @@ func TestCollectionAPI_Create(t *testing.T) {
 
 func TestCollectionAPI_Update(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /ui/api/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
+		"PUT /api/v1/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"col-1","name":"Updated Collection"}`))
 		},
@@ -1645,7 +1645,7 @@ func TestCollectionAPI_Update(t *testing.T) {
 func TestCollectionAPI_Delete(t *testing.T) {
 	var gotMethod string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /ui/api/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
 			gotMethod = r.Method
 			w.WriteHeader(http.StatusOK)
 		},
@@ -1663,7 +1663,7 @@ func TestCollectionAPI_Delete(t *testing.T) {
 func TestCollectionAPI_Duplicate(t *testing.T) {
 	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/collections/": func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"id":"col-dup","name":"Copy of Collection"}`))
@@ -1685,7 +1685,7 @@ func TestCollectionAPI_Duplicate(t *testing.T) {
 func TestCollectionAPI_BatchDelete(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /ui/api/api-tester/collections/batch-delete": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/collections/batch-delete": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)

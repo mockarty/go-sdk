@@ -28,7 +28,7 @@ type importPayload struct {
 // Postman imports a Postman collection.
 func (a *ImportAPI) Postman(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/postman", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/postman", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -37,7 +37,7 @@ func (a *ImportAPI) Postman(ctx context.Context, data []byte) (*ImportResult, er
 // OpenAPI imports an OpenAPI/Swagger specification into a collection.
 func (a *ImportAPI) OpenAPI(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/openapi", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/openapi", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -46,7 +46,7 @@ func (a *ImportAPI) OpenAPI(ctx context.Context, data []byte) (*ImportResult, er
 // WSDL imports a WSDL specification into a collection.
 func (a *ImportAPI) WSDL(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/wsdl", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/wsdl", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -55,7 +55,7 @@ func (a *ImportAPI) WSDL(ctx context.Context, data []byte) (*ImportResult, error
 // HAR imports an HTTP Archive (HAR) file into a collection.
 func (a *ImportAPI) HAR(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/har", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/har", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -64,7 +64,7 @@ func (a *ImportAPI) HAR(ctx context.Context, data []byte) (*ImportResult, error)
 // GrpcProto imports a Protocol Buffers (.proto) definition into a collection.
 func (a *ImportAPI) GrpcProto(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/grpc", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/grpc", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -73,7 +73,7 @@ func (a *ImportAPI) GrpcProto(ctx context.Context, data []byte) (*ImportResult, 
 // GraphQL imports a GraphQL schema into a collection.
 func (a *ImportAPI) GraphQL(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/graphql", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/graphql", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -82,7 +82,7 @@ func (a *ImportAPI) GraphQL(ctx context.Context, data []byte) (*ImportResult, er
 // MCP imports an MCP definition into a collection.
 func (a *ImportAPI) MCP(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/mcp", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/mcp", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -91,7 +91,7 @@ func (a *ImportAPI) MCP(ctx context.Context, data []byte) (*ImportResult, error)
 // Mockarty imports a Mockarty export into a collection.
 func (a *ImportAPI) Mockarty(ctx context.Context, data []byte) (*ImportResult, error) {
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/import/mockarty", &importPayload{Data: string(data)}, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/mockarty", &importPayload{Data: string(data)}, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

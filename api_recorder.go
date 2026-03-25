@@ -40,7 +40,7 @@ func (a *RecorderAPI) StartRecording(ctx context.Context, session *RecorderSessi
 		session.Namespace = a.client.namespace
 	}
 	var result RecorderSession
-	if err := a.client.do(ctx, "POST", "/ui/api/recorder/start", session, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/start", session, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -49,7 +49,7 @@ func (a *RecorderAPI) StartRecording(ctx context.Context, session *RecorderSessi
 // GetSession retrieves a recording session by ID.
 func (a *RecorderAPI) GetSession(ctx context.Context, id string) (*RecorderSession, error) {
 	var session RecorderSession
-	if err := a.client.do(ctx, "GET", "/ui/api/recorder/"+url.PathEscape(id), nil, &session); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(id), nil, &session); err != nil {
 		return nil, err
 	}
 	return &session, nil
@@ -58,7 +58,7 @@ func (a *RecorderAPI) GetSession(ctx context.Context, id string) (*RecorderSessi
 // ListSessions returns all recording sessions.
 func (a *RecorderAPI) ListSessions(ctx context.Context) ([]RecorderSession, error) {
 	var sessions []RecorderSession
-	if err := a.client.do(ctx, "GET", "/ui/api/recorder/sessions", nil, &sessions); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/sessions", nil, &sessions); err != nil {
 		return nil, err
 	}
 	return sessions, nil
@@ -66,23 +66,23 @@ func (a *RecorderAPI) ListSessions(ctx context.Context) ([]RecorderSession, erro
 
 // StopRecording stops recording on a session.
 func (a *RecorderAPI) StopRecording(ctx context.Context, id string) error {
-	return a.client.do(ctx, "POST", "/ui/api/recorder/"+url.PathEscape(id)+"/stop", nil, nil)
+	return a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/stop", nil, nil)
 }
 
 // RestartRecording restarts recording on a session.
 func (a *RecorderAPI) RestartRecording(ctx context.Context, id string) error {
-	return a.client.do(ctx, "POST", "/ui/api/recorder/"+url.PathEscape(id)+"/restart", nil, nil)
+	return a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/restart", nil, nil)
 }
 
 // DeleteSession deletes a recording session by ID.
 func (a *RecorderAPI) DeleteSession(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/recorder/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/recorder/"+url.PathEscape(id), nil, nil)
 }
 
 // GetEntries retrieves all recorded entries for a session.
 func (a *RecorderAPI) GetEntries(ctx context.Context, sessionID string) ([]RecorderEntry, error) {
 	var entries []RecorderEntry
-	if err := a.client.do(ctx, "GET", "/ui/api/recorder/"+url.PathEscape(sessionID)+"/entries", nil, &entries); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/entries", nil, &entries); err != nil {
 		return nil, err
 	}
 	return entries, nil
@@ -91,7 +91,7 @@ func (a *RecorderAPI) GetEntries(ctx context.Context, sessionID string) ([]Recor
 // CreateMocksFromSession creates mocks from all recorded entries in a session.
 func (a *RecorderAPI) CreateMocksFromSession(ctx context.Context, sessionID string, req any) ([]Mock, error) {
 	var mocks []Mock
-	if err := a.client.do(ctx, "POST", "/ui/api/recorder/"+url.PathEscape(sessionID)+"/mocks", req, &mocks); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/mocks", req, &mocks); err != nil {
 		return nil, err
 	}
 	return mocks, nil
@@ -99,7 +99,7 @@ func (a *RecorderAPI) CreateMocksFromSession(ctx context.Context, sessionID stri
 
 // ExportSession exports a recording session as raw bytes (HAR format).
 func (a *RecorderAPI) ExportSession(ctx context.Context, id string) ([]byte, error) {
-	data, err := a.client.doJSON(ctx, "POST", "/ui/api/recorder/"+url.PathEscape(id)+"/export", nil)
+	data, err := a.client.doJSON(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/export", nil)
 	if err != nil {
 		return nil, err
 	}
