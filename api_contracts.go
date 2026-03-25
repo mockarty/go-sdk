@@ -63,7 +63,7 @@ func (a *ContractAPI) ValidateMocks(ctx context.Context, req *ContractValidation
 		req.Namespace = a.client.namespace
 	}
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/validate-mocks", req, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/validate-mocks", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -75,7 +75,7 @@ func (a *ContractAPI) VerifyProvider(ctx context.Context, req *ContractValidatio
 		req.Namespace = a.client.namespace
 	}
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/verify-provider", req, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/verify-provider", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -84,7 +84,7 @@ func (a *ContractAPI) VerifyProvider(ctx context.Context, req *ContractValidatio
 // CheckCompatibility checks compatibility between specs.
 func (a *ContractAPI) CheckCompatibility(ctx context.Context, req any) (*ContractValidationResult, error) {
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/check-compatibility", req, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/check-compatibility", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -93,7 +93,7 @@ func (a *ContractAPI) CheckCompatibility(ctx context.Context, req any) (*Contrac
 // ValidatePayload validates a payload against a spec.
 func (a *ContractAPI) ValidatePayload(ctx context.Context, req any) (*ContractValidationResult, error) {
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/validate-payload", req, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/validate-payload", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -106,7 +106,7 @@ func (a *ContractAPI) ValidatePayload(ctx context.Context, req any) (*ContractVa
 // ListConfigs returns all contract testing configurations.
 func (a *ContractAPI) ListConfigs(ctx context.Context) ([]ContractConfig, error) {
 	var configs []ContractConfig
-	if err := a.client.do(ctx, "GET", "/ui/api/contract/configs", nil, &configs); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/configs", nil, &configs); err != nil {
 		return nil, err
 	}
 	return configs, nil
@@ -118,7 +118,7 @@ func (a *ContractAPI) SaveConfig(ctx context.Context, config *ContractConfig) (*
 		config.Namespace = a.client.namespace
 	}
 	var result ContractConfig
-	if err := a.client.do(ctx, "POST", "/ui/api/contract/configs", config, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/configs", config, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -126,7 +126,7 @@ func (a *ContractAPI) SaveConfig(ctx context.Context, config *ContractConfig) (*
 
 // DeleteConfig deletes a contract testing configuration by ID.
 func (a *ContractAPI) DeleteConfig(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/contract/configs/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/contract/configs/"+url.PathEscape(id), nil, nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ func (a *ContractAPI) DeleteConfig(ctx context.Context, id string) error {
 // ListResults returns all contract validation results.
 func (a *ContractAPI) ListResults(ctx context.Context) ([]ContractValidationResult, error) {
 	var results []ContractValidationResult
-	if err := a.client.do(ctx, "GET", "/ui/api/contract/results", nil, &results); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/results", nil, &results); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -145,7 +145,7 @@ func (a *ContractAPI) ListResults(ctx context.Context) ([]ContractValidationResu
 // GetResult retrieves a specific validation result by ID.
 func (a *ContractAPI) GetResult(ctx context.Context, id string) (*ContractValidationResult, error) {
 	var result ContractValidationResult
-	if err := a.client.do(ctx, "GET", "/ui/api/contract/results/"+url.PathEscape(id), nil, &result); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/results/"+url.PathEscape(id), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

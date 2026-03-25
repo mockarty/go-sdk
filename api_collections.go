@@ -72,7 +72,7 @@ func (a *CollectionAPI) List(ctx context.Context) ([]Collection, error) {
 		params.Set("namespace", a.client.namespace)
 	}
 
-	path := "/ui/api/api-tester/collections"
+	path := "/api/v1/api-tester/collections"
 	if len(params) > 0 {
 		path += "?" + params.Encode()
 	}
@@ -87,7 +87,7 @@ func (a *CollectionAPI) List(ctx context.Context) ([]Collection, error) {
 // Get retrieves a collection by ID.
 func (a *CollectionAPI) Get(ctx context.Context, id string) (*Collection, error) {
 	var col Collection
-	if err := a.client.do(ctx, "GET", "/ui/api/api-tester/collections/"+url.PathEscape(id), nil, &col); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/api-tester/collections/"+url.PathEscape(id), nil, &col); err != nil {
 		return nil, err
 	}
 	return &col, nil
@@ -96,7 +96,7 @@ func (a *CollectionAPI) Get(ctx context.Context, id string) (*Collection, error)
 // Execute runs a test collection and returns the results.
 func (a *CollectionAPI) Execute(ctx context.Context, id string) (*TestRunResult, error) {
 	var result TestRunResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections/"+url.PathEscape(id)+"/run", nil, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/"+url.PathEscape(id)+"/run", nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -109,7 +109,7 @@ func (a *CollectionAPI) ExecuteMultiple(ctx context.Context, ids []string) (*Tes
 	}{CollectionIDs: ids}
 
 	var result TestRunResult
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections/run-multiple", body, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/run-multiple", body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -117,7 +117,7 @@ func (a *CollectionAPI) ExecuteMultiple(ctx context.Context, ids []string) (*Tes
 
 // Export exports a collection as JSON bytes (Postman-compatible format).
 func (a *CollectionAPI) Export(ctx context.Context, id string) ([]byte, error) {
-	data, err := a.client.doJSON(ctx, "GET", "/ui/api/api-tester/collections/"+url.PathEscape(id)+"/export", nil)
+	data, err := a.client.doJSON(ctx, "GET", "/api/v1/api-tester/collections/"+url.PathEscape(id)+"/export", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (a *CollectionAPI) Create(ctx context.Context, col *Collection) (*Collectio
 		col.Namespace = a.client.namespace
 	}
 	var result Collection
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections", col, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections", col, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -139,7 +139,7 @@ func (a *CollectionAPI) Create(ctx context.Context, col *Collection) (*Collectio
 // Update updates an existing collection by ID.
 func (a *CollectionAPI) Update(ctx context.Context, id string, col *Collection) (*Collection, error) {
 	var result Collection
-	if err := a.client.do(ctx, "PUT", "/ui/api/api-tester/collections/"+url.PathEscape(id), col, &result); err != nil {
+	if err := a.client.do(ctx, "PUT", "/api/v1/api-tester/collections/"+url.PathEscape(id), col, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -147,13 +147,13 @@ func (a *CollectionAPI) Update(ctx context.Context, id string, col *Collection) 
 
 // Delete deletes a collection by ID.
 func (a *CollectionAPI) Delete(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/ui/api/api-tester/collections/"+url.PathEscape(id), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/api-tester/collections/"+url.PathEscape(id), nil, nil)
 }
 
 // Duplicate duplicates a collection by ID.
 func (a *CollectionAPI) Duplicate(ctx context.Context, id string) (*Collection, error) {
 	var result Collection
-	if err := a.client.do(ctx, "POST", "/ui/api/api-tester/collections/"+url.PathEscape(id)+"/duplicate", nil, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/"+url.PathEscape(id)+"/duplicate", nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -164,5 +164,5 @@ func (a *CollectionAPI) BatchDelete(ctx context.Context, ids []string) error {
 	body := struct {
 		IDs []string `json:"ids"`
 	}{IDs: ids}
-	return a.client.do(ctx, "POST", "/ui/api/api-tester/collections/batch-delete", body, nil)
+	return a.client.do(ctx, "POST", "/api/v1/api-tester/collections/batch-delete", body, nil)
 }
