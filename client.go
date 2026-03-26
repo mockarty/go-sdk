@@ -55,6 +55,7 @@ type Client struct {
 	namespaceSettingsAPI *NamespaceSettingsAPI
 	proxyAPI             *ProxyAPI
 	environmentAPI       *EnvironmentAPI
+	chaosAPI             *ChaosAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -258,6 +259,14 @@ func (c *Client) Environments() *EnvironmentAPI {
 		c.environmentAPI = &EnvironmentAPI{client: c}
 	}
 	return c.environmentAPI
+}
+
+// Chaos returns the Chaos Engineering API for managing chaos experiments.
+func (c *Client) Chaos() *ChaosAPI {
+	if c.chaosAPI == nil {
+		c.chaosAPI = &ChaosAPI{client: c}
+	}
+	return c.chaosAPI
 }
 
 // ---------------------------------------------------------------------------
