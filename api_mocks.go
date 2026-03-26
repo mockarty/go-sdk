@@ -5,7 +5,6 @@ package mockarty
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -109,14 +108,12 @@ func (a *MockAPI) Delete(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id), nil, nil)
 }
 
-// Restore restores a soft-deleted mock by ID.
+// Restore restores a soft-deleted mock by ID (uses batch/restore endpoint).
 func (a *MockAPI) Restore(ctx context.Context, id string) error {
-	return a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/restore", nil, nil)
-}
-
-// Purge permanently deletes a mock by ID.
-func (a *MockAPI) Purge(ctx context.Context, id string) error {
-	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id)+"/purge", nil, nil)
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: []string{id}}
+	return a.client.do(ctx, "POST", "/api/v1/mocks/batch/restore", body, nil)
 }
 
 // BatchCreate creates multiple mocks in one call.
@@ -126,33 +123,23 @@ func (a *MockAPI) BatchCreate(ctx context.Context, mocks []*Mock) error {
 			mocks[i].Namespace = a.client.namespace
 		}
 	}
-
-	for _, m := range mocks {
-		if _, err := a.Create(ctx, m); err != nil {
-			return fmt.Errorf("mockarty: batch create mock %q: %w", m.ID, err)
-		}
-	}
-	return nil
+	return a.client.do(ctx, "POST", "/api/v1/mocks/batch", mocks, nil)
 }
 
 // BatchDelete soft-deletes multiple mocks by their IDs.
 func (a *MockAPI) BatchDelete(ctx context.Context, ids []string) error {
-	for _, id := range ids {
-		if err := a.Delete(ctx, id); err != nil {
-			return fmt.Errorf("mockarty: batch delete mock %q: %w", id, err)
-		}
-	}
-	return nil
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: ids}
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/batch", body, nil)
 }
 
 // BatchRestore restores multiple soft-deleted mocks.
 func (a *MockAPI) BatchRestore(ctx context.Context, ids []string) error {
-	for _, id := range ids {
-		if err := a.Restore(ctx, id); err != nil {
-			return fmt.Errorf("mockarty: batch restore mock %q: %w", id, err)
-		}
-	}
-	return nil
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: ids}
+	return a.client.do(ctx, "POST", "/api/v1/mocks/batch/restore", body, nil)
 }
 
 // Logs retrieves request logs for a mock.
@@ -186,4 +173,70 @@ func (a *MockAPI) Versions(ctx context.Context, chainID string) ([]*Mock, error)
 		return nil, err
 	}
 	return mocks, nil
+}
+
+// ListVersions returns the version history for a mock.
+func (a *MockAPI) ListVersions(ctx context.Context, id string) ([]*Mock, error) {
+	var mocks []*Mock
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/versions", nil, &mocks); err != nil {
+		return nil, err
+	}
+	return mocks, nil
+}
+
+// GetVersion returns a specific version of a mock.
+func (a *MockAPI) GetVersion(ctx context.Context, id, version string) (*Mock, error) {
+	var mock Mock
+	path := "/api/v1/mocks/" + url.PathEscape(id) + "/versions/" + url.PathEscape(version)
+	if err := a.client.do(ctx, "GET", path, nil, &mock); err != nil {
+		return nil, err
+	}
+	return &mock, nil
+}
+
+// RestoreVersion restores a specific version of a mock.
+func (a *MockAPI) RestoreVersion(ctx context.Context, id, version string) error {
+	path := "/api/v1/mocks/" + url.PathEscape(id) + "/versions/" + url.PathEscape(version) + "/restore"
+	return a.client.do(ctx, "POST", path, nil, nil)
+}
+
+// Patch partially updates a mock by ID.
+func (a *MockAPI) Patch(ctx context.Context, id string, patch map[string]any) (*Mock, error) {
+	var resp SaveMockResponse
+	if err := a.client.do(ctx, "PATCH", "/api/v1/mocks/"+url.PathEscape(id), patch, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Mock, nil
+}
+
+// DeleteLogs deletes request logs for a mock.
+func (a *MockAPI) DeleteLogs(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id)+"/logs", nil, nil)
+}
+
+// CopyToNamespace copies mocks to another namespace.
+func (a *MockAPI) CopyToNamespace(ctx context.Context, ids []string, targetNamespace string) error {
+	body := struct {
+		IDs             []string `json:"ids"`
+		TargetNamespace string   `json:"targetNamespace"`
+	}{IDs: ids, TargetNamespace: targetNamespace}
+	return a.client.do(ctx, "POST", "/api/v1/mocks/copy-to-namespace", body, nil)
+}
+
+// MoveToFolder moves mocks to a folder.
+func (a *MockAPI) MoveToFolder(ctx context.Context, ids []string, folderID string) error {
+	body := struct {
+		IDs      []string `json:"ids"`
+		FolderID string   `json:"folderId"`
+	}{IDs: ids, FolderID: folderID}
+	return a.client.do(ctx, "PATCH", "/api/v1/mocks/batch/move", body, nil)
+}
+
+// BatchUpdateTags updates tags on multiple mocks.
+func (a *MockAPI) BatchUpdateTags(ctx context.Context, ids []string, tags []string) error {
+	body := struct {
+		IDs  []string `json:"ids"`
+		Tags []string `json:"tags"`
+	}{IDs: ids, Tags: tags}
+	return a.client.do(ctx, "PATCH", "/api/v1/mocks/batch/tags", body, nil)
 }

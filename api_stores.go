@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 )
 
@@ -32,10 +33,19 @@ func (a *StoreAPI) GlobalSet(ctx context.Context, key string, value any) error {
 	return a.client.do(ctx, "POST", "/api/v1/stores/global", body, nil)
 }
 
-// GlobalDelete deletes one or more keys from the global store.
-func (a *StoreAPI) GlobalDelete(ctx context.Context, keys ...string) error {
-	body := deleteFromStoreRequest{Keys: keys}
-	return a.client.do(ctx, "DELETE", "/api/v1/stores/global", body, nil)
+// GlobalDelete deletes a key from the global store.
+func (a *StoreAPI) GlobalDelete(ctx context.Context, key string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/global/"+url.PathEscape(key), nil, nil)
+}
+
+// GlobalDeleteMany deletes multiple keys from the global store.
+func (a *StoreAPI) GlobalDeleteMany(ctx context.Context, keys ...string) error {
+	for _, key := range keys {
+		if err := a.GlobalDelete(ctx, key); err != nil {
+			return fmt.Errorf("mockarty: delete global store key %q: %w", key, err)
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -57,13 +67,17 @@ func (a *StoreAPI) ChainSet(ctx context.Context, chainID, key string, value any)
 	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
 }
 
-// ChainDelete deletes one or more keys from a chain store.
-func (a *StoreAPI) ChainDelete(ctx context.Context, chainID string, keys ...string) error {
-	body := deleteFromStoreRequest{Keys: keys}
-	return a.client.do(ctx, "DELETE", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
+// ChainDelete deletes a key from a chain store.
+func (a *StoreAPI) ChainDelete(ctx context.Context, chainID string, key string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/chain/"+url.PathEscape(chainID)+"/"+url.PathEscape(key), nil, nil)
 }
 
-// deleteFromStoreRequest mirrors the server's DeleteFromStoreRequest.
-type deleteFromStoreRequest struct {
-	Keys []string `json:"keys"`
+// ChainDeleteMany deletes multiple keys from a chain store.
+func (a *StoreAPI) ChainDeleteMany(ctx context.Context, chainID string, keys ...string) error {
+	for _, key := range keys {
+		if err := a.ChainDelete(ctx, chainID, key); err != nil {
+			return fmt.Errorf("mockarty: delete chain store key %q: %w", key, err)
+		}
+	}
+	return nil
 }

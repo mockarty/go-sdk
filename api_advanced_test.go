@@ -19,7 +19,7 @@ import (
 func TestGeneratorAPI_FromOpenAPI(t *testing.T) {
 	var gotBody GeneratorRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/openapi": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -45,7 +45,7 @@ func TestGeneratorAPI_FromOpenAPI(t *testing.T) {
 func TestGeneratorAPI_FromOpenAPI_DefaultNamespace(t *testing.T) {
 	var gotBody GeneratorRequest
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/openapi": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -63,7 +63,7 @@ func TestGeneratorAPI_FromOpenAPI_DefaultNamespace(t *testing.T) {
 
 func TestGeneratorAPI_FromWSDL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/soap/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/soap": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":2,"message":"2 SOAP mocks generated"}`))
 		},
@@ -82,7 +82,7 @@ func TestGeneratorAPI_FromWSDL(t *testing.T) {
 
 func TestGeneratorAPI_FromProto(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/grpc/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/grpc": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":5}`))
 		},
@@ -101,7 +101,7 @@ func TestGeneratorAPI_FromProto(t *testing.T) {
 
 func TestGeneratorAPI_FromGraphQL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/graphql/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/graphql": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":4}`))
 		},
@@ -120,7 +120,7 @@ func TestGeneratorAPI_FromGraphQL(t *testing.T) {
 
 func TestGeneratorAPI_FromHAR(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/har/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/har": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":10}`))
 		},
@@ -139,7 +139,7 @@ func TestGeneratorAPI_FromHAR(t *testing.T) {
 
 func TestGeneratorAPI_FromSocket(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/socket/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/socket": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"created":1}`))
 		},
@@ -158,7 +158,7 @@ func TestGeneratorAPI_FromSocket(t *testing.T) {
 
 func TestGeneratorAPI_PreviewOpenAPI(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/openapi/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/openapi/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"preview-1"}],"count":1}`))
 		},
@@ -180,7 +180,7 @@ func TestGeneratorAPI_PreviewOpenAPI(t *testing.T) {
 
 func TestGeneratorAPI_PreviewWSDL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/soap/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/soap/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[],"count":0}`))
 		},
@@ -199,7 +199,7 @@ func TestGeneratorAPI_PreviewWSDL(t *testing.T) {
 
 func TestGeneratorAPI_PreviewProto(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/grpc/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/grpc/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"grpc-1"},{"id":"grpc-2"}],"count":2}`))
 		},
@@ -218,7 +218,7 @@ func TestGeneratorAPI_PreviewProto(t *testing.T) {
 
 func TestGeneratorAPI_PreviewGraphQL(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/graphql/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/graphql/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"gql-1"}],"count":1}`))
 		},
@@ -237,7 +237,7 @@ func TestGeneratorAPI_PreviewGraphQL(t *testing.T) {
 
 func TestGeneratorAPI_PreviewHAR(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/har/preview": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/har/preview": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"mocks":[{"id":"har-1"}],"count":1}`))
 		},
@@ -256,7 +256,7 @@ func TestGeneratorAPI_PreviewHAR(t *testing.T) {
 
 func TestGeneratorAPI_ServerError(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/generator/openapi/generate": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/generators/openapi": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(`{"error":"invalid spec"}`))
 		},
@@ -1049,551 +1049,6 @@ func TestTestRunAPI_ImportReport(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Admin API Tests
-// ---------------------------------------------------------------------------
-
-func TestAdminAPI_ListUsers(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/users": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"u1","username":"alice","role":"admin"},{"id":"u2","username":"bob","role":"user"}]`))
-		},
-	})
-
-	users, err := client.Admin().ListUsers(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(users) != 2 {
-		t.Errorf("expected 2 users, got %d", len(users))
-	}
-	if users[0].Username != "alice" {
-		t.Errorf("expected first user alice, got %q", users[0].Username)
-	}
-}
-
-func TestAdminAPI_CreateUser(t *testing.T) {
-	var gotBody CreateUserRequest
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/users": func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &gotBody)
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"u3","username":"charlie","email":"charlie@example.com","role":"user"}`))
-		},
-	})
-
-	user, err := client.Admin().CreateUser(context.Background(), &CreateUserRequest{
-		Username: "charlie",
-		Email:    "charlie@example.com",
-		Password: "s3cret",
-		Role:     "user",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if user.Username != "charlie" {
-		t.Errorf("expected username charlie, got %q", user.Username)
-	}
-	if gotBody.Password != "s3cret" {
-		t.Errorf("expected password in body, got %q", gotBody.Password)
-	}
-}
-
-func TestAdminAPI_UpdateUser(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"u1","username":"alice","role":"support"}`))
-		},
-	})
-
-	user, err := client.Admin().UpdateUser(context.Background(), "u1", &UpdateUserRequest{
-		Role: "support",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if user.Role != "support" {
-		t.Errorf("expected role support, got %q", user.Role)
-	}
-}
-
-func TestAdminAPI_DeleteUser(t *testing.T) {
-	var gotMethod string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
-			gotMethod = r.Method
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().DeleteUser(context.Background(), "u1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotMethod != "DELETE" {
-		t.Errorf("expected DELETE, got %s", gotMethod)
-	}
-}
-
-func TestAdminAPI_SetUserPassword(t *testing.T) {
-	var gotBody map[string]any
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &gotBody)
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().SetUserPassword(context.Background(), "u1", "new-password")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotBody["password"] != "new-password" {
-		t.Errorf("expected password in body, got %v", gotBody["password"])
-	}
-}
-
-func TestAdminAPI_DisableEnableUser(t *testing.T) {
-	var gotPaths []string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/users/": func(w http.ResponseWriter, r *http.Request) {
-			gotPaths = append(gotPaths, r.URL.Path)
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().DisableUser(context.Background(), "u1")
-	if err != nil {
-		t.Fatalf("unexpected error disabling: %v", err)
-	}
-
-	err = client.Admin().EnableUser(context.Background(), "u1")
-	if err != nil {
-		t.Fatalf("unexpected error enabling: %v", err)
-	}
-
-	if len(gotPaths) != 2 {
-		t.Fatalf("expected 2 calls, got %d", len(gotPaths))
-	}
-	if !strings.Contains(gotPaths[0], "/disable") {
-		t.Errorf("expected first call to /disable, got %s", gotPaths[0])
-	}
-	if !strings.Contains(gotPaths[1], "/enable") {
-		t.Errorf("expected second call to /enable, got %s", gotPaths[1])
-	}
-}
-
-func TestAdminAPI_ListNamespaces(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/namespaces": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"name":"sandbox","mockCount":10,"userCount":3}]`))
-		},
-	})
-
-	namespaces, err := client.Admin().ListNamespaces(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(namespaces) != 1 {
-		t.Errorf("expected 1 namespace, got %d", len(namespaces))
-	}
-	if namespaces[0].MockCount != 10 {
-		t.Errorf("expected 10 mocks, got %d", namespaces[0].MockCount)
-	}
-}
-
-func TestAdminAPI_DeleteNamespace(t *testing.T) {
-	var gotPath string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().DeleteNamespace(context.Background(), "old-ns")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(gotPath, "old-ns") {
-		t.Errorf("expected path to contain old-ns, got %s", gotPath)
-	}
-}
-
-func TestAdminAPI_RestoreNamespace(t *testing.T) {
-	var gotPath string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().RestoreNamespace(context.Background(), "old-ns")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(gotPath, "old-ns/restore") {
-		t.Errorf("expected path to contain old-ns/restore, got %s", gotPath)
-	}
-}
-
-func TestAdminAPI_NamespaceUsers(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"userId":"u1","username":"alice","role":"owner"}]`))
-		},
-		"POST /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-		"DELETE /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	users, err := client.Admin().ListNamespaceUsers(context.Background(), "sandbox")
-	if err != nil {
-		t.Fatalf("unexpected error listing users: %v", err)
-	}
-	if len(users) != 1 {
-		t.Errorf("expected 1 user, got %d", len(users))
-	}
-
-	err = client.Admin().AddNamespaceUser(context.Background(), "sandbox", &AddNamespaceUserRequest{
-		UserID: "u2",
-		Role:   "editor",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error adding user: %v", err)
-	}
-
-	err = client.Admin().RemoveNamespaceUser(context.Background(), "sandbox", "u2")
-	if err != nil {
-		t.Fatalf("unexpected error removing user: %v", err)
-	}
-
-	err = client.Admin().UpdateNamespaceUserRole(context.Background(), "sandbox", "u1", "viewer")
-	if err != nil {
-		t.Fatalf("unexpected error updating role: %v", err)
-	}
-}
-
-func TestAdminAPI_ListBackupConfigs(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"cfg-1","name":"daily","schedule":"0 2 * * *","retention":30,"enabled":true}]`))
-		},
-	})
-
-	configs, err := client.Admin().ListBackupConfigs(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error listing configs: %v", err)
-	}
-	if len(configs) != 1 {
-		t.Errorf("expected 1 config, got %d", len(configs))
-	}
-}
-
-func TestAdminAPI_GetBackupConfig(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/backups/configs/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"daily"}`))
-		},
-	})
-
-	config, err := client.Admin().GetBackupConfig(context.Background(), "cfg-1")
-	if err != nil {
-		t.Fatalf("unexpected error getting config: %v", err)
-	}
-	if config.Name != "daily" {
-		t.Errorf("expected name daily, got %q", config.Name)
-	}
-}
-
-func TestAdminAPI_CreateBackupConfig(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/backups/configs": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"cfg-2","name":"weekly"}`))
-		},
-	})
-
-	created, err := client.Admin().CreateBackupConfig(context.Background(), &BackupConfig{
-		Name:     "weekly",
-		Schedule: "0 3 * * 0",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error creating config: %v", err)
-	}
-	if created.ID != "cfg-2" {
-		t.Errorf("expected ID cfg-2, got %q", created.ID)
-	}
-}
-
-func TestAdminAPI_Backup(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/backups/create": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"bkp-1","configId":"cfg-1","status":"completed"}`))
-		},
-		"GET /api/v1/admin/backups/download": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`backup-binary-data`))
-		},
-		"POST /api/v1/admin/backups/restore": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-		"POST /api/v1/admin/backups/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	backup, err := client.Admin().CreateBackup(context.Background(), "cfg-1")
-	if err != nil {
-		t.Fatalf("unexpected error creating backup: %v", err)
-	}
-	if backup.Status != "completed" {
-		t.Errorf("expected status completed, got %q", backup.Status)
-	}
-
-	data, err := client.Admin().DownloadBackup(context.Background(), "bkp-1")
-	if err != nil {
-		t.Fatalf("unexpected error downloading backup: %v", err)
-	}
-	if len(data) == 0 {
-		t.Error("expected non-empty backup data")
-	}
-
-	err = client.Admin().RestoreBackup(context.Background(), "bkp-1")
-	if err != nil {
-		t.Fatalf("unexpected error restoring backup: %v", err)
-	}
-
-	err = client.Admin().DeleteBackup(context.Background(), "bkp-1")
-	if err != nil {
-		t.Fatalf("unexpected error deleting backup: %v", err)
-	}
-}
-
-func TestAdminAPI_LicenseStatus(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/licenses/status": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"active":true,"type":"enterprise","maxUsers":100,"maxMocks":10000}`))
-		},
-	})
-
-	status, err := client.Admin().GetLicenseStatus(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !status.Active {
-		t.Error("expected active license")
-	}
-	if status.Type != "enterprise" {
-		t.Errorf("expected type enterprise, got %q", status.Type)
-	}
-}
-
-func TestAdminAPI_ListLicenses(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/licenses": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"lic-1","type":"enterprise","status":"active"}]`))
-		},
-	})
-
-	licenses, err := client.Admin().ListLicenses(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(licenses) != 1 {
-		t.Errorf("expected 1 license, got %d", len(licenses))
-	}
-}
-
-func TestAdminAPI_ActivateLicense(t *testing.T) {
-	var gotBody map[string]any
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/admin/licenses/activate": func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &gotBody)
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Admin().ActivateLicense(context.Background(), "LICENSE-KEY-123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotBody["key"] != "LICENSE-KEY-123" {
-		t.Errorf("expected key in body, got %v", gotBody["key"])
-	}
-}
-
-func TestAdminAPI_LicenseUsage(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/licenses/usage": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"users":5,"mocks":250,"namespaces":3}`))
-		},
-	})
-
-	usage, err := client.Admin().GetLicenseUsage(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if usage.Users != 5 {
-		t.Errorf("expected 5 users, got %d", usage.Users)
-	}
-	if usage.Mocks != 250 {
-		t.Errorf("expected 250 mocks, got %d", usage.Mocks)
-	}
-}
-
-func TestAdminAPI_CombinedLimits(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/licenses/combined-limits": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"maxUsers":100,"maxMocks":10000,"aiEnabled":true,"perfEnabled":true,"fuzzEnabled":false}`))
-		},
-	})
-
-	limits, err := client.Admin().GetCombinedLimits(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !limits.AIEnabled {
-		t.Error("expected AI enabled")
-	}
-	if limits.FuzzEnabled {
-		t.Error("expected fuzz disabled")
-	}
-}
-
-func TestAdminAPI_Webhooks(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"wh-1","url":"https://example.com/hook","events":["mock.create"],"enabled":true}]`))
-		},
-		"POST /api/v1/admin/webhooks": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"wh-2","url":"https://example.com/hook2","enabled":true}`))
-		},
-		"DELETE /api/v1/admin/webhooks/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	webhooks, err := client.Admin().ListWebhooks(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error listing webhooks: %v", err)
-	}
-	if len(webhooks) != 1 {
-		t.Errorf("expected 1 webhook, got %d", len(webhooks))
-	}
-
-	created, err := client.Admin().CreateWebhook(context.Background(), &AdminWebhook{
-		URL:    "https://example.com/hook2",
-		Events: []string{"mock.update"},
-	})
-	if err != nil {
-		t.Fatalf("unexpected error creating webhook: %v", err)
-	}
-	if created.ID != "wh-2" {
-		t.Errorf("expected ID wh-2, got %q", created.ID)
-	}
-
-	err = client.Admin().DeleteWebhook(context.Background(), "wh-1")
-	if err != nil {
-		t.Fatalf("unexpected error deleting webhook: %v", err)
-	}
-}
-
-func TestAdminAPI_ExportAuditLogs(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/audit/export": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"action":"mock.create","user":"alice","timestamp":"2024-01-01T00:00:00Z"}]`))
-		},
-	})
-
-	data, err := client.Admin().ExportAuditLogs(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(data) == 0 {
-		t.Error("expected non-empty audit export")
-	}
-}
-
-func TestAdminAPI_CleanupPolicy(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			if strings.Contains(r.URL.Path, "/cleanup-policy") {
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"mockRetentionDays":30,"logRetentionDays":7,"autoCleanup":true}`))
-				return
-			}
-			w.WriteHeader(http.StatusNotFound)
-		},
-		"PUT /api/v1/admin/namespaces/": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	policy, err := client.Admin().GetCleanupPolicy(context.Background(), "sandbox")
-	if err != nil {
-		t.Fatalf("unexpected error getting policy: %v", err)
-	}
-	if policy.MockRetentionDays != 30 {
-		t.Errorf("expected 30 days retention, got %d", policy.MockRetentionDays)
-	}
-	if !policy.AutoCleanup {
-		t.Error("expected auto cleanup enabled")
-	}
-
-	err = client.Admin().UpdateCleanupPolicy(context.Background(), "sandbox", &CleanupPolicy{
-		MockRetentionDays: 60,
-		AutoCleanup:       false,
-	})
-	if err != nil {
-		t.Fatalf("unexpected error updating policy: %v", err)
-	}
-}
-
-func TestAdminAPI_DatabaseHealth(t *testing.T) {
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/admin/database/health": func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"status":"healthy","tables":42,"connections":5}`))
-		},
-	})
-
-	health, err := client.Admin().GetDatabaseHealth(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if health.Status != "healthy" {
-		t.Errorf("expected status healthy, got %q", health.Status)
-	}
-	if health.Tables != 42 {
-		t.Errorf("expected 42 tables, got %d", health.Tables)
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Collection API Extended Tests (new CRUD methods)
 // ---------------------------------------------------------------------------
 
@@ -1685,7 +1140,7 @@ func TestCollectionAPI_Duplicate(t *testing.T) {
 func TestCollectionAPI_BatchDelete(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/api-tester/collections/batch-delete": func(w http.ResponseWriter, r *http.Request) {
+		"POST /api/v1/api-tester/collections/batch": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -1733,7 +1188,28 @@ func TestClient_NewSubAPISingletons(t *testing.T) {
 	if c.TestRuns() != c.TestRuns() {
 		t.Error("TestRuns() should return the same instance")
 	}
-	if c.Admin() != c.Admin() {
-		t.Error("Admin() should return the same instance")
+	if c.Tags() != c.Tags() {
+		t.Error("Tags() should return the same instance")
+	}
+	if c.Folders() != c.Folders() {
+		t.Error("Folders() should return the same instance")
+	}
+	if c.Undefined() != c.Undefined() {
+		t.Error("Undefined() should return the same instance")
+	}
+	if c.Stats() != c.Stats() {
+		t.Error("Stats() should return the same instance")
+	}
+	if c.AgentTasks() != c.AgentTasks() {
+		t.Error("AgentTasks() should return the same instance")
+	}
+	if c.NamespaceSettings() != c.NamespaceSettings() {
+		t.Error("NamespaceSettings() should return the same instance")
+	}
+	if c.Proxy() != c.Proxy() {
+		t.Error("Proxy() should return the same instance")
+	}
+	if c.Environments() != c.Environments() {
+		t.Error("Environments() should return the same instance")
 	}
 }

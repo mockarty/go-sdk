@@ -329,10 +329,13 @@ func TestMockAPI_Delete(t *testing.T) {
 }
 
 func TestMockAPI_Restore(t *testing.T) {
-	var gotPath string
+	var gotBody struct {
+		IDs []string `json:"ids"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
+		"POST /api/v1/mocks/batch/restore": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -341,26 +344,8 @@ func TestMockAPI_Restore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(gotPath, "restored-mock") {
-		t.Errorf("expected path to contain mock ID, got %s", gotPath)
-	}
-}
-
-func TestMockAPI_Purge(t *testing.T) {
-	var gotPath string
-	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
-			gotPath = r.URL.Path
-			w.WriteHeader(http.StatusOK)
-		},
-	})
-
-	err := client.Mocks().Purge(context.Background(), "purge-mock")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(gotPath, "purge-mock") {
-		t.Errorf("expected path to contain mock ID, got %s", gotPath)
+	if len(gotBody.IDs) != 1 || gotBody.IDs[0] != "restored-mock" {
+		t.Errorf("expected IDs [restored-mock], got %v", gotBody.IDs)
 	}
 }
 
@@ -396,17 +381,12 @@ func TestMockAPI_Update(t *testing.T) {
 }
 
 func TestMockAPI_BatchCreate(t *testing.T) {
-	var createCount int
+	var gotMocks []*Mock
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
-			createCount++
+		"POST /api/v1/mocks/batch": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
-			var mock Mock
-			_ = json.Unmarshal(body, &mock)
+			_ = json.Unmarshal(body, &gotMocks)
 			w.WriteHeader(http.StatusOK)
-			resp := SaveMockResponse{Mock: mock}
-			data, _ := json.Marshal(resp)
-			_, _ = w.Write(data)
 		},
 	})
 
@@ -420,16 +400,19 @@ func TestMockAPI_BatchCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if createCount != 3 {
-		t.Errorf("expected 3 create calls, got %d", createCount)
+	if len(gotMocks) != 3 {
+		t.Errorf("expected 3 mocks in batch, got %d", len(gotMocks))
 	}
 }
 
 func TestMockAPI_BatchDelete(t *testing.T) {
-	var deleteCount int
+	var gotBody struct {
+		IDs []string `json:"ids"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
-			deleteCount++
+		"DELETE /api/v1/mocks/batch": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -438,16 +421,19 @@ func TestMockAPI_BatchDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if deleteCount != 2 {
-		t.Errorf("expected 2 delete calls, got %d", deleteCount)
+	if len(gotBody.IDs) != 2 {
+		t.Errorf("expected 2 IDs, got %d", len(gotBody.IDs))
 	}
 }
 
 func TestMockAPI_BatchRestore(t *testing.T) {
-	var restoreCount int
+	var gotBody struct {
+		IDs []string `json:"ids"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"GET /api/v1/mocks/": func(w http.ResponseWriter, r *http.Request) {
-			restoreCount++
+		"POST /api/v1/mocks/batch/restore": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -456,8 +442,8 @@ func TestMockAPI_BatchRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if restoreCount != 3 {
-		t.Errorf("expected 3 restore calls, got %d", restoreCount)
+	if len(gotBody.IDs) != 3 {
+		t.Errorf("expected 3 IDs, got %d", len(gotBody.IDs))
 	}
 }
 
@@ -533,38 +519,25 @@ func TestMockAPI_Versions(t *testing.T) {
 	}
 }
 
-func TestMockAPI_BatchCreate_PartialFailure(t *testing.T) {
-	callCount := 0
+func TestMockAPI_BatchCreate_Failure(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/mocks": func(w http.ResponseWriter, r *http.Request) {
-			callCount++
-			if callCount == 2 {
-				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte(`{"error":"invalid mock"}`))
-				return
-			}
-			body, _ := io.ReadAll(r.Body)
-			var mock Mock
-			_ = json.Unmarshal(body, &mock)
-			w.WriteHeader(http.StatusOK)
-			resp := SaveMockResponse{Mock: mock}
-			data, _ := json.Marshal(resp)
-			_, _ = w.Write(data)
+		"POST /api/v1/mocks/batch": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid mock in batch"}`))
 		},
 	})
 
 	mocks := []*Mock{
 		{ID: "ok-1"},
 		{ID: "fail"},
-		{ID: "ok-2"},
 	}
 
 	err := client.Mocks().BatchCreate(context.Background(), mocks)
 	if err == nil {
-		t.Fatal("expected error on partial failure")
+		t.Fatal("expected error on batch failure")
 	}
-	if !strings.Contains(err.Error(), "fail") {
-		t.Errorf("error should reference the failed mock ID, got: %v", err)
+	if !strings.Contains(err.Error(), "invalid") {
+		t.Errorf("error should contain server message, got: %v", err)
 	}
 }
 
@@ -650,23 +623,20 @@ func TestStoreAPI_GlobalSet(t *testing.T) {
 }
 
 func TestStoreAPI_GlobalDelete(t *testing.T) {
-	var gotKeys []string
+	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"DELETE /api/v1/stores/global": func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			var req deleteFromStoreRequest
-			_ = json.Unmarshal(body, &req)
-			gotKeys = req.Keys
+		"DELETE /api/v1/stores/global/": func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
 	})
 
-	err := client.Stores().GlobalDelete(context.Background(), "key1", "key2")
+	err := client.Stores().GlobalDelete(context.Background(), "mykey")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotKeys) != 2 || gotKeys[0] != "key1" || gotKeys[1] != "key2" {
-		t.Errorf("expected keys [key1, key2], got %v", gotKeys)
+	if !strings.Contains(gotPath, "mykey") {
+		t.Errorf("expected path to contain key, got %s", gotPath)
 	}
 }
 
@@ -707,13 +677,10 @@ func TestStoreAPI_ChainSet(t *testing.T) {
 }
 
 func TestStoreAPI_ChainDelete(t *testing.T) {
-	var gotKeys []string
+	var gotPath string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"DELETE /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
-			var req deleteFromStoreRequest
-			_ = json.Unmarshal(body, &req)
-			gotKeys = req.Keys
+			gotPath = r.URL.Path
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -722,8 +689,8 @@ func TestStoreAPI_ChainDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotKeys) != 1 || gotKeys[0] != "key1" {
-		t.Errorf("expected keys [key1], got %v", gotKeys)
+	if !strings.Contains(gotPath, "chain-1/key1") {
+		t.Errorf("expected path to contain chain-1/key1, got %s", gotPath)
 	}
 }
 

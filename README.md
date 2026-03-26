@@ -1,6 +1,17 @@
-# mockarty-go
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mockarty/go-sdk/main/logo.svg" alt="Mockarty" width="400">
+</p>
 
-Official Go SDK for [Mockarty](https://mockarty.com) — a powerful mocking platform for HTTP, gRPC, MCP, GraphQL, SOAP, SSE, WebSocket, Kafka, RabbitMQ, and SMTP services.
+<h1 align="center">Go SDK</h1>
+
+<p align="center">
+  Official Go client library for <a href="https://mockarty.ru">Mockarty</a> — a multi-protocol mock server for HTTP, gRPC, MCP, GraphQL, SOAP, SSE, WebSocket, Kafka, RabbitMQ, and SMTP.
+</p>
+
+<p align="center">
+  <a href="https://pkg.go.dev/github.com/mockarty/mockarty-go"><img src="https://pkg.go.dev/badge/github.com/mockarty/mockarty-go.svg" alt="Go Reference"></a>
+  <a href="https://github.com/mockarty/go-sdk/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mockarty/go-sdk" alt="License"></a>
+</p>
 
 ## Installation
 
