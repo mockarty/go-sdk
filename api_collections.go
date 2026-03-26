@@ -96,7 +96,7 @@ func (a *CollectionAPI) Get(ctx context.Context, id string) (*Collection, error)
 // Execute runs a test collection and returns the results.
 func (a *CollectionAPI) Execute(ctx context.Context, id string) (*TestRunResult, error) {
 	var result TestRunResult
-	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/"+url.PathEscape(id)+"/run", nil, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/"+url.PathEscape(id)+"/execute", nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -109,7 +109,7 @@ func (a *CollectionAPI) ExecuteMultiple(ctx context.Context, ids []string) (*Tes
 	}{CollectionIDs: ids}
 
 	var result TestRunResult
-	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/run-multiple", body, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/collections/execute-multiple", body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -164,5 +164,5 @@ func (a *CollectionAPI) BatchDelete(ctx context.Context, ids []string) error {
 	body := struct {
 		IDs []string `json:"ids"`
 	}{IDs: ids}
-	return a.client.do(ctx, "POST", "/api/v1/api-tester/collections/batch-delete", body, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/api-tester/collections/batch", body, nil)
 }

@@ -105,3 +105,123 @@ func (a *RecorderAPI) ExportSession(ctx context.Context, id string) ([]byte, err
 	}
 	return data, nil
 }
+
+// ---------------------------------------------------------------------------
+// Recorder Config type
+// ---------------------------------------------------------------------------
+
+// RecorderConfig represents a saved recorder configuration.
+type RecorderConfig struct {
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	TargetURL string `json:"targetUrl,omitempty"`
+	Port      int    `json:"port,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// Configs
+// ---------------------------------------------------------------------------
+
+// ListConfigs returns all recorder configurations.
+func (a *RecorderAPI) ListConfigs(ctx context.Context) ([]RecorderConfig, error) {
+	var configs []RecorderConfig
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/configs", nil, &configs); err != nil {
+		return nil, err
+	}
+	return configs, nil
+}
+
+// SaveConfig creates or updates a recorder configuration.
+func (a *RecorderAPI) SaveConfig(ctx context.Context, config *RecorderConfig) (*RecorderConfig, error) {
+	var result RecorderConfig
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/configs", config, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteConfig deletes a recorder configuration by ID.
+func (a *RecorderAPI) DeleteConfig(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/recorder/configs/"+url.PathEscape(id), nil, nil)
+}
+
+// ExportConfig exports a recorder configuration as raw bytes.
+func (a *RecorderAPI) ExportConfig(ctx context.Context, id string) ([]byte, error) {
+	data, err := a.client.doJSON(ctx, "GET", "/api/v1/recorder/configs/"+url.PathEscape(id)+"/export", nil)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// ---------------------------------------------------------------------------
+// CA (Certificate Authority)
+// ---------------------------------------------------------------------------
+
+// GetCAStatus returns the CA certificate status.
+func (a *RecorderAPI) GetCAStatus(ctx context.Context) (map[string]any, error) {
+	var status map[string]any
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/ca/status", nil, &status); err != nil {
+		return nil, err
+	}
+	return status, nil
+}
+
+// GenerateCA generates a new CA certificate.
+func (a *RecorderAPI) GenerateCA(ctx context.Context) error {
+	return a.client.do(ctx, "POST", "/api/v1/recorder/ca/generate", nil, nil)
+}
+
+// DownloadCA downloads the CA certificate as raw bytes.
+func (a *RecorderAPI) DownloadCA(ctx context.Context) ([]byte, error) {
+	data, err := a.client.doJSON(ctx, "GET", "/api/v1/recorder/ca/download", nil)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// ---------------------------------------------------------------------------
+// Entry Operations
+// ---------------------------------------------------------------------------
+
+// AnnotateEntry adds or updates an annotation on a recorded entry.
+func (a *RecorderAPI) AnnotateEntry(ctx context.Context, sessionID string, entryID string, annotation any) error {
+	return a.client.do(ctx, "PATCH", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/entries/"+url.PathEscape(entryID), annotation, nil)
+}
+
+// ReplayEntry replays a recorded entry.
+func (a *RecorderAPI) ReplayEntry(ctx context.Context, sessionID string, entryID string) error {
+	return a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/entries/"+url.PathEscape(entryID)+"/replay", nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Modifications
+// ---------------------------------------------------------------------------
+
+// GetModifications returns the request/response modifications for a session.
+func (a *RecorderAPI) GetModifications(ctx context.Context, sessionID string) (map[string]any, error) {
+	var mods map[string]any
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/modifications", nil, &mods); err != nil {
+		return nil, err
+	}
+	return mods, nil
+}
+
+// UpdateModifications updates the request/response modifications for a session.
+func (a *RecorderAPI) UpdateModifications(ctx context.Context, sessionID string, mods any) error {
+	return a.client.do(ctx, "PUT", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/modifications", mods, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Ports
+// ---------------------------------------------------------------------------
+
+// GetPorts returns available recorder proxy ports.
+func (a *RecorderAPI) GetPorts(ctx context.Context) (map[string]any, error) {
+	var ports map[string]any
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/ports", nil, &ports); err != nil {
+		return nil, err
+	}
+	return ports, nil
+}

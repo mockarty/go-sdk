@@ -150,3 +150,118 @@ func (a *ContractAPI) GetResult(ctx context.Context, id string) (*ContractValida
 	}
 	return &result, nil
 }
+
+// ---------------------------------------------------------------------------
+// Pact types
+// ---------------------------------------------------------------------------
+
+// Pact represents a consumer-driven contract (pact).
+type Pact struct {
+	ID        string `json:"id,omitempty"`
+	Consumer  string `json:"consumer"`
+	Provider  string `json:"provider"`
+	Version   string `json:"version,omitempty"`
+	Spec      string `json:"spec,omitempty"`
+	SpecURL   string `json:"specUrl,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	CreatedAt int64  `json:"createdAt,omitempty"`
+}
+
+// PactVerificationResult holds the result of a pact verification.
+type PactVerificationResult struct {
+	ID         string              `json:"id,omitempty"`
+	PactID     string              `json:"pactId,omitempty"`
+	Status     string              `json:"status,omitempty"`
+	Violations []ContractViolation `json:"violations,omitempty"`
+	VerifiedAt int64               `json:"verifiedAt,omitempty"`
+}
+
+// CanIDeployResult holds the result of a can-i-deploy check.
+type CanIDeployResult struct {
+	OK     bool   `json:"ok"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// Pact endpoints
+// ---------------------------------------------------------------------------
+
+// ListPacts returns all pacts.
+func (a *ContractAPI) ListPacts(ctx context.Context) ([]Pact, error) {
+	var pacts []Pact
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/pacts", nil, &pacts); err != nil {
+		return nil, err
+	}
+	return pacts, nil
+}
+
+// GetPact retrieves a pact by ID.
+func (a *ContractAPI) GetPact(ctx context.Context, id string) (*Pact, error) {
+	var pact Pact
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/pacts/"+url.PathEscape(id), nil, &pact); err != nil {
+		return nil, err
+	}
+	return &pact, nil
+}
+
+// PublishPact publishes a new pact.
+func (a *ContractAPI) PublishPact(ctx context.Context, pact *Pact) (*Pact, error) {
+	if pact.Namespace == "" && a.client.namespace != "" {
+		pact.Namespace = a.client.namespace
+	}
+	var result Pact
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/pacts", pact, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// VerifyPact verifies a pact against a provider.
+func (a *ContractAPI) VerifyPact(ctx context.Context, req any) (*PactVerificationResult, error) {
+	var result PactVerificationResult
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/pacts/verify", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CanIDeploy checks whether a service can be safely deployed.
+func (a *ContractAPI) CanIDeploy(ctx context.Context, req any) (*CanIDeployResult, error) {
+	var result CanIDeployResult
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/pacts/can-i-deploy", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeletePact deletes a pact by ID.
+func (a *ContractAPI) DeletePact(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/contract/pacts/"+url.PathEscape(id), nil, nil)
+}
+
+// GenerateMocksFromPact generates mocks from a pact.
+func (a *ContractAPI) GenerateMocksFromPact(ctx context.Context, pactID string) ([]Mock, error) {
+	var mocks []Mock
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/pacts/"+url.PathEscape(pactID)+"/mocks", nil, &mocks); err != nil {
+		return nil, err
+	}
+	return mocks, nil
+}
+
+// ListVerifications returns all pact verification results.
+func (a *ContractAPI) ListVerifications(ctx context.Context) ([]PactVerificationResult, error) {
+	var results []PactVerificationResult
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/pacts/verifications", nil, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// DetectDrift detects drift between a contract and the live service.
+func (a *ContractAPI) DetectDrift(ctx context.Context, req any) (any, error) {
+	var result any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}

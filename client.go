@@ -34,20 +34,27 @@ type Client struct {
 	retryDelay time.Duration
 
 	// Sub-API singletons (lazy-initialized through accessor methods)
-	mockAPI       *MockAPI
-	namespaceAPI  *NamespaceAPI
-	storeAPI      *StoreAPI
-	collectionAPI *CollectionAPI
-	perfAPI       *PerfAPI
-	healthAPI     *HealthAPI
-	generatorAPI  *GeneratorAPI
-	fuzzingAPI    *FuzzingAPI
-	contractAPI   *ContractAPI
-	recorderAPI   *RecorderAPI
-	templateAPI   *TemplateAPI
-	importAPI     *ImportAPI
-	testRunAPI    *TestRunAPI
-	adminAPI      *AdminAPI
+	mockAPI              *MockAPI
+	namespaceAPI         *NamespaceAPI
+	storeAPI             *StoreAPI
+	collectionAPI        *CollectionAPI
+	perfAPI              *PerfAPI
+	healthAPI            *HealthAPI
+	generatorAPI         *GeneratorAPI
+	fuzzingAPI           *FuzzingAPI
+	contractAPI          *ContractAPI
+	recorderAPI          *RecorderAPI
+	templateAPI          *TemplateAPI
+	importAPI            *ImportAPI
+	testRunAPI           *TestRunAPI
+	tagAPI               *TagAPI
+	folderAPI            *FolderAPI
+	undefinedAPI         *UndefinedAPI
+	statsAPI             *StatsAPI
+	agentTaskAPI         *AgentTaskAPI
+	namespaceSettingsAPI *NamespaceSettingsAPI
+	proxyAPI             *ProxyAPI
+	environmentAPI       *EnvironmentAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -189,12 +196,68 @@ func (c *Client) TestRuns() *TestRunAPI {
 	return c.testRunAPI
 }
 
-// Admin returns the Admin API for platform administration.
-func (c *Client) Admin() *AdminAPI {
-	if c.adminAPI == nil {
-		c.adminAPI = &AdminAPI{client: c}
+// Tags returns the Tag API for managing mock tags.
+func (c *Client) Tags() *TagAPI {
+	if c.tagAPI == nil {
+		c.tagAPI = &TagAPI{client: c}
 	}
-	return c.adminAPI
+	return c.tagAPI
+}
+
+// Folders returns the Folder API for managing mock folders.
+func (c *Client) Folders() *FolderAPI {
+	if c.folderAPI == nil {
+		c.folderAPI = &FolderAPI{client: c}
+	}
+	return c.folderAPI
+}
+
+// Undefined returns the Undefined API for managing unmatched requests.
+func (c *Client) Undefined() *UndefinedAPI {
+	if c.undefinedAPI == nil {
+		c.undefinedAPI = &UndefinedAPI{client: c}
+	}
+	return c.undefinedAPI
+}
+
+// Stats returns the Stats API for retrieving platform statistics.
+func (c *Client) Stats() *StatsAPI {
+	if c.statsAPI == nil {
+		c.statsAPI = &StatsAPI{client: c}
+	}
+	return c.statsAPI
+}
+
+// AgentTasks returns the Agent Task API for managing AI agent tasks.
+func (c *Client) AgentTasks() *AgentTaskAPI {
+	if c.agentTaskAPI == nil {
+		c.agentTaskAPI = &AgentTaskAPI{client: c}
+	}
+	return c.agentTaskAPI
+}
+
+// NamespaceSettings returns the Namespace Settings API.
+func (c *Client) NamespaceSettings() *NamespaceSettingsAPI {
+	if c.namespaceSettingsAPI == nil {
+		c.namespaceSettingsAPI = &NamespaceSettingsAPI{client: c}
+	}
+	return c.namespaceSettingsAPI
+}
+
+// Proxy returns the Proxy API for proxying requests.
+func (c *Client) Proxy() *ProxyAPI {
+	if c.proxyAPI == nil {
+		c.proxyAPI = &ProxyAPI{client: c}
+	}
+	return c.proxyAPI
+}
+
+// Environments returns the Environment API for managing API Tester environments.
+func (c *Client) Environments() *EnvironmentAPI {
+	if c.environmentAPI == nil {
+		c.environmentAPI = &EnvironmentAPI{client: c}
+	}
+	return c.environmentAPI
 }
 
 // ---------------------------------------------------------------------------

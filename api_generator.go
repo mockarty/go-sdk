@@ -41,7 +41,7 @@ func (a *GeneratorAPI) FromOpenAPI(ctx context.Context, spec *GeneratorRequest) 
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/openapi/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/openapi", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -53,7 +53,7 @@ func (a *GeneratorAPI) FromWSDL(ctx context.Context, spec *GeneratorRequest) (*G
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/soap/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/soap", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -65,7 +65,7 @@ func (a *GeneratorAPI) FromProto(ctx context.Context, spec *GeneratorRequest) (*
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/grpc/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/grpc", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -77,7 +77,7 @@ func (a *GeneratorAPI) FromGraphQL(ctx context.Context, spec *GeneratorRequest) 
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/graphql/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/graphql", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -89,7 +89,7 @@ func (a *GeneratorAPI) FromHAR(ctx context.Context, spec *GeneratorRequest) (*Ge
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/har/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/har", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -101,7 +101,7 @@ func (a *GeneratorAPI) FromSocket(ctx context.Context, spec *GeneratorRequest) (
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/socket/generate", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/socket", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -113,7 +113,7 @@ func (a *GeneratorAPI) PreviewOpenAPI(ctx context.Context, spec *GeneratorReques
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorPreview
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/openapi/preview", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/openapi/preview", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -125,7 +125,7 @@ func (a *GeneratorAPI) PreviewWSDL(ctx context.Context, spec *GeneratorRequest) 
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorPreview
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/soap/preview", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/soap/preview", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -137,7 +137,7 @@ func (a *GeneratorAPI) PreviewProto(ctx context.Context, spec *GeneratorRequest)
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorPreview
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/grpc/preview", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/grpc/preview", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -149,7 +149,7 @@ func (a *GeneratorAPI) PreviewGraphQL(ctx context.Context, spec *GeneratorReques
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorPreview
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/graphql/preview", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/graphql/preview", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -161,7 +161,7 @@ func (a *GeneratorAPI) PreviewHAR(ctx context.Context, spec *GeneratorRequest) (
 		spec.Namespace = a.client.namespace
 	}
 	var resp GeneratorPreview
-	if err := a.client.do(ctx, "POST", "/api/v1/generator/har/preview", spec, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/har/preview", spec, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
