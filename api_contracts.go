@@ -1,10 +1,11 @@
-// Copyright (c) 2024-2026 Mockarty. All rights reserved.
+// Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
 package mockarty
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 )
 
@@ -261,6 +262,207 @@ func (a *ContractAPI) ListVerifications(ctx context.Context) ([]PactVerification
 func (a *ContractAPI) DetectDrift(ctx context.Context, req any) (any, error) {
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ─── API Registry ───────────────────────────────────────────────────────────
+
+// RegistryEntry represents a published API in the internal marketplace.
+type RegistryEntry struct {
+	ID                string   `json:"id,omitempty"`
+	Namespace         string   `json:"namespace,omitempty"`
+	ServiceName       string   `json:"serviceName"`
+	Description       string   `json:"description,omitempty"`
+	SpecType          string   `json:"specType,omitempty"`
+	SpecURL           string   `json:"specUrl,omitempty"`
+	SpecContent       string   `json:"specContent,omitempty"`
+	Version           string   `json:"version,omitempty"`
+	Tags              []string `json:"tags,omitempty"`
+	Visibility        string   `json:"visibility,omitempty"`
+	AllowedNamespaces []string `json:"allowedNamespaces,omitempty"`
+	Owner             string   `json:"owner,omitempty"`
+	EndpointsCount    int      `json:"endpointsCount,omitempty"`
+}
+
+// ListRegistry returns published APIs, optionally filtered by query.
+func (a *ContractAPI) ListRegistry(ctx context.Context, query string) ([]RegistryEntry, error) {
+	path := "/api/v1/contract/registry"
+	if query != "" {
+		path += "?q=" + url.QueryEscape(query)
+	}
+	var entries []RegistryEntry
+	if err := a.client.do(ctx, "GET", path, nil, &entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// GetRegistryEntry returns a single registry entry by ID.
+func (a *ContractAPI) GetRegistryEntry(ctx context.Context, id string) (*RegistryEntry, error) {
+	var entry RegistryEntry
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/registry/"+id, nil, &entry); err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
+// PublishToRegistry publishes an API specification to the internal registry.
+func (a *ContractAPI) PublishToRegistry(ctx context.Context, entry *RegistryEntry) (*RegistryEntry, error) {
+	var result RegistryEntry
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry", entry, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// UpdateRegistryEntry updates an existing registry entry.
+func (a *ContractAPI) UpdateRegistryEntry(ctx context.Context, id string, update *RegistryEntry) (*RegistryEntry, error) {
+	var result RegistryEntry
+	if err := a.client.do(ctx, "PUT", "/api/v1/contract/registry/"+id, update, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteRegistryEntry removes a registry entry.
+func (a *ContractAPI) DeleteRegistryEntry(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/contract/registry/"+id, nil, nil)
+}
+
+// GenerateMocksFromRegistry generates mocks from a registry entry's specification.
+func (a *ContractAPI) GenerateMocksFromRegistry(ctx context.Context, entryID string) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/generate-mocks", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// CheckImpact checks which subscribers would be affected by a spec change.
+func (a *ContractAPI) CheckImpact(ctx context.Context, entryID string, newSpecContent string) (map[string]any, error) {
+	var result map[string]any
+	body := map[string]string{"newSpecContent": newSpecContent}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/check-impact", body, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ─── Subscriptions ──────────────────────────────────────────────────────────
+
+// Subscription represents a team's dependency on another team's API.
+type Subscription struct {
+	ID               string   `json:"id,omitempty"`
+	Namespace        string   `json:"namespace,omitempty"`
+	RegistryEntryID  string   `json:"registryEntryId"`
+	ServiceName      string   `json:"serviceName"`
+	WatchEndpoints   []string `json:"watchEndpoints,omitempty"`
+	NotifyOnBreaking bool     `json:"notifyOnBreaking,omitempty"`
+	AutoBlock        bool     `json:"autoBlock,omitempty"`
+}
+
+// ListSubscriptions returns current namespace's subscriptions.
+func (a *ContractAPI) ListSubscriptions(ctx context.Context) ([]Subscription, error) {
+	var subs []Subscription
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/subscriptions", nil, &subs); err != nil {
+		return nil, err
+	}
+	return subs, nil
+}
+
+// Subscribe creates a subscription to a registry API.
+func (a *ContractAPI) Subscribe(ctx context.Context, registryEntryID string, sub *Subscription) (*Subscription, error) {
+	var result Subscription
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+registryEntryID+"/subscribe", sub, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Unsubscribe removes a subscription.
+func (a *ContractAPI) Unsubscribe(ctx context.Context, subscriptionID string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/contract/subscriptions/"+subscriptionID, nil, nil)
+}
+
+// ListSubscribers returns who subscribes to a specific API.
+func (a *ContractAPI) ListSubscribers(ctx context.Context, registryEntryID string) ([]Subscription, error) {
+	var subs []Subscription
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/registry/"+registryEntryID+"/subscribers", nil, &subs); err != nil {
+		return nil, err
+	}
+	return subs, nil
+}
+
+// ─── Change Requests ────────────────────────────────────────────────────────
+
+// ChangeRequest represents a proposed API spec update pending review.
+type ChangeRequest struct {
+	ID              string `json:"id,omitempty"`
+	RegistryEntryID string `json:"registryEntryId"`
+	Namespace       string `json:"namespace,omitempty"`
+	SubmittedBy     string `json:"submittedBy,omitempty"`
+	NewSpecContent  string `json:"newSpecContent"`
+	NewVersion      string `json:"newVersion,omitempty"`
+	Status          string `json:"status,omitempty"`
+	BreakingChanges int    `json:"breakingChanges,omitempty"`
+}
+
+// CreateChangeRequest submits a spec change for review.
+func (a *ContractAPI) CreateChangeRequest(ctx context.Context, registryEntryID string, newSpec, newVersion string) (*ChangeRequest, error) {
+	var result ChangeRequest
+	body := map[string]string{"newSpecContent": newSpec, "newVersion": newVersion}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+registryEntryID+"/change-requests", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListChangeRequests returns change requests for a registry entry.
+func (a *ContractAPI) ListChangeRequests(ctx context.Context, registryEntryID string) ([]ChangeRequest, error) {
+	var result []ChangeRequest
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/registry/"+registryEntryID+"/change-requests", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ApproveChangeRequest approves a change request.
+func (a *ContractAPI) ApproveChangeRequest(ctx context.Context, crID, comment string) error {
+	body := map[string]string{"comment": comment}
+	return a.client.do(ctx, "POST", "/api/v1/contract/change-requests/"+crID+"/approve", body, nil)
+}
+
+// RejectChangeRequest rejects a change request.
+func (a *ContractAPI) RejectChangeRequest(ctx context.Context, crID, comment string) error {
+	body := map[string]string{"comment": comment}
+	return a.client.do(ctx, "POST", "/api/v1/contract/change-requests/"+crID+"/reject", body, nil)
+}
+
+// PendingChangeRequests returns change requests awaiting my team's approval.
+func (a *ContractAPI) PendingChangeRequests(ctx context.Context) ([]ChangeRequest, error) {
+	var result []ChangeRequest
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/change-requests/pending", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetTrends returns validation trend data for the past N days.
+func (a *ContractAPI) GetTrends(ctx context.Context, days int) ([]map[string]any, error) {
+	path := fmt.Sprintf("/api/v1/contract/trends?days=%d", days)
+	var result []map[string]any
+	if err := a.client.do(ctx, "GET", path, nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ListParticipants returns unique consumer/provider names from pacts (for autocomplete).
+func (a *ContractAPI) ListParticipants(ctx context.Context) ([]string, error) {
+	var result []string
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/pacts/participants", nil, &result); err != nil {
 		return nil, err
 	}
 	return result, nil

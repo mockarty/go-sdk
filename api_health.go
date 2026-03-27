@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Mockarty. All rights reserved.
+// Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
 package mockarty
@@ -30,11 +30,11 @@ type HealthCheckDetail struct {
 
 // HealthResponse represents the full health check response from the server.
 type HealthResponse struct {
-	Status    HealthStatus                    `json:"status"`
-	ReleaseID string                          `json:"releaseId,omitempty"`
-	Errors    map[string]string               `json:"errors,omitempty"`
-	Checks    map[string][]HealthCheckDetail  `json:"checks"`
-	Output    string                          `json:"output,omitempty"`
+	Status    HealthStatus                   `json:"status"`
+	ReleaseID string                         `json:"releaseId,omitempty"`
+	Errors    map[string]string              `json:"errors,omitempty"`
+	Checks    map[string][]HealthCheckDetail `json:"checks"`
+	Output    string                         `json:"output,omitempty"`
 }
 
 // Check performs a comprehensive health check.
