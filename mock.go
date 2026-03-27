@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Mockarty. All rights reserved.
+// Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
 package mockarty
@@ -184,7 +184,7 @@ type RabbitMQRequestContext struct {
 	OutputExchange   string               `json:"outputExchange,omitempty"`
 	OutputRoutingKey string               `json:"outputRoutingKey,omitempty"`
 	OutputQueue      string               `json:"outputQueue,omitempty"`
-	OutputProps      *RabbitMQOutputProps  `json:"outputProps,omitempty"`
+	OutputProps      *RabbitMQOutputProps `json:"outputProps,omitempty"`
 }
 
 // SmtpRequestContext defines matching rules for SMTP messages.

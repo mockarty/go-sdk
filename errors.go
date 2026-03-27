@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Mockarty. All rights reserved.
+// Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
 package mockarty
@@ -10,12 +10,12 @@ import (
 
 // Sentinel errors for common HTTP status codes.
 var (
-	ErrNotFound    = errors.New("mockarty: not found")
+	ErrNotFound     = errors.New("mockarty: not found")
 	ErrUnauthorized = errors.New("mockarty: unauthorized")
-	ErrForbidden   = errors.New("mockarty: forbidden")
-	ErrConflict    = errors.New("mockarty: conflict")
-	ErrRateLimited = errors.New("mockarty: rate limited")
-	ErrServerError = errors.New("mockarty: server error")
+	ErrForbidden    = errors.New("mockarty: forbidden")
+	ErrConflict     = errors.New("mockarty: conflict")
+	ErrRateLimited  = errors.New("mockarty: rate limited")
+	ErrServerError  = errors.New("mockarty: server error")
 )
 
 // APIError represents a structured error returned by the Mockarty API.

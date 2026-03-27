@@ -1,4 +1,4 @@
-// Copyright (c) 2024-2026 Mockarty. All rights reserved.
+// Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
 package mockarty
@@ -184,7 +184,7 @@ type SafetyConfig struct {
 	MaxPodsAffected    int      `json:"maxPodsAffected,omitempty"`    // Max pods that can be killed/affected at once
 	MinReplicasAlive   int      `json:"minReplicasAlive,omitempty"`   // Minimum replicas that must remain alive
 	AutoRollback       bool     `json:"autoRollback,omitempty"`       // Automatically rollback on steady-state violation
-	HaltOnSteadyFail   bool     `json:"haltOnSteadyFail,omitempty"`  // Halt experiment if steady-state check fails
+	HaltOnSteadyFail   bool     `json:"haltOnSteadyFail,omitempty"`   // Halt experiment if steady-state check fails
 	RequireApproval    bool     `json:"requireApproval,omitempty"`    // Require manual approval before execution
 	BlastRadiusPercent int      `json:"blastRadiusPercent,omitempty"` // Max % of pods that can be affected (0 = no limit)
 }
@@ -215,7 +215,7 @@ type PhaseMetrics struct {
 	EndTime     time.Time `json:"endTime"`
 	Latency     MinMaxAvg `json:"latency,omitempty"`
 	ErrorRate   float64   `json:"errorRate"`
-	Throughput  float64   `json:"throughput,omitempty"`  // Requests per second
+	Throughput  float64   `json:"throughput,omitempty"` // Requests per second
 	PodRestarts int       `json:"podRestarts,omitempty"`
 }
 
@@ -229,7 +229,7 @@ type MinMaxAvg struct {
 // TimelineEvent represents a discrete event that occurred during the experiment.
 type TimelineEvent struct {
 	Timestamp time.Time   `json:"timestamp"`
-	Type      string      `json:"type"`               // fault_injected, fault_removed, pod_killed, pod_restarted, etc.
+	Type      string      `json:"type"` // fault_injected, fault_removed, pod_killed, pod_restarted, etc.
 	Message   string      `json:"message"`
 	Details   interface{} `json:"details,omitempty"`
 	Severity  string      `json:"severity,omitempty"` // info, warning, error
@@ -237,7 +237,7 @@ type TimelineEvent struct {
 
 // AffectedResource describes a resource that was impacted by the experiment.
 type AffectedResource struct {
-	Kind      string `json:"kind"`      // Pod, Deployment, Node, NetworkPolicy
+	Kind      string `json:"kind"` // Pod, Deployment, Node, NetworkPolicy
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`
 	Action    string `json:"action"` // killed, restarted, scaled, drained, partitioned
@@ -256,8 +256,8 @@ type ChaosProfile struct {
 	Name           string `json:"name"`
 	KubeconfigPath string `json:"kubeconfigPath,omitempty"`
 	KubeconfigData string `json:"kubeconfigData,omitempty"` // Base64-encoded kubeconfig content
-	Context        string `json:"context,omitempty"`         // kubectl context name
-	InCluster      bool   `json:"inCluster,omitempty"`       // Use in-cluster config
+	Context        string `json:"context,omitempty"`        // kubectl context name
+	InCluster      bool   `json:"inCluster,omitempty"`      // Use in-cluster config
 	DefaultNS      string `json:"defaultNamespace,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
@@ -294,12 +294,12 @@ type ChaosPreset struct {
 
 // ChaosOperatorStatus holds the status of the chaos operator in a cluster.
 type ChaosOperatorStatus struct {
-	Installed     bool   `json:"installed"`
-	Healthy       bool   `json:"healthy"`
-	Replicas      int    `json:"replicas,omitempty"`
-	ReadyReplicas int    `json:"readyReplicas,omitempty"`
-	Namespace     string `json:"namespace,omitempty"`
-	Message       string `json:"message,omitempty"`
+	Installed     bool     `json:"installed"`
+	Healthy       bool     `json:"healthy"`
+	Replicas      int      `json:"replicas,omitempty"`
+	ReadyReplicas int      `json:"readyReplicas,omitempty"`
+	Namespace     string   `json:"namespace,omitempty"`
+	Message       string   `json:"message,omitempty"`
 	SetupSteps    []string `json:"setupSteps,omitempty"`
 }
 
