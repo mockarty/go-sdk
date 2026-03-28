@@ -267,6 +267,24 @@ func (a *ContractAPI) DetectDrift(ctx context.Context, req any) (any, error) {
 	return result, nil
 }
 
+// DetectGraphQLDrift detects drift between mock and real GraphQL schema via introspection.
+func (a *ContractAPI) DetectGraphQLDrift(ctx context.Context, req any) (any, error) {
+	var result any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/graphql", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DetectGRPCDrift detects drift between mock and real gRPC services via reflection.
+func (a *ContractAPI) DetectGRPCDrift(ctx context.Context, req any) (any, error) {
+	var result any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/grpc", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ─── API Registry ───────────────────────────────────────────────────────────
 
 // RegistryEntry represents a published API in the internal marketplace.
@@ -466,4 +484,53 @@ func (a *ContractAPI) ListParticipants(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+// ValidateFromRegistry validates mocks against a registry entry's specification.
+func (a *ContractAPI) ValidateFromRegistry(ctx context.Context, entryID string) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/validate", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// SubmitForReview submits a registry entry for review.
+func (a *ContractAPI) SubmitForReview(ctx context.Context, entryID, reviewerID string) (*RegistryEntry, error) {
+	var result RegistryEntry
+	body := map[string]string{"reviewerId": reviewerID}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/submit-review", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ApproveReview approves a registry entry review.
+func (a *ContractAPI) ApproveReview(ctx context.Context, entryID, comment string) (*RegistryEntry, error) {
+	var result RegistryEntry
+	body := map[string]string{"comment": comment}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/approve-review", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RejectReview rejects a registry entry review.
+func (a *ContractAPI) RejectReview(ctx context.Context, entryID, comment string) (*RegistryEntry, error) {
+	var result RegistryEntry
+	body := map[string]string{"comment": comment}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+entryID+"/reject-review", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// AssignReviewer assigns a reviewer to a registry entry.
+func (a *ContractAPI) AssignReviewer(ctx context.Context, entryID, reviewerID string) (*RegistryEntry, error) {
+	var result RegistryEntry
+	body := map[string]string{"reviewerId": reviewerID}
+	if err := a.client.do(ctx, "PUT", "/api/v1/contract/registry/"+entryID+"/reviewer", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
