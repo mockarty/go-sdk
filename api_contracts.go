@@ -534,3 +534,312 @@ func (a *ContractAPI) AssignReviewer(ctx context.Context, entryID, reviewerID st
 	}
 	return &result, nil
 }
+
+// ---------------------------------------------------------------------------
+// Consumer Contracts (Dependency Bundles)
+// ---------------------------------------------------------------------------
+
+// ConsumerContract represents a consumer's dependency bundle.
+type ConsumerContract struct {
+	ID           string               `json:"id,omitempty"`
+	Name         string               `json:"name"`
+	Namespace    string               `json:"namespace,omitempty"`
+	Dependencies []ContractDependency `json:"dependencies"`
+	Version      int                  `json:"version,omitempty"`
+	Tags         []string             `json:"tags,omitempty"`
+	Hash         string               `json:"hash,omitempty"`
+	CreatedBy    string               `json:"createdBy,omitempty"`
+	CreatedAt    string               `json:"createdAt,omitempty"`
+	UpdatedAt    string               `json:"updatedAt,omitempty"`
+}
+
+// ContractDependency links to a registry API.
+type ContractDependency struct {
+	RegistryEntryID string             `json:"registryEntryId"`
+	ProviderName    string             `json:"providerName"`
+	ProviderVersion string             `json:"providerVersion,omitempty"`
+	SpecHash        string             `json:"specHash,omitempty"`
+	Endpoints       []ContractEndpoint `json:"endpoints"`
+}
+
+// ContractEndpoint describes what the consumer needs from a specific endpoint.
+type ContractEndpoint struct {
+	Route           string            `json:"route"`
+	Protocol        string            `json:"protocol,omitempty"`
+	ExpectedStatus  []int             `json:"expectedStatus,omitempty"`
+	RequiredFields  []ContractField   `json:"requiredFields,omitempty"`
+	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty"`
+}
+
+// ContractField describes a field the consumer depends on.
+type ContractField struct {
+	Path     string `json:"path"`
+	Type     string `json:"type,omitempty"`
+	Required bool   `json:"required"`
+	Pattern  string `json:"pattern,omitempty"`
+}
+
+// ListConsumerContracts returns all consumer contracts in the current namespace.
+func (a *ContractAPI) ListConsumerContracts(ctx context.Context) ([]ConsumerContract, error) {
+	var result []ConsumerContract
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/consumer-contracts", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetConsumerContract returns a consumer contract by ID.
+func (a *ContractAPI) GetConsumerContract(ctx context.Context, id string) (*ConsumerContract, error) {
+	var result ConsumerContract
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/consumer-contracts/"+id, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateConsumerContract creates or updates a consumer contract.
+func (a *ContractAPI) CreateConsumerContract(ctx context.Context, contract ConsumerContract) (*ConsumerContract, error) {
+	var result ConsumerContract
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/consumer-contracts", contract, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteConsumerContract removes a consumer contract.
+func (a *ContractAPI) DeleteConsumerContract(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/contract/consumer-contracts/"+id, nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Can I Deploy V2 (Bidirectional)
+// ---------------------------------------------------------------------------
+
+// CanIDeployV2Request is the request for the bidirectional deployment check.
+type CanIDeployV2Request struct {
+	Role            string `json:"role"`                      // "consumer" or "provider"
+	ContractID      string `json:"contractId,omitempty"`      // For consumer check
+	RegistryEntryID string `json:"registryEntryId,omitempty"` // For provider check
+	NewSpec         string `json:"newSpec,omitempty"`          // Future spec (pre-deploy)
+	NewSpecURL      string `json:"newSpecUrl,omitempty"`
+}
+
+// CanIDeployV2Result is the result of a bidirectional deployment check.
+type CanIDeployV2Result struct {
+	Deployable        bool                    `json:"deployable"`
+	Role              string                  `json:"role"`
+	Summary           string                  `json:"summary"`
+	DependencyResults []DependencyCheckResult `json:"dependencyResults,omitempty"`
+	AffectedConsumers []ConsumerImpact        `json:"affectedConsumers,omitempty"`
+}
+
+// DependencyCheckResult is the result of checking one provider dependency.
+type DependencyCheckResult struct {
+	ProviderName string `json:"providerName"`
+	Compatible   bool   `json:"compatible"`
+}
+
+// ConsumerImpact describes how a provider change affects one consumer.
+type ConsumerImpact struct {
+	ContractID   string   `json:"contractId"`
+	ConsumerName string   `json:"consumerName"`
+	Namespace    string   `json:"namespace"`
+	Compatible   bool     `json:"compatible"`
+	BrokenFields []string `json:"brokenFields,omitempty"`
+}
+
+// CanIDeployV2 performs a bidirectional deployment readiness check.
+func (a *ContractAPI) CanIDeployV2(ctx context.Context, req CanIDeployV2Request) (*CanIDeployV2Result, error) {
+	var result CanIDeployV2Result
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/can-i-deploy", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Spec Parsing (Wizard Support)
+// ---------------------------------------------------------------------------
+
+// ParseEndpointsResult is the result of parsing endpoints from a spec.
+type ParseEndpointsResult struct {
+	RegistryEntryID string           `json:"registryEntryId"`
+	SpecType        string           `json:"specType"`
+	Endpoints       []ParsedEndpoint `json:"endpoints"`
+}
+
+// ParsedEndpoint is a single endpoint extracted from a spec.
+type ParsedEndpoint struct {
+	Route       string   `json:"route"`
+	Protocol    string   `json:"protocol"`
+	Summary     string   `json:"summary,omitempty"`
+	StatusCodes []int    `json:"statusCodes,omitempty"`
+	Deprecated  bool     `json:"deprecated,omitempty"`
+}
+
+// ParseFieldsResult is the result of parsing response fields for an endpoint.
+type ParseFieldsResult struct {
+	Route  string          `json:"route"`
+	Fields []FieldNode     `json:"fields"`
+}
+
+// FieldNode is a tree node representing a response field.
+type FieldNode struct {
+	Path     string      `json:"path"`
+	Name     string      `json:"name"`
+	Type     string      `json:"type"`
+	Required bool        `json:"required"`
+	Checked  bool        `json:"checked"`
+	Children []FieldNode `json:"children,omitempty"`
+}
+
+// ParseEndpoints parses a registry entry's spec and returns available endpoints.
+func (a *ContractAPI) ParseEndpoints(ctx context.Context, registryEntryID string) (*ParseEndpointsResult, error) {
+	var result ParseEndpointsResult
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+registryEntryID+"/parse-endpoints", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ParseFields parses response fields for a specific endpoint in a registry entry.
+func (a *ContractAPI) ParseFields(ctx context.Context, registryEntryID, route string, statusCode int) (*ParseFieldsResult, error) {
+	var result ParseFieldsResult
+	body := map[string]interface{}{"route": route, "statusCode": statusCode}
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/registry/"+registryEntryID+"/parse-fields", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ---------------------------------------------------------------------------
+// Versioning
+// ---------------------------------------------------------------------------
+
+// VersionEntry represents one version of a registry entry or consumer contract.
+type VersionEntry struct {
+	ID         string `json:"id"`
+	EntityType string `json:"entityType"`
+	EntityID   string `json:"entityId"`
+	Version    int    `json:"version"`
+	Content    string `json:"content,omitempty"`
+	Hash       string `json:"hash,omitempty"`
+	CreatedBy  string `json:"createdBy,omitempty"`
+	CreatedAt  string `json:"createdAt,omitempty"`
+	ChangeNote string `json:"changeNote,omitempty"`
+	IsCurrent  bool   `json:"isCurrent"`
+}
+
+// VersionDiff represents a structural diff between two versions.
+type VersionDiff struct {
+	OldVersion int         `json:"oldVersion"`
+	NewVersion int         `json:"newVersion"`
+	Changes    []DiffEntry `json:"changes"`
+	Summary    DiffSummary `json:"summary"`
+}
+
+// DiffEntry is a single change between versions.
+type DiffEntry struct {
+	ChangeType string `json:"changeType"`
+	Category   string `json:"category"`
+	Path       string `json:"path"`
+	OldValue   string `json:"oldValue,omitempty"`
+	NewValue   string `json:"newValue,omitempty"`
+	Breaking   bool   `json:"breaking"`
+	Message    string `json:"message"`
+}
+
+// DiffSummary aggregates the diff.
+type DiffSummary struct {
+	TotalChanges    int `json:"totalChanges"`
+	Added           int `json:"added"`
+	Removed         int `json:"removed"`
+	Changed         int `json:"changed"`
+	BreakingChanges int `json:"breakingChanges"`
+}
+
+// ListRegistryVersions returns version history for a registry entry.
+func (a *ContractAPI) ListRegistryVersions(ctx context.Context, entryID string) ([]VersionEntry, error) {
+	var result []VersionEntry
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/registry/"+entryID+"/versions", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetRegistryVersion returns a specific version of a registry entry.
+func (a *ContractAPI) GetRegistryVersion(ctx context.Context, entryID string, version int) (*VersionEntry, error) {
+	var result VersionEntry
+	if err := a.client.do(ctx, "GET", fmt.Sprintf("/api/v1/contract/registry/%s/versions/%d", entryID, version), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RollbackRegistryVersion rolls back a registry entry to a previous version.
+func (a *ContractAPI) RollbackRegistryVersion(ctx context.Context, entryID string, version int) error {
+	return a.client.do(ctx, "POST", fmt.Sprintf("/api/v1/contract/registry/%s/versions/%d/rollback", entryID, version), nil, nil)
+}
+
+// DiffRegistryVersions computes a diff between two versions of a registry entry.
+func (a *ContractAPI) DiffRegistryVersions(ctx context.Context, entryID string, v1, v2 int) (*VersionDiff, error) {
+	var result VersionDiff
+	if err := a.client.do(ctx, "GET", fmt.Sprintf("/api/v1/contract/registry/%s/versions/%d/diff/%d", entryID, v1, v2), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListConsumerContractVersions returns version history for a consumer contract.
+func (a *ContractAPI) ListConsumerContractVersions(ctx context.Context, contractID string) ([]VersionEntry, error) {
+	var result []VersionEntry
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/consumer-contracts/"+contractID+"/versions", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetConsumerContractVersion returns a specific version of a consumer contract.
+func (a *ContractAPI) GetConsumerContractVersion(ctx context.Context, contractID string, version int) (*VersionEntry, error) {
+	var result VersionEntry
+	if err := a.client.do(ctx, "GET", fmt.Sprintf("/api/v1/contract/consumer-contracts/%s/versions/%d", contractID, version), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// RollbackConsumerContractVersion rolls back a consumer contract to a previous version.
+func (a *ContractAPI) RollbackConsumerContractVersion(ctx context.Context, contractID string, version int) error {
+	return a.client.do(ctx, "POST", fmt.Sprintf("/api/v1/contract/consumer-contracts/%s/versions/%d/rollback", contractID, version), nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+// ContractHealth represents the health status of contracts in a namespace.
+type ContractHealth struct {
+	Namespace string                 `json:"namespace"`
+	Overall   string                 `json:"overall"`
+	Items     []ContractHealthItem   `json:"items"`
+	Summary   map[string]interface{} `json:"summary"`
+}
+
+// ContractHealthItem represents a single contract's health.
+type ContractHealthItem struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	ProvidersCount int    `json:"providersCount,omitempty"`
+	EndpointsCount int    `json:"endpointsCount,omitempty"`
+	Status         string `json:"status"`
+}
+
+// Health returns the health status of all contracts in the current namespace.
+func (a *ContractAPI) Health(ctx context.Context) (*ContractHealth, error) {
+	var result ContractHealth
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/health", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
