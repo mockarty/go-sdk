@@ -302,5 +302,154 @@ func main() {
 			r.ID, r.ConfigID, r.Status, r.Violations, validatedAt)
 	}
 
+	// -----------------------------------------------------------------------
+	// 13. Consumer Contracts (Dependency Bundles)
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Consumer Contracts ---")
+
+	// Create a consumer contract that declares dependencies on provider APIs
+	newContract, err := client.Contracts().CreateConsumerContract(ctx, mockarty.ConsumerContract{
+		Name: "OrderService",
+		Dependencies: []mockarty.ContractDependency{
+			{
+				RegistryEntryID: "user-service-api",
+				ProviderName:    "UserService",
+				ProviderVersion: "latest",
+				Endpoints: []mockarty.ContractEndpoint{
+					{
+						Route:          "GET /api/users/{id}",
+						Protocol:       "openapi",
+						ExpectedStatus: []int{200},
+						RequiredFields: []mockarty.ContractField{
+							{Path: "$.id", Type: "integer", Required: true},
+							{Path: "$.email", Type: "string", Required: true},
+						},
+					},
+				},
+			},
+		},
+		Tags: []string{"critical", "orders"},
+	})
+	if err != nil {
+		fmt.Printf("Create consumer contract returned: %v\n", err)
+	} else {
+		fmt.Printf("Created consumer contract: id=%s, name=%s, version=%d\n",
+			newContract.ID, newContract.Name, newContract.Version)
+	}
+
+	// List consumer contracts
+	contracts, err := client.Contracts().ListConsumerContracts(ctx)
+	if err != nil {
+		fmt.Printf("List contracts returned: %v\n", err)
+	} else {
+		fmt.Printf("Found %d consumer contracts\n", len(contracts))
+		for _, c := range contracts {
+			fmt.Printf("  - %s (v%d, %d providers)\n", c.Name, c.Version, len(c.Dependencies))
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// 14. Can-I-Deploy V2 (Bidirectional)
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Can I Deploy V2 ---")
+
+	// Consumer check: will my dependencies break me?
+	if newContract != nil {
+		consumerCheck, err := client.Contracts().CanIDeployV2(ctx, mockarty.CanIDeployV2Request{
+			Role:       "consumer",
+			ContractID: newContract.ID,
+		})
+		if err != nil {
+			fmt.Printf("Consumer deploy check returned: %v\n", err)
+		} else {
+			icon := "SAFE"
+			if !consumerCheck.Deployable {
+				icon = "BLOCKED"
+			}
+			fmt.Printf("[%s] %s\n", icon, consumerCheck.Summary)
+		}
+	}
+
+	// Provider check: will my changes break others?
+	providerCheck, err := client.Contracts().CanIDeployV2(ctx, mockarty.CanIDeployV2Request{
+		Role:            "provider",
+		RegistryEntryID: "user-service-api",
+		NewSpec:         `{"openapi":"3.0.0","info":{"title":"UserService","version":"2.0"},"paths":{}}`,
+	})
+	if err != nil {
+		fmt.Printf("Provider deploy check returned: %v\n", err)
+	} else {
+		fmt.Printf("Provider impact: deployable=%v, affected=%d consumers\n",
+			providerCheck.Deployable, len(providerCheck.AffectedConsumers))
+	}
+
+	// -----------------------------------------------------------------------
+	// 15. Spec Parsing (for building contracts visually)
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Spec Parsing ---")
+
+	endpoints, err := client.Contracts().ParseEndpoints(ctx, "user-service-api")
+	if err != nil {
+		fmt.Printf("Parse endpoints returned: %v\n", err)
+	} else {
+		fmt.Printf("Parsed %d endpoints from spec\n", len(endpoints.Endpoints))
+		for _, ep := range endpoints.Endpoints {
+			fmt.Printf("  - %s (%s)\n", ep.Route, ep.Protocol)
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// 16. Registry Version History
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Registry Versions ---")
+
+	versions, err := client.Contracts().ListRegistryVersions(ctx, "user-service-api")
+	if err != nil {
+		fmt.Printf("List registry versions returned: %v\n", err)
+	} else {
+		fmt.Printf("Found %d versions\n", len(versions))
+		for _, v := range versions {
+			current := ""
+			if v.IsCurrent {
+				current = " (current)"
+			}
+			fmt.Printf("  - v%d by %s%s\n", v.Version, v.CreatedBy, current)
+		}
+	}
+
+	// Compare two versions
+	if len(versions) >= 2 {
+		diff, err := client.Contracts().DiffRegistryVersions(ctx, "user-service-api",
+			versions[1].Version, versions[0].Version)
+		if err != nil {
+			fmt.Printf("Diff returned: %v\n", err)
+		} else {
+			fmt.Printf("Diff: %d changes (%d breaking)\n",
+				diff.Summary.TotalChanges, diff.Summary.BreakingChanges)
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// 17. Contract Health
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Contract Health ---")
+
+	health, err := client.Contracts().Health(ctx)
+	if err != nil {
+		fmt.Printf("Health returned: %v\n", err)
+	} else {
+		fmt.Printf("Overall: %s (%d contracts)\n", health.Overall, len(health.Items))
+		for _, item := range health.Items {
+			fmt.Printf("  [%s] %s (%s)\n", item.Status, item.Name, item.Type)
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Cleanup
+	// -----------------------------------------------------------------------
+	if newContract != nil {
+		_ = client.Contracts().DeleteConsumerContract(ctx, newContract.ID)
+	}
+
 	fmt.Println("\nContract testing examples completed!")
 }
