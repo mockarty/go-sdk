@@ -1140,7 +1140,7 @@ func TestCollectionAPI_Duplicate(t *testing.T) {
 func TestCollectionAPI_BatchDelete(t *testing.T) {
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
-		"POST /api/v1/api-tester/collections/batch": func(w http.ResponseWriter, r *http.Request) {
+		"DELETE /api/v1/api-tester/collections/batch": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
