@@ -285,6 +285,24 @@ func (a *ContractAPI) DetectGRPCDrift(ctx context.Context, req any) (any, error)
 	return result, nil
 }
 
+// DetectWSDLDrift detects drift between mock and real SOAP/WSDL services.
+func (a *ContractAPI) DetectWSDLDrift(ctx context.Context, req any) (any, error) {
+	var result any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/wsdl", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DetectMCPDrift detects drift between mock and real MCP servers.
+func (a *ContractAPI) DetectMCPDrift(ctx context.Context, req any) (any, error) {
+	var result any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/mcp", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ─── API Registry ───────────────────────────────────────────────────────────
 
 // RegistryEntry represents a published API in the internal marketplace.
