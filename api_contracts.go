@@ -581,12 +581,15 @@ type ContractDependency struct {
 }
 
 // ContractEndpoint describes what the consumer needs from a specific endpoint.
+// A contract tracks both what the consumer sends (request) and what it reads (response).
 type ContractEndpoint struct {
-	Route           string            `json:"route"`
-	Protocol        string            `json:"protocol,omitempty"`
-	ExpectedStatus  []int             `json:"expectedStatus,omitempty"`
-	RequiredFields  []ContractField   `json:"requiredFields,omitempty"`
-	RequiredHeaders map[string]string `json:"requiredHeaders,omitempty"`
+	Route                  string            `json:"route"`
+	Protocol               string            `json:"protocol,omitempty"`
+	ExpectedStatus         []int             `json:"expectedStatus,omitempty"`
+	RequiredFields         []ContractField   `json:"requiredFields,omitempty"`           // Response body fields
+	RequiredRequestFields  []ContractField   `json:"requiredRequestFields,omitempty"`    // Request body fields
+	RequiredParameters     []ContractField   `json:"requiredParameters,omitempty"`       // URL/query/header parameters
+	RequiredHeaders        map[string]string `json:"requiredHeaders,omitempty"`
 }
 
 // ContractField describes a field the consumer depends on.

@@ -119,13 +119,15 @@ namespaces, err := client.Namespaces().List(ctx)
 ```go
 // Global store
 store, err := client.Stores().GlobalGet(ctx)
-err := client.Stores().GlobalSet(ctx, "counter", 42)
-err := client.Stores().GlobalDelete(ctx, "key1", "key2")
+err := client.Stores().GlobalSet(ctx, "counter", "42")
+err := client.Stores().GlobalDelete(ctx, "key1")
+err := client.Stores().GlobalDeleteMany(ctx, "key1", "key2") // multiple keys
 
 // Chain store
 store, err := client.Stores().ChainGet(ctx, "chain-id")
 err := client.Stores().ChainSet(ctx, "chain-id", "status", "completed")
 err := client.Stores().ChainDelete(ctx, "chain-id", "key")
+err := client.Stores().ChainDeleteMany(ctx, "chain-id", "key1", "key2") // multiple keys
 ```
 
 ### Health

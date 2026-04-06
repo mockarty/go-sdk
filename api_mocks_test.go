@@ -617,8 +617,11 @@ func TestStoreAPI_GlobalSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotBody["counter"] != float64(42) {
-		t.Errorf("expected counter=42 in body, got %v", gotBody["counter"])
+	if gotBody["key"] != "counter" {
+		t.Errorf("expected key=counter in body, got %v", gotBody["key"])
+	}
+	if gotBody["value"] != float64(42) {
+		t.Errorf("expected value=42 in body, got %v", gotBody["value"])
 	}
 }
 
@@ -671,8 +674,11 @@ func TestStoreAPI_ChainSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotBody["status"] != "completed" {
-		t.Errorf("expected status=completed in body, got %v", gotBody["status"])
+	if gotBody["key"] != "status" {
+		t.Errorf("expected key=status in body, got %v", gotBody["key"])
+	}
+	if gotBody["value"] != "completed" {
+		t.Errorf("expected value=completed in body, got %v", gotBody["value"])
 	}
 }
 
@@ -691,6 +697,90 @@ func TestStoreAPI_ChainDelete(t *testing.T) {
 	}
 	if !strings.Contains(gotPath, "chain-1/key1") {
 		t.Errorf("expected path to contain chain-1/key1, got %s", gotPath)
+	}
+}
+
+// TestStoreAPI_GlobalSet_IncludesNamespace verifies that namespace is sent in the POST body.
+func TestStoreAPI_GlobalSet_IncludesNamespace(t *testing.T) {
+	var gotBody map[string]any
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /api/v1/stores/global": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
+			w.WriteHeader(http.StatusOK)
+		},
+	})
+
+	err := client.Stores().GlobalSet(context.Background(), "env", "production")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotBody["namespace"] != "sandbox" {
+		t.Errorf("expected namespace=sandbox in body, got %v", gotBody["namespace"])
+	}
+}
+
+// TestStoreAPI_ChainSet_IncludesNamespace verifies namespace in chain POST body.
+func TestStoreAPI_ChainSet_IncludesNamespace(t *testing.T) {
+	var gotBody map[string]any
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
+			w.WriteHeader(http.StatusOK)
+		},
+	})
+
+	err := client.Stores().ChainSet(context.Background(), "flow-1", "step", "done")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotBody["namespace"] != "sandbox" {
+		t.Errorf("expected namespace=sandbox in body, got %v", gotBody["namespace"])
+	}
+}
+
+// TestStoreAPI_GlobalDeleteMany verifies batch delete calls individual endpoints.
+func TestStoreAPI_GlobalDeleteMany(t *testing.T) {
+	var deletedKeys []string
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"DELETE /api/v1/stores/global/": func(w http.ResponseWriter, r *http.Request) {
+			// Extract key from path: /api/v1/stores/global/{key}
+			path := r.URL.Path
+			key := path[len("/api/v1/stores/global/"):]
+			deletedKeys = append(deletedKeys, key)
+			w.WriteHeader(http.StatusOK)
+		},
+	})
+
+	err := client.Stores().GlobalDeleteMany(context.Background(), "a", "b", "c")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(deletedKeys) != 3 {
+		t.Errorf("expected 3 delete calls, got %d", len(deletedKeys))
+	}
+}
+
+// TestStoreAPI_GlobalDelete_URLEncoding verifies keys with special chars are URL-encoded.
+func TestStoreAPI_GlobalDelete_URLEncoding(t *testing.T) {
+	var gotRawPath string
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"DELETE /api/v1/stores/global/": func(w http.ResponseWriter, r *http.Request) {
+			gotRawPath = r.RequestURI
+			w.WriteHeader(http.StatusOK)
+		},
+	})
+
+	err := client.Stores().GlobalDelete(context.Background(), "key with spaces")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Contains(gotRawPath, "key with spaces") {
+		t.Errorf("key should be URL-encoded, but raw path was: %s", gotRawPath)
+	}
+	if !strings.Contains(gotRawPath, "key%20with%20spaces") {
+		t.Errorf("expected URL-encoded key in path, got: %s", gotRawPath)
 	}
 }
 

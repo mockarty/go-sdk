@@ -29,7 +29,11 @@ func (a *StoreAPI) GlobalGet(ctx context.Context) (map[string]any, error) {
 
 // GlobalSet sets a key-value pair in the global store.
 func (a *StoreAPI) GlobalSet(ctx context.Context, key string, value any) error {
-	body := map[string]any{key: value}
+	body := map[string]any{
+		"key":       key,
+		"value":     value,
+		"namespace": a.client.namespace,
+	}
 	return a.client.do(ctx, "POST", "/api/v1/stores/global", body, nil)
 }
 
@@ -63,7 +67,11 @@ func (a *StoreAPI) ChainGet(ctx context.Context, chainID string) (map[string]any
 
 // ChainSet sets a key-value pair in a chain store.
 func (a *StoreAPI) ChainSet(ctx context.Context, chainID, key string, value any) error {
-	body := map[string]any{key: value}
+	body := map[string]any{
+		"key":       key,
+		"value":     value,
+		"namespace": a.client.namespace,
+	}
 	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
 }
 
