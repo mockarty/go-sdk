@@ -284,10 +284,9 @@ func TestFuzzingAPI_Start(t *testing.T) {
 	})
 
 	run, err := client.Fuzzing().Start(context.Background(), &FuzzingConfig{
-		Name:      "security-fuzz",
-		TargetURL: "https://api.example.com",
-		Duration:  "5m",
-		Workers:   4,
+		Name:          "security-fuzz",
+		TargetBaseURL: "https://api.example.com",
+		Strategy:      "all",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -315,7 +314,7 @@ func TestFuzzingAPI_Start_DefaultNamespace(t *testing.T) {
 	})
 
 	_, _ = client.Fuzzing().Start(context.Background(), &FuzzingConfig{
-		TargetURL: "https://api.example.com",
+		TargetBaseURL: "https://api.example.com",
 	})
 	if gotBody.Namespace != "sandbox" {
 		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
@@ -344,7 +343,7 @@ func TestFuzzingAPI_GetResult(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/fuzzing/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"fuzz-1","status":"completed","totalRequests":1000,"findings":3}`))
+			_, _ = w.Write([]byte(`{"id":"fuzz-1","status":"completed","totalRequests":1000,"totalFindings":3}`))
 		},
 	})
 
@@ -355,8 +354,8 @@ func TestFuzzingAPI_GetResult(t *testing.T) {
 	if result.TotalRequests != 1000 {
 		t.Errorf("expected 1000 total requests, got %d", result.TotalRequests)
 	}
-	if result.Findings != 3 {
-		t.Errorf("expected 3 findings, got %d", result.Findings)
+	if result.TotalFindings != 3 {
+		t.Errorf("expected 3 findings, got %d", result.TotalFindings)
 	}
 }
 
@@ -403,13 +402,13 @@ func TestFuzzingAPI_CreateConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/fuzzing/configs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","targetUrl":"https://api.example.com"}`))
+			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","targetBaseUrl":"https://api.example.com"}`))
 		},
 	})
 
 	config, err := client.Fuzzing().CreateConfig(context.Background(), &FuzzingConfig{
-		Name:      "my-config",
-		TargetURL: "https://api.example.com",
+		Name:          "my-config",
+		TargetBaseURL: "https://api.example.com",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -423,7 +422,7 @@ func TestFuzzingAPI_GetConfig(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/fuzzing/configs/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","workers":8}`))
+			_, _ = w.Write([]byte(`{"id":"cfg-1","name":"my-config","strategy":"all"}`))
 		},
 	})
 
@@ -431,8 +430,8 @@ func TestFuzzingAPI_GetConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if config.Workers != 8 {
-		t.Errorf("expected 8 workers, got %d", config.Workers)
+	if config.Strategy != "all" {
+		t.Errorf("expected strategy 'all', got %q", config.Strategy)
 	}
 }
 

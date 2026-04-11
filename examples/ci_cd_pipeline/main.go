@@ -282,11 +282,10 @@ func main() {
 	fmt.Println("\n[Step 5] Running fuzzing...")
 
 	fuzzRun, err := client.Fuzzing().Start(ctx, &mockarty.FuzzingConfig{
-		Name:      "CI Fuzz - " + buildID,
-		TargetURL: targetURL,
-		SpecURL:   specURL,
-		Duration:  "15s",
-		Workers:   2,
+		Name:          "CI Fuzz - " + buildID,
+		TargetBaseURL: targetURL,
+		SourceType:    "openapi",
+		Strategy:      "all",
 		Namespace: namespace,
 	})
 	if err != nil {
@@ -304,17 +303,17 @@ func main() {
 			fmt.Printf("  WARN: Get fuzzing result failed: %v\n", err)
 		} else {
 			fmt.Printf("  Fuzzing results: status=%s, requests=%d, findings=%d\n",
-				fuzzResult.Status, fuzzResult.TotalRequests, fuzzResult.Findings)
+				fuzzResult.Status, fuzzResult.TotalRequests, fuzzResult.TotalFindings)
 
 			// Check for critical findings
-			if fuzzResult.Findings > 0 {
+			if fuzzResult.TotalFindings > 0 {
 				findings, err := client.Fuzzing().ListFindings(ctx)
 				if err == nil {
 					criticalCount := 0
 					for _, f := range findings {
 						if f.Severity == "critical" || f.Severity == "high" {
 							criticalCount++
-							fmt.Printf("  [%s] %s: %s\n", f.Severity, f.Type, f.Title)
+							fmt.Printf("  [%s] %s: %s\n", f.Severity, f.Category, f.Title)
 						}
 					}
 					if criticalCount > 0 {

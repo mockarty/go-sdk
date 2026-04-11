@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mockarty/go-sdk/main/logo.svg" alt="Mockarty" width="400">
+  <img src="https://raw.githubusercontent.com/mockarty/mockarty-go/main/logo.svg" alt="Mockarty" width="400">
 </p>
 
 <h1 align="center">Go SDK</h1>
@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://pkg.go.dev/github.com/mockarty/mockarty-go"><img src="https://pkg.go.dev/badge/github.com/mockarty/mockarty-go.svg" alt="Go Reference"></a>
-  <a href="https://github.com/mockarty/go-sdk/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mockarty/go-sdk" alt="License"></a>
+  <a href="https://github.com/mockarty/mockarty-go/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mockarty/mockarty-go" alt="License"></a>
 </p>
 
 ## Installation

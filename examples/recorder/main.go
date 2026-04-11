@@ -309,6 +309,60 @@ func main() {
 		fmt.Printf("Exported session as HAR: %d bytes\n", len(harData))
 	}
 
+	// -----------------------------------------------------------------------
+	// 11. Session-level replay (point captured traffic at any target)
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Replay Session Against Different Target ---")
+
+	replaySummary, err := client.Recorder().ReplaySession(ctx, session.ID, &mockarty.ReplayOptions{
+		TargetURL:   "https://staging.example.com",
+		Concurrency: 5,
+		TimeoutMs:   5000,
+	})
+	if err != nil {
+		fmt.Printf("Replay session returned: %v\n", err)
+	} else {
+		fmt.Printf("Replay summary: %d total, %d matched, %d mismatched, %d failed, %d skipped\n",
+			replaySummary.TotalEntries, replaySummary.Matched, replaySummary.Mismatched,
+			replaySummary.Failed, replaySummary.Skipped)
+		for _, res := range replaySummary.Results {
+			marker := "✓"
+			if !res.StatusMatch {
+				marker = "✗"
+			}
+			fmt.Printf("  %s %s -> %d (was %d) [%dms]\n",
+				marker, res.ReplayedURL, res.NewStatus, res.OriginalStatus, res.DurationMs)
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// 12. Correlation engine — discover dynamic-value flow
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Correlate Session ---")
+
+	// The correlation engine scans the session for values that flow from one
+	// entry's response into a later entry's request — auth tokens, IDs,
+	// CSRF cookies, etc. The output tells you which values need to be
+	// extracted at runtime instead of hard-coded from the original capture.
+	report, err := client.Recorder().CorrelateSession(ctx, session.ID, &mockarty.CorrelationOptions{
+		MinValueLength: 6,
+		ExcludeNumeric: false, // numeric IDs are valuable in REST flows
+	})
+	if err != nil {
+		fmt.Printf("Correlate session returned: %v\n", err)
+	} else {
+		fmt.Printf("Correlation report: %d correlations across %d entries\n",
+			len(report.Correlations), report.TotalEntries)
+		for i, c := range report.Correlations {
+			if i >= 5 { // print top 5 only
+				fmt.Printf("  ... (%d more)\n", len(report.Correlations)-i)
+				break
+			}
+			fmt.Printf("  [%s] %s = %q (confidence %.2f, %d targets)\n",
+				c.ValueType, c.Source.Section, c.Value, c.Confidence, len(c.Targets))
+		}
+	}
+
 	fmt.Println("\nRecorder examples completed!")
 }
 

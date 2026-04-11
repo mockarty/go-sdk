@@ -37,11 +37,10 @@ func main() {
 	fmt.Println("--- Create Fuzzing Config ---")
 
 	config, err := client.Fuzzing().CreateConfig(ctx, &mockarty.FuzzingConfig{
-		Name:      "User API Fuzz Test",
-		TargetURL: "http://localhost:5770",
-		SpecURL:   "http://localhost:5770/swagger/doc.json",
-		Duration:  "30s",
-		Workers:   4,
+		Name:          "User API Fuzz Test",
+		TargetBaseURL: "http://localhost:5770",
+		SourceType:    "openapi",
+		Strategy:      "all",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create fuzzing config: %v", err)
@@ -53,8 +52,8 @@ func main() {
 	if err != nil {
 		fmt.Printf("Get config returned: %v\n", err)
 	} else {
-		fmt.Printf("Retrieved config: name=%s, targetUrl=%s, workers=%d\n",
-			retrieved.Name, retrieved.TargetURL, retrieved.Workers)
+		fmt.Printf("Retrieved config: name=%s, targetBaseUrl=%s, strategy=%s\n",
+			retrieved.Name, retrieved.TargetBaseURL, retrieved.Strategy)
 	}
 
 	// -----------------------------------------------------------------------
@@ -63,11 +62,10 @@ func main() {
 	fmt.Println("\n--- Start Fuzzing Run ---")
 
 	run, err := client.Fuzzing().Start(ctx, &mockarty.FuzzingConfig{
-		Name:      "Quick Fuzz",
-		TargetURL: "http://localhost:5770",
-		SpecURL:   "http://localhost:5770/swagger/doc.json",
-		Duration:  "10s",
-		Workers:   2,
+		Name:          "Quick Fuzz",
+		TargetBaseURL: "http://localhost:5770",
+		SourceType:    "openapi",
+		Strategy:      "all",
 	})
 	if err != nil {
 		fmt.Printf("Start fuzzing returned: %v\n", err)
@@ -88,13 +86,13 @@ func main() {
 			fmt.Printf("  ID: %s\n", result.ID)
 			fmt.Printf("  Status: %s\n", result.Status)
 			fmt.Printf("  Total requests: %d\n", result.TotalRequests)
-			fmt.Printf("  Findings: %d\n", result.Findings)
+			fmt.Printf("  Total findings: %d\n", result.TotalFindings)
 
-			if result.StartedAt > 0 {
-				fmt.Printf("  Started: %s\n", time.Unix(result.StartedAt, 0).Format(time.RFC3339))
+			if result.StartedAt != "" {
+				fmt.Printf("  Started: %s\n", result.StartedAt)
 			}
-			if result.FinishedAt > 0 {
-				fmt.Printf("  Finished: %s\n", time.Unix(result.FinishedAt, 0).Format(time.RFC3339))
+			if result.CompletedAt != "" {
+				fmt.Printf("  Completed: %s\n", result.CompletedAt)
 			}
 		}
 
@@ -115,7 +113,7 @@ func main() {
 		fmt.Printf("Found %d security findings:\n", len(findings))
 		for _, f := range findings {
 			fmt.Printf("  - [%s] %s: %s (triage=%s)\n",
-				f.Severity, f.Type, f.Title, f.TriageStatus)
+				f.Severity, f.Category, f.Title, f.TriagedStatus)
 		}
 
 		// If we have findings, demonstrate triage, replay, and analysis
@@ -130,7 +128,7 @@ func main() {
 			} else {
 				fmt.Printf("Finding detail:\n")
 				fmt.Printf("  ID: %s\n", detail.ID)
-				fmt.Printf("  Type: %s\n", detail.Type)
+				fmt.Printf("  Category: %s\n", detail.Category)
 				fmt.Printf("  Severity: %s\n", detail.Severity)
 				fmt.Printf("  Description: %s\n", detail.Description)
 			}
@@ -258,26 +256,26 @@ func main() {
 
 	// Create a schedule to run fuzzing automatically (e.g. nightly)
 	schedule, err := client.Fuzzing().CreateSchedule(ctx, &mockarty.FuzzingSchedule{
-		ConfigID: config.ID,
-		Cron:     "0 2 * * *", // every night at 2 AM
-		Enabled:  true,
+		ConfigID:       config.ID,
+		CronExpression: "0 2 * * *", // every night at 2 AM
+		Enabled:        true,
 	})
 	if err != nil {
 		fmt.Printf("Create schedule returned: %v\n", err)
 	} else {
 		fmt.Printf("Created fuzzing schedule: id=%s, cron=%s, enabled=%t\n",
-			schedule.ID, schedule.Cron, schedule.Enabled)
+			schedule.ID, schedule.CronExpression, schedule.Enabled)
 
 		// Update the schedule
 		updated, err := client.Fuzzing().UpdateSchedule(ctx, schedule.ID, &mockarty.FuzzingSchedule{
-			ConfigID: config.ID,
-			Cron:     "0 3 * * 1", // weekly on Monday at 3 AM
-			Enabled:  true,
+			ConfigID:       config.ID,
+			CronExpression: "0 3 * * 1", // weekly on Monday at 3 AM
+			Enabled:        true,
 		})
 		if err != nil {
 			fmt.Printf("Update schedule returned: %v\n", err)
 		} else {
-			fmt.Printf("Updated schedule cron to: %s\n", updated.Cron)
+			fmt.Printf("Updated schedule cron to: %s\n", updated.CronExpression)
 		}
 
 		// Get a specific schedule
@@ -285,7 +283,7 @@ func main() {
 		if err != nil {
 			fmt.Printf("Get schedule returned: %v\n", err)
 		} else {
-			fmt.Printf("Retrieved schedule: cron=%s, enabled=%t\n", got.Cron, got.Enabled)
+			fmt.Printf("Retrieved schedule: cron=%s, enabled=%t\n", got.CronExpression, got.Enabled)
 		}
 
 		// Delete the schedule
@@ -305,7 +303,7 @@ func main() {
 		fmt.Printf("Found %d fuzzing schedules:\n", len(schedules))
 		for _, s := range schedules {
 			fmt.Printf("  - id=%s, config=%s, cron=%s, enabled=%t\n",
-				s.ID, s.ConfigID, s.Cron, s.Enabled)
+				s.ID, s.ConfigID, s.CronExpression, s.Enabled)
 		}
 	}
 
@@ -315,8 +313,8 @@ func main() {
 	fmt.Println("\n--- Quick Fuzz ---")
 
 	quickRun, err := client.Fuzzing().QuickFuzz(ctx, map[string]any{
-		"targetUrl": "http://localhost:5770/api/v1/mocks",
-		"method":    "GET",
+		"url":    "http://localhost:5770/api/v1/mocks",
+		"method": "GET",
 	})
 	if err != nil {
 		fmt.Printf("Quick fuzz returned: %v\n", err)
@@ -351,7 +349,7 @@ func main() {
 		fmt.Printf("Found %d fuzzing results:\n", len(results))
 		for _, r := range results {
 			fmt.Printf("  - id=%s, status=%s, requests=%d, findings=%d\n",
-				r.ID, r.Status, r.TotalRequests, r.Findings)
+				r.ID, r.Status, r.TotalRequests, r.TotalFindings)
 		}
 	}
 

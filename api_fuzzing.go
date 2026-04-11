@@ -6,6 +6,7 @@ package mockarty
 import (
 	"context"
 	"net/url"
+	"strconv"
 )
 
 // FuzzingAPI provides methods for managing fuzzing tests.
@@ -15,14 +16,17 @@ type FuzzingAPI struct {
 
 // FuzzingConfig defines the configuration for a fuzzing run.
 type FuzzingConfig struct {
-	ID        string `json:"id,omitempty"`
-	Name      string `json:"name,omitempty"`
-	TargetURL string `json:"targetUrl,omitempty"`
-	SpecURL   string `json:"specUrl,omitempty"`
-	Spec      string `json:"spec,omitempty"`
-	Duration  string `json:"duration,omitempty"`
-	Workers   int    `json:"workers,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
+	ID                string   `json:"id,omitempty"`
+	Name              string   `json:"name,omitempty"`
+	Namespace         string   `json:"namespace,omitempty"`
+	TargetBaseURL     string   `json:"targetBaseUrl,omitempty"`
+	SourceType        string   `json:"sourceType,omitempty"`
+	Strategy          string   `json:"strategy,omitempty"`
+	PayloadCategories []string `json:"payloadCategories,omitempty"`
+	SeedRequests      any      `json:"seedRequests,omitempty"`
+	Options           any      `json:"options,omitempty"`
+	CreatedAt         string   `json:"createdAt,omitempty"`
+	UpdatedAt         string   `json:"updatedAt,omitempty"`
 }
 
 // FuzzingRun represents a started fuzzing run.
@@ -33,13 +37,21 @@ type FuzzingRun struct {
 
 // FuzzingResult holds the results of a completed or in-progress fuzzing run.
 type FuzzingResult struct {
-	ID            string `json:"id,omitempty"`
-	ConfigID      string `json:"configId,omitempty"`
-	Status        string `json:"status,omitempty"`
-	StartedAt     int64  `json:"startedAt,omitempty"`
-	FinishedAt    int64  `json:"finishedAt,omitempty"`
-	TotalRequests int    `json:"totalRequests,omitempty"`
-	Findings      int    `json:"findings,omitempty"`
+	ID               string `json:"id,omitempty"`
+	ConfigID         string `json:"configId,omitempty"`
+	Namespace        string `json:"namespace,omitempty"`
+	Status           string `json:"status,omitempty"`
+	Strategy         string `json:"strategy,omitempty"`
+	TotalRequests    int64  `json:"totalRequests,omitempty"`
+	TotalFindings    int    `json:"totalFindings,omitempty"`
+	CriticalFindings int    `json:"criticalFindings,omitempty"`
+	HighFindings     int    `json:"highFindings,omitempty"`
+	MediumFindings   int    `json:"mediumFindings,omitempty"`
+	LowFindings      int    `json:"lowFindings,omitempty"`
+	InfoFindings     int    `json:"infoFindings,omitempty"`
+	StartedAt        string `json:"startedAt,omitempty"`
+	CompletedAt      string `json:"completedAt,omitempty"`
+	DurationMs       int64  `json:"durationMs,omitempty"`
 }
 
 // Start starts a new fuzzing run with the given configuration.
@@ -103,28 +115,75 @@ func (a *FuzzingAPI) GetConfig(ctx context.Context, id string) (*FuzzingConfig, 
 	return &config, nil
 }
 
+// ListConfigs returns all fuzzing configurations.
+func (a *FuzzingAPI) ListConfigs(ctx context.Context) ([]FuzzingConfig, error) {
+	var configs []FuzzingConfig
+	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/configs", nil, &configs); err != nil {
+		return nil, err
+	}
+	return configs, nil
+}
+
+// UpdateConfig updates a fuzzing configuration by ID.
+func (a *FuzzingAPI) UpdateConfig(ctx context.Context, id string, config *FuzzingConfig) (*FuzzingConfig, error) {
+	var result FuzzingConfig
+	if err := a.client.do(ctx, "PUT", "/api/v1/fuzzing/configs/"+url.PathEscape(id), config, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteConfig deletes a fuzzing configuration by ID.
+func (a *FuzzingAPI) DeleteConfig(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/fuzzing/configs/"+url.PathEscape(id), nil, nil)
+}
+
 // ---------------------------------------------------------------------------
 // Finding types
 // ---------------------------------------------------------------------------
 
 // FuzzingFinding represents a security finding from a fuzzing run.
 type FuzzingFinding struct {
-	ID           string `json:"id,omitempty"`
-	RunID        string `json:"runId,omitempty"`
-	Type         string `json:"type,omitempty"`
-	Severity     string `json:"severity,omitempty"`
-	Title        string `json:"title,omitempty"`
-	Description  string `json:"description,omitempty"`
-	TriageStatus string `json:"triageStatus,omitempty"`
+	ID            string `json:"id,omitempty"`
+	RunID         string `json:"runId,omitempty"`
+	Severity      string `json:"severity,omitempty"`
+	Category      string `json:"category,omitempty"`
+	Title         string `json:"title,omitempty"`
+	Description   string `json:"description,omitempty"`
+	RequestMethod string `json:"requestMethod,omitempty"`
+	RequestURL    string `json:"requestUrl,omitempty"`
+	ResponseStatus int   `json:"responseStatus,omitempty"`
+	TriagedStatus string `json:"triagedStatus,omitempty"`
+	CreatedAt     string `json:"createdAt,omitempty"`
 }
 
 // FuzzingSchedule represents a scheduled fuzzing run.
 type FuzzingSchedule struct {
-	ID        string `json:"id,omitempty"`
-	ConfigID  string `json:"configId,omitempty"`
-	Cron      string `json:"cron,omitempty"`
-	Enabled   bool   `json:"enabled"`
-	CreatedAt int64  `json:"createdAt,omitempty"`
+	ID              string `json:"id,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	ConfigID        string `json:"configId,omitempty"`
+	Name            string `json:"name,omitempty"`
+	CronExpression  string `json:"cronExpression,omitempty"`
+	Enabled         bool   `json:"enabled"`
+	NotifyOnFailure bool   `json:"notifyOnFailure,omitempty"`
+	NextRunAt       string `json:"nextRunAt,omitempty"`
+	LastRunAt       string `json:"lastRunAt,omitempty"`
+	CreatedAt       string `json:"createdAt,omitempty"`
+	UpdatedAt       string `json:"updatedAt,omitempty"`
+}
+
+// QuarantineEntry represents a quarantine rule for fuzzing findings.
+type QuarantineEntry struct {
+	ID              string `json:"id,omitempty"`
+	Namespace       string `json:"namespace,omitempty"`
+	Fingerprint     string `json:"fingerprint,omitempty"`
+	Category        string `json:"category,omitempty"`
+	EndpointPattern string `json:"endpointPattern,omitempty"`
+	Title           string `json:"title,omitempty"`
+	Reason          string `json:"reason,omitempty"`
+	SourceFindingID string `json:"sourceFindingId,omitempty"`
+	CreatedBy       string `json:"createdBy,omitempty"`
+	CreatedAt       string `json:"createdAt,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -225,10 +284,10 @@ func (a *FuzzingAPI) ExportFindings(ctx context.Context, req any) ([]byte, error
 // ---------------------------------------------------------------------------
 
 // ImportFromCurl imports a fuzzing target from a cURL command.
-func (a *FuzzingAPI) ImportFromCurl(ctx context.Context, data string) error {
+func (a *FuzzingAPI) ImportFromCurl(ctx context.Context, curl string) error {
 	body := struct {
-		Data string `json:"data"`
-	}{Data: data}
+		Curl string `json:"curl"`
+	}{Curl: curl}
 	return a.client.do(ctx, "POST", "/api/v1/fuzzing/import/curl", body, nil)
 }
 
@@ -295,4 +354,125 @@ func (a *FuzzingAPI) UpdateSchedule(ctx context.Context, id string, schedule *Fu
 // DeleteSchedule deletes a fuzzing schedule by ID.
 func (a *FuzzingAPI) DeleteSchedule(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/fuzzing/schedules/"+url.PathEscape(id), nil, nil)
+}
+
+// ---------------------------------------------------------------------------
+// Batch Finding Operations
+// ---------------------------------------------------------------------------
+
+// BatchManualTriageFuzzFindings updates the triage status and optional note for multiple findings.
+func (a *FuzzingAPI) BatchManualTriageFuzzFindings(ctx context.Context, ids []string, status string, note *string) (int, error) {
+	body := struct {
+		IDs    []string `json:"ids"`
+		Status string   `json:"status"`
+		Note   *string  `json:"note,omitempty"`
+	}{IDs: ids, Status: status, Note: note}
+	var resp struct {
+		Updated int `json:"updated"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/findings/batch-manual-triage", body, &resp); err != nil {
+		return 0, err
+	}
+	return resp.Updated, nil
+}
+
+// BatchDeleteFuzzFindings deletes multiple fuzzing findings by IDs.
+func (a *FuzzingAPI) BatchDeleteFuzzFindings(ctx context.Context, ids []string) (int, error) {
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: ids}
+	var resp struct {
+		Deleted int `json:"deleted"`
+	}
+	if err := a.client.do(ctx, "DELETE", "/api/v1/fuzzing/findings/batch", body, &resp); err != nil {
+		return 0, err
+	}
+	return resp.Deleted, nil
+}
+
+// ---------------------------------------------------------------------------
+// Quarantine
+// ---------------------------------------------------------------------------
+
+// ListFuzzQuarantine returns quarantine entries with pagination.
+func (a *FuzzingAPI) ListFuzzQuarantine(ctx context.Context, limit, offset int) ([]QuarantineEntry, int, error) {
+	params := url.Values{}
+	if limit > 0 {
+		params.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		params.Set("offset", strconv.Itoa(offset))
+	}
+
+	path := "/api/v1/fuzzing/quarantine"
+	if len(params) > 0 {
+		path += "?" + params.Encode()
+	}
+
+	var resp struct {
+		Entries []QuarantineEntry `json:"entries"`
+		Total   int               `json:"total"`
+	}
+	if err := a.client.do(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, 0, err
+	}
+	return resp.Entries, resp.Total, nil
+}
+
+// CreateFuzzQuarantine creates a new quarantine entry.
+func (a *FuzzingAPI) CreateFuzzQuarantine(ctx context.Context, entry *QuarantineEntry) (*QuarantineEntry, error) {
+	var result QuarantineEntry
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/quarantine", entry, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// DeleteFuzzQuarantine deletes a quarantine entry by ID.
+func (a *FuzzingAPI) DeleteFuzzQuarantine(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/fuzzing/quarantine/"+url.PathEscape(id), nil, nil)
+}
+
+// BatchDeleteFuzzQuarantine deletes multiple quarantine entries by IDs.
+func (a *FuzzingAPI) BatchDeleteFuzzQuarantine(ctx context.Context, ids []string) (int, error) {
+	body := struct {
+		IDs []string `json:"ids"`
+	}{IDs: ids}
+	var resp struct {
+		Deleted int `json:"deleted"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/quarantine/batch-delete", body, &resp); err != nil {
+		return 0, err
+	}
+	return resp.Deleted, nil
+}
+
+// QuarantineFuzzFinding creates a quarantine entry from a finding.
+func (a *FuzzingAPI) QuarantineFuzzFinding(ctx context.Context, findingID string, reason string) (*QuarantineEntry, error) {
+	body := struct {
+		FindingID string `json:"findingId"`
+		Reason    string `json:"reason"`
+	}{FindingID: findingID, Reason: reason}
+	var result QuarantineEntry
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/quarantine/from-finding", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// BatchQuarantineFuzzFindings creates quarantine entries from multiple findings.
+func (a *FuzzingAPI) BatchQuarantineFuzzFindings(ctx context.Context, findingIDs []string, reason string) (created, triaged, failed int, err error) {
+	body := struct {
+		FindingIDs []string `json:"findingIds"`
+		Reason     string   `json:"reason"`
+	}{FindingIDs: findingIDs, Reason: reason}
+	var resp struct {
+		Created int `json:"created"`
+		Triaged int `json:"triaged"`
+		Failed  int `json:"failed"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/quarantine/from-findings", body, &resp); err != nil {
+		return 0, 0, 0, err
+	}
+	return resp.Created, resp.Triaged, resp.Failed, nil
 }

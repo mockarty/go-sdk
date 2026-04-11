@@ -169,7 +169,7 @@ func TestClient_ErrorParsing(t *testing.T) {
 			name:       "plain text error",
 			statusCode: 503,
 			body:       `service unavailable`,
-			wantErr:    ErrServerError,
+			wantErr:    ErrUnavailable,
 			wantMsg:    "service unavailable",
 		},
 	}
@@ -436,14 +436,24 @@ func TestAPIError_Error(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "without request ID",
+			name:     "bare",
 			err:      APIError{StatusCode: 404, Message: "not found"},
 			expected: "mockarty: HTTP 404: not found",
 		},
 		{
-			name:     "with request ID",
+			name:     "with request ID only",
 			err:      APIError{StatusCode: 500, Message: "internal error", RequestID: "abc-123"},
 			expected: "mockarty: HTTP 500: internal error (request_id=abc-123)",
+		},
+		{
+			name:     "with code only",
+			err:      APIError{StatusCode: 404, Message: "not found", Code: "not_found"},
+			expected: "mockarty: HTTP 404 not_found: not found",
+		},
+		{
+			name:     "with code and request ID",
+			err:      APIError{StatusCode: 404, Message: "not found", Code: "not_found", RequestID: "abc-123"},
+			expected: "mockarty: HTTP 404 not_found: not found (request_id=abc-123)",
 		},
 	}
 
@@ -462,15 +472,15 @@ func TestAPIError_Unwrap(t *testing.T) {
 		statusCode int
 		want       error
 	}{
+		{400, ErrValidation},
 		{401, ErrUnauthorized},
 		{403, ErrForbidden},
 		{404, ErrNotFound},
 		{409, ErrConflict},
 		{429, ErrRateLimited},
 		{500, ErrServerError},
-		{502, ErrServerError},
-		{503, ErrServerError},
-		{400, nil},
+		{502, ErrExternal},
+		{503, ErrUnavailable},
 		{422, nil},
 	}
 
@@ -482,5 +492,76 @@ func TestAPIError_Unwrap(t *testing.T) {
 				t.Errorf("Unwrap() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestAPIError_UnwrapByCode verifies that the new {"code": "..."} field in the
+// server's error envelope is the primary dispatch source for errors.Is matching.
+// When both Code and StatusCode are present, Code wins.
+func TestAPIError_UnwrapByCode(t *testing.T) {
+	tests := []struct {
+		name       string
+		code       string
+		statusCode int
+		want       error
+	}{
+		{"validation", "validation", 400, ErrValidation},
+		{"unauthorized", "unauthorized", 401, ErrUnauthorized},
+		{"forbidden", "forbidden", 403, ErrForbidden},
+		{"not_found", "not_found", 404, ErrNotFound},
+		{"conflict", "conflict", 409, ErrConflict},
+		{"rate_limit", "rate_limit", 429, ErrRateLimited},
+		{"unavailable", "unavailable", 503, ErrUnavailable},
+		{"external", "external", 502, ErrExternal},
+		{"internal", "internal", 500, ErrServerError},
+		// Code wins over a mismatched status
+		{"code_wins_over_status", "not_found", 500, ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			apiErr := &APIError{
+				StatusCode: tt.statusCode,
+				Code:       tt.code,
+				Message:    "test",
+			}
+			got := apiErr.Unwrap()
+			if got != tt.want {
+				t.Errorf("Unwrap() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+// TestClient_ParsesCodeAndRequestID verifies that the new server envelope
+// fields code and request_id are extracted into APIError.
+func TestClient_ParsesCodeAndRequestID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-Id", "header-req-id")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"mock not found","code":"not_found","request_id":"body-req-id"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	err := c.do(context.Background(), "GET", "/test", nil, nil)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatal("expected error to be *APIError")
+	}
+
+	if apiErr.Code != "not_found" {
+		t.Errorf("expected code %q, got %q", "not_found", apiErr.Code)
+	}
+	// Body request_id wins over header X-Request-Id.
+	if apiErr.RequestID != "body-req-id" {
+		t.Errorf("expected request_id %q, got %q", "body-req-id", apiErr.RequestID)
+	}
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("expected errors.Is(err, ErrNotFound) to be true")
 	}
 }

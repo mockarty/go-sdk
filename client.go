@@ -388,16 +388,29 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 			RequestID:  resp.Header.Get(headerRequestID),
 		}
 
-		// Try to parse structured error
+		// Parse the server's uniform error envelope:
+		//   {"error": "...", "code": "...", "request_id": "..."}
+		// `message` is accepted as a legacy fallback for very old servers.
 		var errResp struct {
-			Error   string `json:"error"`
-			Message string `json:"message"`
+			Error     string `json:"error"`
+			Message   string `json:"message"`
+			Code      string `json:"code"`
+			RequestID string `json:"request_id"`
 		}
 		if json.Unmarshal(errBody, &errResp) == nil {
 			if errResp.Error != "" {
 				apiErr.Message = errResp.Error
 			} else if errResp.Message != "" {
 				apiErr.Message = errResp.Message
+			}
+			if errResp.Code != "" {
+				apiErr.Code = errResp.Code
+			}
+			// Body request_id wins over the X-Request-Id header: if both
+			// are present they should match, but the body is the canonical
+			// source in the new envelope.
+			if errResp.RequestID != "" {
+				apiErr.RequestID = errResp.RequestID
 			}
 		}
 		if apiErr.Message == "" {

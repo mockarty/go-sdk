@@ -107,6 +107,133 @@ func (a *RecorderAPI) ExportSession(ctx context.Context, id string) ([]byte, err
 }
 
 // ---------------------------------------------------------------------------
+// Session-level Replay
+// ---------------------------------------------------------------------------
+
+// ReplayOptions configures a session-level replay run.
+//
+// All fields are optional. When TargetURL is empty, the recorder replays
+// against each captured entry's original URL. EntryIDs filters down to a
+// subset; an empty slice replays everything in the session.
+type ReplayOptions struct {
+	TargetURL       string   `json:"targetUrl,omitempty"`
+	EntryIDs        []string `json:"entryIds,omitempty"`
+	Concurrency     int      `json:"concurrency,omitempty"`     // default 1
+	TimeoutMs       int      `json:"timeoutMs,omitempty"`       // per request
+	IncludeNonHTTP  bool     `json:"includeNonHttp,omitempty"`  // include WS/SSE entries (debug)
+	FollowRedirects bool     `json:"followRedirects,omitempty"` // default false
+}
+
+// ReplayResult is the per-entry outcome of a replay run.
+type ReplayResult struct {
+	EntryID         string `json:"entryId"`
+	OriginalStatus  int    `json:"originalStatus"`
+	NewStatus       int    `json:"newStatus"`
+	StatusMatch     bool   `json:"statusMatch"`
+	DurationMs      int64  `json:"durationMs"`
+	ReplayedURL     string `json:"replayedUrl"`
+	ResponsePreview string `json:"responsePreview,omitempty"`
+	Error           string `json:"error,omitempty"`
+	Skipped         bool   `json:"skipped,omitempty"`
+	SkippedReason   string `json:"skippedReason,omitempty"`
+}
+
+// ReplaySummary aggregates the outcome of a replay run.
+type ReplaySummary struct {
+	SessionID    string         `json:"sessionId"`
+	TotalEntries int            `json:"totalEntries"`
+	Matched      int            `json:"matched"`
+	Mismatched   int            `json:"mismatched"`
+	Failed       int            `json:"failed"`
+	Skipped      int            `json:"skipped"`
+	Results      []ReplayResult `json:"results"`
+}
+
+// ReplaySession re-runs every (or a subset of) captured entry against either
+// the original URL or a new TargetURL and returns a per-entry summary.
+//
+//	summary, err := client.Recorder().ReplaySession(ctx, "sess-123", &mockarty.ReplayOptions{
+//	    TargetURL:   "http://staging.example.com",
+//	    Concurrency: 5,
+//	})
+func (a *RecorderAPI) ReplaySession(ctx context.Context, id string, opts *ReplayOptions) (*ReplaySummary, error) {
+	body := opts
+	if body == nil {
+		body = &ReplayOptions{}
+	}
+	var out ReplaySummary
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/replay", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ---------------------------------------------------------------------------
+// Correlation engine
+// ---------------------------------------------------------------------------
+
+// CorrelationOptions configures a correlation analysis run. Defaults are
+// chosen to surface common REST patterns; override for noisier traffic.
+type CorrelationOptions struct {
+	EntryIDs                 []string `json:"entryIds,omitempty"`
+	MinValueLength           int      `json:"minValueLength,omitempty"`           // default 4
+	MaxValueLength           int      `json:"maxValueLength,omitempty"`           // default 512
+	ExcludeNumeric           bool     `json:"excludeNumeric,omitempty"`           // default false
+	MaxCorrelationsPerSource int      `json:"maxCorrelationsPerSource,omitempty"` // default 50
+}
+
+// CorrelationLocation pins a value to a section/path inside one entry.
+type CorrelationLocation struct {
+	EntryID  string `json:"entryId"`
+	Sequence int    `json:"sequence"`
+	Section  string `json:"section"`
+	Path     string `json:"path"`
+}
+
+// Correlation links a value found in one entry's response to its later use
+// in another entry's request (URL, header, body, cookie, etc.).
+type Correlation struct {
+	Value      string                `json:"value"`
+	ValueType  string                `json:"valueType"` // string|number|uuid|jwt|token
+	Source     CorrelationLocation   `json:"source"`
+	Targets    []CorrelationLocation `json:"targets"`
+	Confidence float64               `json:"confidence"`
+	Reason     string                `json:"reason"`
+}
+
+// CorrelationReport is the result of CorrelateSession.
+type CorrelationReport struct {
+	SessionID    string        `json:"sessionId"`
+	TotalEntries int           `json:"totalEntries"`
+	Scanned      int           `json:"scanned"`
+	Correlations []Correlation `json:"correlations"`
+	Summary      struct {
+		ByValueType map[string]int `json:"byValueType"`
+		BySection   map[string]int `json:"bySection"`
+	} `json:"summary"`
+}
+
+// CorrelateSession runs the deterministic value-matching correlation engine
+// against a captured session and returns a report linking response values
+// (tokens, IDs, cookies) to their later re-use sites.
+//
+//	report, err := client.Recorder().CorrelateSession(ctx, "sess-123", nil)
+//	for _, c := range report.Correlations {
+//	    fmt.Printf("%s (%s) → %d targets\n", c.Value, c.ValueType, len(c.Targets))
+//	}
+func (a *RecorderAPI) CorrelateSession(ctx context.Context, id string, opts *CorrelationOptions) (*CorrelationReport, error) {
+	body := opts
+	if body == nil {
+		body = &CorrelationOptions{}
+	}
+	var out CorrelationReport
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/correlate", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ---------------------------------------------------------------------------
 // Recorder Config type
 // ---------------------------------------------------------------------------
 
