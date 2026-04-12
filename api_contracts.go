@@ -27,12 +27,46 @@ type ContractConfig struct {
 	UpdatedAt int64  `json:"updatedAt,omitempty"`
 }
 
-// ContractValidationRequest is the payload for validation endpoints.
+// ContractValidationRequest is the payload for validate-mocks and verify-provider.
 type ContractValidationRequest struct {
-	Spec      string `json:"spec,omitempty"`
-	SpecURL   string `json:"specUrl,omitempty"`
-	TargetURL string `json:"targetUrl,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
+	SpecContent string            `json:"specContent,omitempty"`
+	SpecURL     string            `json:"specUrl,omitempty"`
+	SpecType    string            `json:"specType,omitempty"`
+	ContentType string            `json:"contentType,omitempty"`
+	BaseURL     string            `json:"baseUrl,omitempty"`
+	Namespace   string            `json:"namespace,omitempty"`
+	MockIDs     []string          `json:"mockIds,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Headers     map[string]string `json:"headers,omitempty"`
+	Timeout     int               `json:"timeout,omitempty"`
+}
+
+// CheckCompatibilityRequest is the payload for backwards-compatibility checking.
+type CheckCompatibilityRequest struct {
+	OldSpecContent string `json:"oldSpecContent"`
+	OldContentType string `json:"oldContentType,omitempty"`
+	NewSpecContent string `json:"newSpecContent"`
+	NewContentType string `json:"newContentType,omitempty"`
+}
+
+// ValidatePayloadRequest is the payload for single-payload validation.
+type ValidatePayloadRequest struct {
+	Payload     interface{} `json:"payload"`
+	SpecContent string      `json:"specContent"`
+	ContentType string      `json:"contentType,omitempty"`
+	SpecURL     string      `json:"specUrl,omitempty"`
+	Endpoint    string      `json:"endpoint"`
+	StatusCode  string      `json:"statusCode"`
+}
+
+// DriftDetectionRequest is the payload for drift detection endpoints.
+type DriftDetectionRequest struct {
+	BaseURL   string            `json:"baseUrl"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	Namespace string            `json:"namespace,omitempty"`
+	MockIDs   []string          `json:"mockIds,omitempty"`
+	Tags      []string          `json:"tags,omitempty"`
+	Timeout   int               `json:"timeout,omitempty"`
 }
 
 // ContractValidationResult holds the result of a contract validation.
@@ -82,8 +116,8 @@ func (a *ContractAPI) VerifyProvider(ctx context.Context, req *ContractValidatio
 	return &result, nil
 }
 
-// CheckCompatibility checks compatibility between specs.
-func (a *ContractAPI) CheckCompatibility(ctx context.Context, req any) (*ContractValidationResult, error) {
+// CheckCompatibility checks backward compatibility between two spec versions.
+func (a *ContractAPI) CheckCompatibility(ctx context.Context, req *CheckCompatibilityRequest) (*ContractValidationResult, error) {
 	var result ContractValidationResult
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/check-compatibility", req, &result); err != nil {
 		return nil, err
@@ -91,8 +125,8 @@ func (a *ContractAPI) CheckCompatibility(ctx context.Context, req any) (*Contrac
 	return &result, nil
 }
 
-// ValidatePayload validates a payload against a spec.
-func (a *ContractAPI) ValidatePayload(ctx context.Context, req any) (*ContractValidationResult, error) {
+// ValidatePayload validates a single JSON payload against a spec schema.
+func (a *ContractAPI) ValidatePayload(ctx context.Context, req *ValidatePayloadRequest) (*ContractValidationResult, error) {
 	var result ContractValidationResult
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/validate-payload", req, &result); err != nil {
 		return nil, err
@@ -183,6 +217,42 @@ type CanIDeployResult struct {
 	Reason string `json:"reason,omitempty"`
 }
 
+// PactVerifyRequest is the input for pact provider verification.
+type PactVerifyRequest struct {
+	PactID             string            `json:"pactId,omitempty"`
+	PactContent        string            `json:"pactContent,omitempty"`
+	ProviderBaseURL    string            `json:"providerBaseUrl"`
+	ProviderStateURL   string            `json:"providerStateUrl,omitempty"`
+	MessageCallbackURL string            `json:"messageCallbackUrl,omitempty"`
+	Headers            map[string]string `json:"headers,omitempty"`
+	Timeout            int               `json:"timeout,omitempty"`
+}
+
+// PactProviderState describes a provider state required by a message interaction.
+type PactProviderState struct {
+	Name   string                 `json:"name"`
+	Params map[string]interface{} `json:"params,omitempty"`
+}
+
+// PactMessageContent is one request or response body inside a synchronous
+// message interaction. For asynchronous messages only Contents/Metadata apply.
+type PactMessageContent struct {
+	Contents interface{}            `json:"contents,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// PactMessageInteraction represents an async or sync message interaction
+// from a v4 pact file. Async messages use Contents+Metadata; sync messages
+// additionally populate Responses with one or more reply variants.
+type PactMessageInteraction struct {
+	Type           string                 `json:"type,omitempty"` // "async" | "sync"
+	Description    string                 `json:"description"`
+	ProviderStates []PactProviderState    `json:"providerStates,omitempty"`
+	Contents       interface{}            `json:"contents,omitempty"`
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	Responses      []PactMessageContent   `json:"response,omitempty"`
+}
+
 // ---------------------------------------------------------------------------
 // Pact endpoints
 // ---------------------------------------------------------------------------
@@ -218,7 +288,7 @@ func (a *ContractAPI) PublishPact(ctx context.Context, pact *Pact) (*Pact, error
 }
 
 // VerifyPact verifies a pact against a provider.
-func (a *ContractAPI) VerifyPact(ctx context.Context, req any) (*PactVerificationResult, error) {
+func (a *ContractAPI) VerifyPact(ctx context.Context, req *PactVerifyRequest) (*PactVerificationResult, error) {
 	var result PactVerificationResult
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/pacts/verify", req, &result); err != nil {
 		return nil, err
@@ -258,8 +328,11 @@ func (a *ContractAPI) ListVerifications(ctx context.Context) ([]PactVerification
 	return results, nil
 }
 
-// DetectDrift detects drift between a contract and the live service.
-func (a *ContractAPI) DetectDrift(ctx context.Context, req any) (any, error) {
+// DetectDrift detects drift between mocks and the live service.
+func (a *ContractAPI) DetectDrift(ctx context.Context, req *DriftDetectionRequest) (any, error) {
+	if req.Namespace == "" && a.client.namespace != "" {
+		req.Namespace = a.client.namespace
+	}
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift", req, &result); err != nil {
 		return nil, err
@@ -268,7 +341,7 @@ func (a *ContractAPI) DetectDrift(ctx context.Context, req any) (any, error) {
 }
 
 // DetectGraphQLDrift detects drift between mock and real GraphQL schema via introspection.
-func (a *ContractAPI) DetectGraphQLDrift(ctx context.Context, req any) (any, error) {
+func (a *ContractAPI) DetectGraphQLDrift(ctx context.Context, req *DriftDetectionRequest) (any, error) {
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/graphql", req, &result); err != nil {
 		return nil, err
@@ -277,7 +350,7 @@ func (a *ContractAPI) DetectGraphQLDrift(ctx context.Context, req any) (any, err
 }
 
 // DetectGRPCDrift detects drift between mock and real gRPC services via reflection.
-func (a *ContractAPI) DetectGRPCDrift(ctx context.Context, req any) (any, error) {
+func (a *ContractAPI) DetectGRPCDrift(ctx context.Context, req *DriftDetectionRequest) (any, error) {
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/grpc", req, &result); err != nil {
 		return nil, err
@@ -286,7 +359,7 @@ func (a *ContractAPI) DetectGRPCDrift(ctx context.Context, req any) (any, error)
 }
 
 // DetectWSDLDrift detects drift between mock and real SOAP/WSDL services.
-func (a *ContractAPI) DetectWSDLDrift(ctx context.Context, req any) (any, error) {
+func (a *ContractAPI) DetectWSDLDrift(ctx context.Context, req *DriftDetectionRequest) (any, error) {
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/wsdl", req, &result); err != nil {
 		return nil, err
@@ -295,7 +368,7 @@ func (a *ContractAPI) DetectWSDLDrift(ctx context.Context, req any) (any, error)
 }
 
 // DetectMCPDrift detects drift between mock and real MCP servers.
-func (a *ContractAPI) DetectMCPDrift(ctx context.Context, req any) (any, error) {
+func (a *ContractAPI) DetectMCPDrift(ctx context.Context, req *DriftDetectionRequest) (any, error) {
 	var result any
 	if err := a.client.do(ctx, "POST", "/api/v1/contract/detect-drift/mcp", req, &result); err != nil {
 		return nil, err
@@ -863,4 +936,89 @@ func (a *ContractAPI) Health(ctx context.Context) (*ContractHealth, error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+// BDCTVerify runs bidirectional contract testing — verifying a Pact contract
+// against an OpenAPI/AsyncAPI provider specification without a running provider.
+func (a *ContractAPI) BDCTVerify(ctx context.Context, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/bdct/verify", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ParseJSONFields parses field trees from inline spec content without
+// requiring a registry entry.
+func (a *ContractAPI) ParseJSONFields(ctx context.Context, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/parse-json-fields", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DiffConsumerContract compares a consumer contract against another and
+// returns structural differences.
+func (a *ContractAPI) DiffConsumerContract(ctx context.Context, contractID string, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", fmt.Sprintf("/api/v1/contract/consumer-contracts/%s/diff", contractID), req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// DiffConsumerContractVersions compares two specific versions of a consumer
+// contract and returns their structural differences.
+func (a *ContractAPI) DiffConsumerContractVersions(ctx context.Context, contractID string, v1, v2 int) (*VersionDiff, error) {
+	var result VersionDiff
+	if err := a.client.do(ctx, "GET", fmt.Sprintf("/api/v1/contract/consumer-contracts/%s/versions/%d/diff/%d", contractID, v1, v2), nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// ListRegistryNamespaces returns all namespaces that have registry entries.
+func (a *ContractAPI) ListRegistryNamespaces(ctx context.Context) ([]string, error) {
+	var result []string
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/registry/namespaces", nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// AnalyzeFindings asks the AI to analyze contract validation findings.
+func (a *ContractAPI) AnalyzeFindings(ctx context.Context, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/findings/analyze", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// AutoTriageFindings auto-triages contract findings by severity and impact.
+func (a *ContractAPI) AutoTriageFindings(ctx context.Context, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/findings/auto-triage", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ExportFindings exports contract findings in a specified format.
+func (a *ContractAPI) ExportFindings(ctx context.Context, req any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/contract/findings/export", req, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// RunConfig triggers an immediate execution of a contract validation schedule.
+func (a *ContractAPI) RunConfig(ctx context.Context, configID string) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", fmt.Sprintf("/api/v1/contract/configs/%s/run", configID), nil, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

@@ -451,8 +451,8 @@ func TestContractAPI_ValidateMocks(t *testing.T) {
 	})
 
 	result, err := client.Contracts().ValidateMocks(context.Background(), &ContractValidationRequest{
-		SpecURL:   "https://example.com/openapi.yaml",
-		TargetURL: "https://api.example.com",
+		SpecURL: "https://example.com/openapi.yaml",
+		BaseURL: "https://api.example.com",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

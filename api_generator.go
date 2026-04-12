@@ -166,3 +166,36 @@ func (a *GeneratorAPI) PreviewHAR(ctx context.Context, spec *GeneratorRequest) (
 	}
 	return &resp, nil
 }
+
+// FromMCP generates mocks from an MCP (Model Context Protocol) server specification.
+func (a *GeneratorAPI) FromMCP(ctx context.Context, spec *GeneratorRequest) (*GeneratorResponse, error) {
+	if spec.Namespace == "" && a.client.namespace != "" {
+		spec.Namespace = a.client.namespace
+	}
+	var resp GeneratorResponse
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/mcp", spec, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// PreviewMCP previews mocks that would be generated from an MCP specification.
+func (a *GeneratorAPI) PreviewMCP(ctx context.Context, spec *GeneratorRequest) (*GeneratorPreview, error) {
+	if spec.Namespace == "" && a.client.namespace != "" {
+		spec.Namespace = a.client.namespace
+	}
+	var resp GeneratorPreview
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/mcp/preview", spec, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// LoadGraphQLSchemaFromURL loads a GraphQL schema from an introspection endpoint.
+func (a *GeneratorAPI) LoadGraphQLSchemaFromURL(ctx context.Context, url string) (map[string]any, error) {
+	var resp map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/generators/graphql/schema", map[string]string{"graphqlUrl": url}, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
