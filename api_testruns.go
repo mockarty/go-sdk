@@ -36,6 +36,22 @@ func (a *TestRunAPI) List(ctx context.Context) ([]TestRun, error) {
 	return runs, nil
 }
 
+// activeTestRunsEnvelope mirrors the `{"runs": [...]}` envelope emitted by
+// the /api/v1/test-runs/active endpoint used by the Runs Tray UI.
+type activeTestRunsEnvelope struct {
+	Runs []TestRun `json:"runs"`
+}
+
+// ListActive returns the list of pending/running test runs visible to the caller
+// in the current namespace. Useful for CI/CD gating on parallel runs.
+func (a *TestRunAPI) ListActive(ctx context.Context) ([]TestRun, error) {
+	var envelope activeTestRunsEnvelope
+	if err := a.client.do(ctx, "GET", "/api/v1/test-runs/active", nil, &envelope); err != nil {
+		return nil, err
+	}
+	return envelope.Runs, nil
+}
+
 // Get retrieves a test run by ID.
 func (a *TestRunAPI) Get(ctx context.Context, id string) (*TestRun, error) {
 	var run TestRun

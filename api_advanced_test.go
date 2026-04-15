@@ -1047,6 +1047,26 @@ func TestTestRunAPI_ImportReport(t *testing.T) {
 	}
 }
 
+func TestTestRunAPI_ListActive(t *testing.T) {
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"GET /api/v1/test-runs/active": func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"runs":[{"id":"00000000-0000-0000-0000-000000000001","status":"running"},{"id":"00000000-0000-0000-0000-000000000002","status":"pending"}]}`))
+		},
+	})
+
+	runs, err := client.TestRuns().ListActive(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Fatalf("expected 2 active runs, got %d", len(runs))
+	}
+	if runs[0].Status != "running" {
+		t.Errorf("expected first run status 'running', got %q", runs[0].Status)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Collection API Extended Tests (new CRUD methods)
 // ---------------------------------------------------------------------------
