@@ -934,6 +934,134 @@ func TestTestPlans_GetRunReport_EmptyIDs(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// 2026-04-20: generated non-Allure report formats (JUnit XML / Markdown / Unified)
+// ---------------------------------------------------------------------------
+
+func TestTestPlans_GetRunReportJUnit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/api/v1/namespaces/prod/test-plans/plan-1/runs/run-1/report.junit.xml"
+		if r.URL.Path != wantPath {
+			t.Fatalf("wrong path: %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+		_, _ = w.Write([]byte(`<?xml version="1.0"?><testsuites tests="1"/>`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	data, err := c.TestPlans().GetRunReportJUnit(context.Background(), "prod", "plan-1", "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("<testsuites")) {
+		t.Errorf("JUnit body missing <testsuites>: %q", data)
+	}
+}
+
+func TestTestPlans_GetRunReportMarkdown(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/api/v1/namespaces/prod/test-plans/plan-1/runs/run-1/report.md"
+		if r.URL.Path != wantPath {
+			t.Fatalf("wrong path: %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		_, _ = w.Write([]byte("# Test Plan Run\n\n- **Run ID:** `run-1`\n"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	data, err := c.TestPlans().GetRunReportMarkdown(context.Background(), "prod", "plan-1", "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("# Test Plan Run")) {
+		t.Errorf("Markdown body missing heading: %q", data)
+	}
+}
+
+func TestTestPlans_GetRunReportUnified(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/api/v1/namespaces/prod/test-plans/plan-1/runs/run-1/report.unified.json"
+		if r.URL.Path != wantPath {
+			t.Fatalf("wrong path: %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"planName":"nightly","runId":"run-1","startedAt":"2026-04-20T00:00:00Z","counts":{"total":2,"passed":1,"failed":1,"skipped":0,"broken":0},"generatedAt":1713571200000,"durationMs":1500,"results":[{"uuid":"u","name":"functional:1","status":"passed","stage":"finished","start":0,"stop":1000}]}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	rep, err := c.TestPlans().GetRunReportUnified(context.Background(), "prod", "plan-1", "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.PlanName != "nightly" || rep.RunID != "run-1" {
+		t.Errorf("decode failed: %+v", rep)
+	}
+	if rep.Counts.Total != 2 || rep.Counts.Passed != 1 || rep.Counts.Failed != 1 {
+		t.Errorf("counts: %+v", rep.Counts)
+	}
+	if len(rep.Results) != 1 || rep.Results[0].Status != "passed" {
+		t.Errorf("results: %+v", rep.Results)
+	}
+	if len(rep.Raw) == 0 {
+		t.Error("Raw not preserved")
+	}
+}
+
+func TestTestPlans_GetRunReportHTML(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/api/v1/namespaces/prod/test-plans/plan-1/runs/run-1/report.html"
+		if r.URL.Path != wantPath {
+			t.Fatalf("wrong path: %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<!DOCTYPE html><html><body>Run run-1</body></html>"))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	data, err := c.TestPlans().GetRunReportHTML(context.Background(), "prod", "plan-1", "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(data, []byte("<!DOCTYPE html>")) {
+		t.Errorf("HTML body missing <!DOCTYPE html>: %q", data)
+	}
+}
+
+func TestTestPlans_GeneratedReports_EmptyIDs(t *testing.T) {
+	c := NewClient("http://x")
+	for _, fn := range []func() error{
+		func() error { _, e := c.TestPlans().GetRunReportJUnit(context.Background(), "ns", "", "run"); return e },
+		func() error { _, e := c.TestPlans().GetRunReportJUnit(context.Background(), "ns", "plan", ""); return e },
+		func() error { _, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "", "run"); return e },
+		func() error { _, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "plan", ""); return e },
+		func() error { _, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "", "run"); return e },
+		func() error { _, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "plan", ""); return e },
+		func() error { _, e := c.TestPlans().GetRunReportHTML(context.Background(), "ns", "", "run"); return e },
+		func() error { _, e := c.TestPlans().GetRunReportHTML(context.Background(), "ns", "plan", ""); return e },
+	} {
+		if err := fn(); err == nil {
+			t.Error("expected error for empty id")
+		}
+	}
+}
+
+func TestTestPlans_GeneratedReports_ErrorPropagates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"no run"}`))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.URL)
+	if _, err := c.TestPlans().GetRunReportJUnit(context.Background(), "prod", "plan-1", "run-1"); err == nil {
+		t.Error("expected 404 error")
+	}
+}
+
+// ---------------------------------------------------------------------------
 // namespaceScopedBase helper
 // ---------------------------------------------------------------------------
 

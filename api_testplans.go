@@ -93,6 +93,14 @@ const (
 	ScheduleKindInterval ScheduleKind = "interval"
 )
 
+// ExecutionMode enumerates the typed Plan-level execution strategy. Mirrors
+// the server's testplan.ExecutionMode* constants (added in migration 077).
+const (
+	ExecutionModeFIFO     = "fifo"
+	ExecutionModeParallel = "parallel"
+	ExecutionModeDAG      = "dag"
+)
+
 // TestPlanItem is a single step within a Test Plan.
 //
 // Fields are alignment-sorted (8-byte first) per project convention.
@@ -124,18 +132,27 @@ type TestPlanItem struct {
 }
 
 // TestPlan is the top-level planning artefact.
+//
+// ExecutionMode is the typed, post-077 successor to the legacy Schedule
+// sentinel. Set it to one of "fifo" / "parallel" / "dag" — the server
+// dual-writes both columns so older clients reading Schedule still see a
+// consistent value. Empty defaults to "dag" when typed Gates are present
+// on items, otherwise FIFO. The Schedule field remains for backward
+// compatibility (cron strings + legacy parallel/dag sentinels) and will
+// stay supported per the post-release contract.
 type TestPlan struct {
-	CreatedAt   time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
-	ClosedAt    *time.Time     `json:"closedAt,omitempty"`
-	ID          string         `json:"id,omitempty"`
-	Namespace   string         `json:"namespace"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Schedule    string         `json:"schedule,omitempty"` // legacy "mode" column: "" / "parallel" / "dag" / cron
-	CreatedBy   string         `json:"createdBy,omitempty"`
-	Items       []TestPlanItem `json:"items"`
-	NumericID   int64          `json:"numericId,omitempty"`
+	CreatedAt     time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt     time.Time      `json:"updatedAt,omitempty"`
+	ClosedAt      *time.Time     `json:"closedAt,omitempty"`
+	ID            string         `json:"id,omitempty"`
+	Namespace     string         `json:"namespace"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description,omitempty"`
+	Schedule      string         `json:"schedule,omitempty"`      // legacy "mode" column: "" / "parallel" / "dag" / cron
+	ExecutionMode string         `json:"executionMode,omitempty"` // typed mode: "fifo" / "parallel" / "dag"
+	CreatedBy     string         `json:"createdBy,omitempty"`
+	Items         []TestPlanItem `json:"items"`
+	NumericID     int64          `json:"numericId,omitempty"`
 }
 
 // TestPlanRun is the aggregate execution of a Plan.
@@ -286,11 +303,14 @@ type RunOptions struct {
 //
 // ScheduleCron is a 5-/6-field cron expression OR one of the sentinel modes
 // `parallel` / `dag` — the server validates both forms via Plan.Validate.
+// Prefer ExecutionMode for the typed mode field — ScheduleCron stays
+// supported for cron schedules and legacy clients (post-release contract).
 type PatchPlanRequest struct {
-	Name         *string `json:"name,omitempty"`
-	Description  *string `json:"description,omitempty"`
-	ScheduleCron *string `json:"schedule_cron,omitempty"`
-	Enabled      *bool   `json:"enabled,omitempty"`
+	Name          *string `json:"name,omitempty"`
+	Description   *string `json:"description,omitempty"`
+	ScheduleCron  *string `json:"schedule_cron,omitempty"`
+	ExecutionMode *string `json:"execution_mode,omitempty"`
+	Enabled       *bool   `json:"enabled,omitempty"`
 }
 
 // PatchOptions tunes a TestPlansAPI.Patch call.
@@ -356,6 +376,50 @@ type AllureReport struct {
 	RunID   string            `json:"runId,omitempty"`
 	PlanID  string            `json:"planId,omitempty"`
 	Status  string            `json:"status,omitempty"`
+}
+
+// UnifiedReport is the strongly-typed decode target for
+// TestPlansAPI.GetRunReportUnified — the native Mockarty envelope served
+// from GET .../report.unified.json. Field names mirror the server-side
+// unifiedReport in internal/testplan/report_formats.go; new fields on the
+// server surface via UnifiedReport.Raw for forward compat.
+type UnifiedReport struct {
+	StartedAt     time.Time            `json:"startedAt"`
+	PlanName      string               `json:"planName"`
+	RunID         string               `json:"runId"`
+	Results       []UnifiedItemResult  `json:"results"`
+	Counts        UnifiedReportCounts  `json:"counts"`
+	Raw           json.RawMessage      `json:"-"`
+	GeneratedAtMs int64                `json:"generatedAt"`
+	DurationMs    int64                `json:"durationMs"`
+}
+
+// UnifiedReportCounts tallies per-status item counts in a unified report.
+type UnifiedReportCounts struct {
+	Total   int `json:"total"`
+	Passed  int `json:"passed"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
+	Broken  int `json:"broken"`
+}
+
+// UnifiedItemResult is one result entry inside a UnifiedReport. Mirrors
+// internal/testplan.AllureResult — kept as a loose struct so new upstream
+// fields round-trip through UnifiedReport.Raw for callers who need them.
+type UnifiedItemResult struct {
+	Name          string                 `json:"name"`
+	UUID          string                 `json:"uuid"`
+	HistoryID     string                 `json:"historyId"`
+	FullName      string                 `json:"fullName"`
+	Description   string                 `json:"description,omitempty"`
+	Status        string                 `json:"status"`
+	Stage         string                 `json:"stage"`
+	StatusDetails map[string]any         `json:"statusDetails,omitempty"`
+	Labels        []map[string]string    `json:"labels,omitempty"`
+	Parameters    []map[string]string    `json:"parameters,omitempty"`
+	Attachments   []map[string]string    `json:"attachments,omitempty"`
+	Start         int64                  `json:"start"`
+	Stop          int64                  `json:"stop"`
 }
 
 // ---------------------------------------------------------------------------
@@ -901,7 +965,8 @@ func (a *TestPlansAPI) Patch(ctx context.Context, planRef string, req PatchPlanR
 	if err != nil {
 		return nil, err
 	}
-	if req.Name == nil && req.Description == nil && req.ScheduleCron == nil && req.Enabled == nil {
+	if req.Name == nil && req.Description == nil && req.ScheduleCron == nil &&
+		req.ExecutionMode == nil && req.Enabled == nil {
 		return nil, fmt.Errorf("mockarty: Patch requires at least one field")
 	}
 
@@ -1064,6 +1129,129 @@ func (a *TestPlansAPI) GetRunReportZIP(ctx context.Context, namespace, planRef, 
 		}
 	}
 	return resp.Body, nil
+}
+
+// GetRunReportJUnit fetches the JUnit XML report for a namespace-scoped
+// run via GET .../report.junit.xml. The bytes are returned verbatim so CI
+// integrations can feed them straight into Jenkins / GitLab / any JUnit
+// consumer. Use namespace="" to fall back to the client default.
+func (a *TestPlansAPI) GetRunReportJUnit(ctx context.Context, namespace, planRef, runID string) ([]byte, error) {
+	key, err := planRefEscape(planRef)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(runID) == "" {
+		return nil, fmt.Errorf("mockarty: empty run id")
+	}
+	path := a.namespaceScopedBase(namespace) +
+		"/test-plans/" + key +
+		"/runs/" + url.PathEscape(runID) +
+		"/report.junit.xml"
+	return a.fetchReportBytes(ctx, path, "application/xml")
+}
+
+// GetRunReportMarkdown fetches the Markdown summary report for a
+// namespace-scoped run via GET .../report.md. Intended for Slack
+// attachments, email bodies, and wiki pastes. Use namespace="" to fall
+// back to the client default.
+func (a *TestPlansAPI) GetRunReportMarkdown(ctx context.Context, namespace, planRef, runID string) ([]byte, error) {
+	key, err := planRefEscape(planRef)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(runID) == "" {
+		return nil, fmt.Errorf("mockarty: empty run id")
+	}
+	path := a.namespaceScopedBase(namespace) +
+		"/test-plans/" + key +
+		"/runs/" + url.PathEscape(runID) +
+		"/report.md"
+	return a.fetchReportBytes(ctx, path, "text/markdown")
+}
+
+// GetRunReportUnified fetches the native Mockarty-shape JSON report
+// (no Allure translation) via GET .../report.unified.json and decodes it
+// into UnifiedReport. The raw bytes are preserved on UnifiedReport.Raw so
+// callers can re-parse with domain-specific types if the server adds new
+// fields later.
+func (a *TestPlansAPI) GetRunReportUnified(ctx context.Context, namespace, planRef, runID string) (*UnifiedReport, error) {
+	key, err := planRefEscape(planRef)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(runID) == "" {
+		return nil, fmt.Errorf("mockarty: empty run id")
+	}
+	path := a.namespaceScopedBase(namespace) +
+		"/test-plans/" + key +
+		"/runs/" + url.PathEscape(runID) +
+		"/report.unified.json"
+	raw, err := a.fetchReportBytes(ctx, path, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	rep := &UnifiedReport{Raw: json.RawMessage(raw)}
+	if err := json.Unmarshal(raw, rep); err != nil {
+		// Best-effort: unknown top-level shape still yields a non-nil Raw
+		// so callers can fall back to manual decoding.
+		return rep, fmt.Errorf("mockarty: decode unified report: %w", err)
+	}
+	return rep, nil
+}
+
+// GetRunReportHTML fetches the standalone, print-friendly HTML report for
+// a namespace-scoped run via GET .../report.html. The response is a
+// self-contained HTML document (inlined CSS, no external assets) that
+// users can open in any browser and export to PDF via Save-as-PDF.
+// Intended for air-gapped deployments and shareable run artifacts. Use
+// namespace="" to fall back to the client default.
+func (a *TestPlansAPI) GetRunReportHTML(ctx context.Context, namespace, planRef, runID string) ([]byte, error) {
+	key, err := planRefEscape(planRef)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(runID) == "" {
+		return nil, fmt.Errorf("mockarty: empty run id")
+	}
+	path := a.namespaceScopedBase(namespace) +
+		"/test-plans/" + key +
+		"/runs/" + url.PathEscape(runID) +
+		"/report.html"
+	return a.fetchReportBytes(ctx, path, "text/html")
+}
+
+// fetchReportBytes is a shared helper for the non-Allure report endpoints
+// that return bytes verbatim. Mirrors doJSON's retry/error semantics while
+// letting callers specify the Accept header so log-aggregators can see the
+// requested format.
+func (a *TestPlansAPI) fetchReportBytes(ctx context.Context, path, accept string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.client.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	if a.client.apiKey != "" {
+		req.Header.Set(headerAPIKey, a.client.apiKey)
+	}
+	resp, err := a.client.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("mockarty: fetch report: %w", err)
+	}
+	defer resp.Body.Close()
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return nil, fmt.Errorf("mockarty: read report: %w", readErr)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    strings.TrimSpace(string(body)),
+			RequestID:  resp.Header.Get(headerRequestID),
+		}
+	}
+	return body, nil
 }
 
 // newJSONRequest is a small internal helper for endpoints that need
