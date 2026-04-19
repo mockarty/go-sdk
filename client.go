@@ -56,6 +56,8 @@ type Client struct {
 	proxyAPI             *ProxyAPI
 	environmentAPI       *EnvironmentAPI
 	chaosAPI             *ChaosAPI
+	testPlansAPI         *TestPlansAPI
+	trashAPI             *TrashAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -267,6 +269,24 @@ func (c *Client) Chaos() *ChaosAPI {
 		c.chaosAPI = &ChaosAPI{client: c}
 	}
 	return c.chaosAPI
+}
+
+// TestPlans returns the Test Plans API — the master orchestrator for
+// functional / fuzz / chaos / load / contract runs under a single plan.
+func (c *Client) TestPlans() *TestPlansAPI {
+	if c.testPlansAPI == nil {
+		c.testPlansAPI = &TestPlansAPI{client: c}
+	}
+	return c.testPlansAPI
+}
+
+// Trash returns the Recycle Bin / Soft-Delete API for listing, restoring,
+// and purging soft-deleted entities (cascade-aware).
+func (c *Client) Trash() *TrashAPI {
+	if c.trashAPI == nil {
+		c.trashAPI = &TrashAPI{client: c}
+	}
+	return c.trashAPI
 }
 
 // ---------------------------------------------------------------------------
