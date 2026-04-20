@@ -58,6 +58,7 @@ type Client struct {
 	chaosAPI             *ChaosAPI
 	testPlansAPI         *TestPlansAPI
 	trashAPI             *TrashAPI
+	entitySearchAPI      *EntitySearchAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -287,6 +288,17 @@ func (c *Client) Trash() *TrashAPI {
 		c.trashAPI = &TrashAPI{client: c}
 	}
 	return c.trashAPI
+}
+
+// EntitySearch returns the unified entity-picker API. Use it to look up
+// mocks / Test Plans / perf configs / fuzz configs / chaos experiments /
+// contract pacts by case-insensitive name match — the same backend the
+// admin UI pickers consume.
+func (c *Client) EntitySearch() *EntitySearchAPI {
+	if c.entitySearchAPI == nil {
+		c.entitySearchAPI = &EntitySearchAPI{client: c}
+	}
+	return c.entitySearchAPI
 }
 
 // ---------------------------------------------------------------------------

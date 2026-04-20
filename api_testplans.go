@@ -606,6 +606,118 @@ func (a *TestPlansAPI) ListRuns(ctx context.Context, planID string, limit, offse
 	return env.Items, nil
 }
 
+// ---------------------------------------------------------------------------
+// Compare runs (Phase-4 task #82)
+// ---------------------------------------------------------------------------
+
+// CompareItemSide mirrors the per-run snapshot the server emits.
+type CompareItemSide struct {
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	CompletedAt *time.Time `json:"completedAt,omitempty"`
+	Status      string     `json:"status"`
+	SkipReason  string     `json:"skipReason,omitempty"`
+	Error       string     `json:"error,omitempty"`
+	DurationMs  int64      `json:"durationMs"`
+	Attempts    int        `json:"attempts"`
+	Present     bool       `json:"present"`
+}
+
+// CompareItemDiff captures the per-item delta. RegressionType is one of:
+// "unchanged", "pass_to_fail", "fail_to_pass", "skipped_to_ran",
+// "ran_to_skipped", "fail_to_fail", "pass_to_pass", "added", "removed".
+type CompareItemDiff struct {
+	RegressionType   string `json:"regressionType"`
+	DurationDeltaMs  int64  `json:"durationDeltaMs"`
+	StatusChanged    bool   `json:"statusChanged"`
+	IsRegression     bool   `json:"isRegression"`
+	IsImprovement    bool   `json:"isImprovement"`
+	DurationWorsened bool   `json:"durationWorsened"`
+}
+
+// CompareItem is the tuple emitted for each item that appears in either run.
+type CompareItem struct {
+	A       CompareItemSide `json:"a"`
+	B       CompareItemSide `json:"b"`
+	Diff    CompareItemDiff `json:"diff"`
+	Type    string          `json:"type,omitempty"`
+	Name    string          `json:"name,omitempty"`
+	ItemUID string          `json:"itemUid"`
+}
+
+// CompareRunSide describes the run-level envelope on each side of the diff.
+type CompareRunSide struct {
+	StartedAt      time.Time  `json:"startedAt"`
+	CompletedAt    *time.Time `json:"completedAt,omitempty"`
+	PlanName       string     `json:"planName"`
+	Status         string     `json:"status"`
+	Namespace      string     `json:"namespace"`
+	ID             string     `json:"id"`
+	PlanID         string     `json:"planId"`
+	PlanNumericID  int64      `json:"planNumericId,omitempty"`
+	TotalItems     int        `json:"totalItems"`
+	CompletedItems int        `json:"completedItems"`
+	FailedItems    int        `json:"failedItems"`
+	PassedItems    int        `json:"passedItems"`
+	SkippedItems   int        `json:"skippedItems"`
+	DurationMs     int64      `json:"durationMs"`
+}
+
+// CompareItemRef is the compact pointer used in summary added/removed slices.
+type CompareItemRef struct {
+	Type    string `json:"type,omitempty"`
+	Name    string `json:"name,omitempty"`
+	ItemUID string `json:"itemUid"`
+}
+
+// CompareSummary aggregates the diff for fast CI consumption.
+type CompareSummary struct {
+	AddedItems     []CompareItemRef `json:"addedItems"`
+	RemovedItems   []CompareItemRef `json:"removedItems"`
+	TotalA         int              `json:"totalA"`
+	TotalB         int              `json:"totalB"`
+	PassToFail     int              `json:"passToFail"`
+	FailToPass     int              `json:"failToPass"`
+	SkippedToRan   int              `json:"skippedToRan"`
+	RanToSkipped   int              `json:"ranToSkipped"`
+	Regressions    int              `json:"regressions"`
+	Improvements   int              `json:"improvements"`
+	UnchangedItems int              `json:"unchangedItems"`
+	DifferentPlans bool             `json:"differentPlans"`
+}
+
+// CompareResult is the full diff envelope the server returns.
+type CompareResult struct {
+	RunA    CompareRunSide `json:"runA"`
+	RunB    CompareRunSide `json:"runB"`
+	Items   []CompareItem  `json:"items"`
+	Summary CompareSummary `json:"summary"`
+}
+
+// CompareRuns diffs two test plan runs.
+//
+// Both runs MUST live in the caller's namespace (the server returns 404 on
+// cross-tenant probes — same no-leak semantics as GetRun). Comparing runs of
+// different plans IS allowed; CompareSummary.DifferentPlans flags the case so
+// callers can render a banner. Pass the older/baseline run as runA and the
+// newer/target run as runB to keep regression/improvement signs intuitive.
+func (a *TestPlansAPI) CompareRuns(ctx context.Context, runA, runB string) (*CompareResult, error) {
+	if runA == "" || runB == "" {
+		return nil, fmt.Errorf("mockarty: empty run id (run_a or run_b)")
+	}
+	if runA == runB {
+		return nil, fmt.Errorf("mockarty: run_a and run_b must differ")
+	}
+	q := url.Values{}
+	q.Set("run_a", runA)
+	q.Set("run_b", runB)
+	path := testPlansBase + "/runs/compare?" + q.Encode()
+	var out CompareResult
+	if err := a.client.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // WaitForRun polls the run until it reaches a terminal state or ctx expires.
 //
 // pollInterval ≤0 falls back to 2s. Returns the final run and a typed error
