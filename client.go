@@ -59,6 +59,8 @@ type Client struct {
 	testPlansAPI         *TestPlansAPI
 	trashAPI             *TrashAPI
 	entitySearchAPI      *EntitySearchAPI
+	secretsAPI           *SecretsAPI
+	promptsAPI           *PromptsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -288,6 +290,24 @@ func (c *Client) Trash() *TrashAPI {
 		c.trashAPI = &TrashAPI{client: c}
 	}
 	return c.trashAPI
+}
+
+// Secrets returns the centralised Secrets Storage API (Phase A0 —
+// namespace-scoped encrypted key/value stores with optional Vault backend).
+func (c *Client) Secrets() *SecretsAPI {
+	if c.secretsAPI == nil {
+		c.secretsAPI = &SecretsAPI{client: c}
+	}
+	return c.secretsAPI
+}
+
+// Prompts returns the Prompts Storage API — managed AI prompts with
+// FIFO-20 version history and rollback.
+func (c *Client) Prompts() *PromptsAPI {
+	if c.promptsAPI == nil {
+		c.promptsAPI = &PromptsAPI{client: c}
+	}
+	return c.promptsAPI
 }
 
 // EntitySearch returns the unified entity-picker API. Use it to look up
