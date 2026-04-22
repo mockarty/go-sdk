@@ -286,7 +286,7 @@ func main() {
 		TargetBaseURL: targetURL,
 		SourceType:    "openapi",
 		Strategy:      "all",
-		Namespace: namespace,
+		Namespace:     namespace,
 	})
 	if err != nil {
 		fmt.Printf("  WARN: Fuzzing start failed: %v\n", err)

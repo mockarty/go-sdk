@@ -384,14 +384,14 @@ type AllureReport struct {
 // unifiedReport in internal/testplan/report_formats.go; new fields on the
 // server surface via UnifiedReport.Raw for forward compat.
 type UnifiedReport struct {
-	StartedAt     time.Time            `json:"startedAt"`
-	PlanName      string               `json:"planName"`
-	RunID         string               `json:"runId"`
-	Results       []UnifiedItemResult  `json:"results"`
-	Counts        UnifiedReportCounts  `json:"counts"`
-	Raw           json.RawMessage      `json:"-"`
-	GeneratedAtMs int64                `json:"generatedAt"`
-	DurationMs    int64                `json:"durationMs"`
+	StartedAt     time.Time           `json:"startedAt"`
+	PlanName      string              `json:"planName"`
+	RunID         string              `json:"runId"`
+	Results       []UnifiedItemResult `json:"results"`
+	Counts        UnifiedReportCounts `json:"counts"`
+	Raw           json.RawMessage     `json:"-"`
+	GeneratedAtMs int64               `json:"generatedAt"`
+	DurationMs    int64               `json:"durationMs"`
 }
 
 // UnifiedReportCounts tallies per-status item counts in a unified report.
@@ -407,19 +407,19 @@ type UnifiedReportCounts struct {
 // internal/testplan.AllureResult — kept as a loose struct so new upstream
 // fields round-trip through UnifiedReport.Raw for callers who need them.
 type UnifiedItemResult struct {
-	Name          string                 `json:"name"`
-	UUID          string                 `json:"uuid"`
-	HistoryID     string                 `json:"historyId"`
-	FullName      string                 `json:"fullName"`
-	Description   string                 `json:"description,omitempty"`
-	Status        string                 `json:"status"`
-	Stage         string                 `json:"stage"`
-	StatusDetails map[string]any         `json:"statusDetails,omitempty"`
-	Labels        []map[string]string    `json:"labels,omitempty"`
-	Parameters    []map[string]string    `json:"parameters,omitempty"`
-	Attachments   []map[string]string    `json:"attachments,omitempty"`
-	Start         int64                  `json:"start"`
-	Stop          int64                  `json:"stop"`
+	Name          string              `json:"name"`
+	UUID          string              `json:"uuid"`
+	HistoryID     string              `json:"historyId"`
+	FullName      string              `json:"fullName"`
+	Description   string              `json:"description,omitempty"`
+	Status        string              `json:"status"`
+	Stage         string              `json:"stage"`
+	StatusDetails map[string]any      `json:"statusDetails,omitempty"`
+	Labels        []map[string]string `json:"labels,omitempty"`
+	Parameters    []map[string]string `json:"parameters,omitempty"`
+	Attachments   []map[string]string `json:"attachments,omitempty"`
+	Start         int64               `json:"start"`
+	Stop          int64               `json:"stop"`
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,6 +1032,122 @@ func (a *TestPlansAPI) TestWebhook(ctx context.Context, planID, wID string) erro
 		return fmt.Errorf("%w: %s", ErrWebhookDeliveryFailed, msg)
 	}
 	return nil
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (backlog #63)
+//
+// A PlanNotification is a plan-scoped subscription that routes run lifecycle
+// events (run_started / run_finished / run_failed / item_failed) through the
+// admin's configured notification channels (Slack, Email, Telegram, Discord,
+// Teams, Webex, PagerDuty, OpsGenie, Mattermost, Google Chat, generic
+// webhook). It's orthogonal to Webhook (which targets arbitrary URLs with
+// HMAC signatures); users can enable either or both surfaces per plan.
+// ---------------------------------------------------------------------------
+
+// PlanNotification is one row in test_plan_notifications.
+//
+// Recipients is optional: when empty, the server fans out to every enabled
+// binding on the channel. When populated, the dispatcher sends directly to
+// each recipient (e.g. Slack channel ID, email address, chat ID).
+type PlanNotification struct {
+	CreatedAt      time.Time `json:"createdAt,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt,omitempty"`
+	ID             string    `json:"id,omitempty"`
+	TestPlanID     string    `json:"testPlanId,omitempty"`
+	Namespace      string    `json:"namespace,omitempty"`
+	ChannelID      string    `json:"channelId"`
+	Trigger        string    `json:"trigger"`
+	RecipientsJSON string    `json:"recipientsJson,omitempty"`
+	LastStatus     string    `json:"lastStatus,omitempty"`
+	LastError      string    `json:"lastError,omitempty"`
+	Recipients     []string  `json:"recipients,omitempty"`
+	Enabled        bool      `json:"enabled"`
+}
+
+// CreateNotification attaches a new plan-level notification subscription.
+func (a *TestPlansAPI) CreateNotification(ctx context.Context, planID string, n PlanNotification) (*PlanNotification, error) {
+	if planID == "" {
+		return nil, fmt.Errorf("mockarty: empty plan id")
+	}
+	body := map[string]interface{}{
+		"channelId":  n.ChannelID,
+		"trigger":    n.Trigger,
+		"recipients": n.Recipients,
+		"enabled":    n.Enabled,
+	}
+	var out PlanNotification
+	if err := a.client.do(ctx, http.MethodPost,
+		testPlansBase+"/"+url.PathEscape(planID)+"/notifications", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListNotifications lists notifications attached to a plan.
+func (a *TestPlansAPI) ListNotifications(ctx context.Context, planID string) ([]PlanNotification, error) {
+	if planID == "" {
+		return nil, fmt.Errorf("mockarty: empty plan id")
+	}
+	var env struct {
+		Items []PlanNotification `json:"items"`
+	}
+	path := testPlansBase + "/" + url.PathEscape(planID) + "/notifications"
+	if err := a.client.do(ctx, http.MethodGet, path, nil, &env); err != nil {
+		return nil, err
+	}
+	return env.Items, nil
+}
+
+// GetNotification fetches a single notification by id.
+func (a *TestPlansAPI) GetNotification(ctx context.Context, planID, notifID string) (*PlanNotification, error) {
+	if planID == "" || notifID == "" {
+		return nil, fmt.Errorf("mockarty: empty plan or notification id")
+	}
+	var out PlanNotification
+	path := testPlansBase + "/" + url.PathEscape(planID) + "/notifications/" + url.PathEscape(notifID)
+	if err := a.client.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateNotification replaces a notification's mutable fields (trigger,
+// channelId, enabled, recipients). Unset fields are preserved.
+func (a *TestPlansAPI) UpdateNotification(ctx context.Context, planID, notifID string, n PlanNotification) (*PlanNotification, error) {
+	if planID == "" || notifID == "" {
+		return nil, fmt.Errorf("mockarty: empty plan or notification id")
+	}
+	body := map[string]interface{}{}
+	if n.ChannelID != "" {
+		body["channelId"] = n.ChannelID
+	}
+	if n.Trigger != "" {
+		body["trigger"] = n.Trigger
+	}
+	if n.Recipients != nil {
+		body["recipients"] = n.Recipients
+	}
+	// Always include enabled so callers can flip the flag explicitly. Omitting
+	// it would make disabling impossible through this helper.
+	body["enabled"] = n.Enabled
+
+	var out PlanNotification
+	path := testPlansBase + "/" + url.PathEscape(planID) + "/notifications/" + url.PathEscape(notifID)
+	if err := a.client.do(ctx, http.MethodPut, path, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteNotification soft-deletes a plan notification subscription.
+func (a *TestPlansAPI) DeleteNotification(ctx context.Context, planID, notifID string) error {
+	if planID == "" || notifID == "" {
+		return fmt.Errorf("mockarty: empty plan or notification id")
+	}
+	return a.client.do(ctx, http.MethodDelete,
+		testPlansBase+"/"+url.PathEscape(planID)+"/notifications/"+url.PathEscape(notifID),
+		nil, nil)
 }
 
 // ---------------------------------------------------------------------------

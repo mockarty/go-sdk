@@ -144,17 +144,17 @@ func (a *FuzzingAPI) DeleteConfig(ctx context.Context, id string) error {
 
 // FuzzingFinding represents a security finding from a fuzzing run.
 type FuzzingFinding struct {
-	ID            string `json:"id,omitempty"`
-	RunID         string `json:"runId,omitempty"`
-	Severity      string `json:"severity,omitempty"`
-	Category      string `json:"category,omitempty"`
-	Title         string `json:"title,omitempty"`
-	Description   string `json:"description,omitempty"`
-	RequestMethod string `json:"requestMethod,omitempty"`
-	RequestURL    string `json:"requestUrl,omitempty"`
-	ResponseStatus int   `json:"responseStatus,omitempty"`
-	TriagedStatus string `json:"triagedStatus,omitempty"`
-	CreatedAt     string `json:"createdAt,omitempty"`
+	ID             string `json:"id,omitempty"`
+	RunID          string `json:"runId,omitempty"`
+	Severity       string `json:"severity,omitempty"`
+	Category       string `json:"category,omitempty"`
+	Title          string `json:"title,omitempty"`
+	Description    string `json:"description,omitempty"`
+	RequestMethod  string `json:"requestMethod,omitempty"`
+	RequestURL     string `json:"requestUrl,omitempty"`
+	ResponseStatus int    `json:"responseStatus,omitempty"`
+	TriagedStatus  string `json:"triagedStatus,omitempty"`
+	CreatedAt      string `json:"createdAt,omitempty"`
 }
 
 // FuzzingSchedule represents a scheduled fuzzing run.

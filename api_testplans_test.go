@@ -1034,11 +1034,26 @@ func TestTestPlans_GeneratedReports_EmptyIDs(t *testing.T) {
 	c := NewClient("http://x")
 	for _, fn := range []func() error{
 		func() error { _, e := c.TestPlans().GetRunReportJUnit(context.Background(), "ns", "", "run"); return e },
-		func() error { _, e := c.TestPlans().GetRunReportJUnit(context.Background(), "ns", "plan", ""); return e },
-		func() error { _, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "", "run"); return e },
-		func() error { _, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "plan", ""); return e },
-		func() error { _, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "", "run"); return e },
-		func() error { _, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "plan", ""); return e },
+		func() error {
+			_, e := c.TestPlans().GetRunReportJUnit(context.Background(), "ns", "plan", "")
+			return e
+		},
+		func() error {
+			_, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "", "run")
+			return e
+		},
+		func() error {
+			_, e := c.TestPlans().GetRunReportMarkdown(context.Background(), "ns", "plan", "")
+			return e
+		},
+		func() error {
+			_, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "", "run")
+			return e
+		},
+		func() error {
+			_, e := c.TestPlans().GetRunReportUnified(context.Background(), "ns", "plan", "")
+			return e
+		},
 		func() error { _, e := c.TestPlans().GetRunReportHTML(context.Background(), "ns", "", "run"); return e },
 		func() error { _, e := c.TestPlans().GetRunReportHTML(context.Background(), "ns", "plan", ""); return e },
 	} {
@@ -1075,4 +1090,3 @@ func TestNamespaceScopedBase_FallsBackToClient(t *testing.T) {
 		t.Errorf("explicit override: got %q", got)
 	}
 }
-

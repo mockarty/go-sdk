@@ -656,13 +656,13 @@ type ContractDependency struct {
 // ContractEndpoint describes what the consumer needs from a specific endpoint.
 // A contract tracks both what the consumer sends (request) and what it reads (response).
 type ContractEndpoint struct {
-	Route                  string            `json:"route"`
-	Protocol               string            `json:"protocol,omitempty"`
-	ExpectedStatus         []int             `json:"expectedStatus,omitempty"`
-	RequiredFields         []ContractField   `json:"requiredFields,omitempty"`           // Response body fields
-	RequiredRequestFields  []ContractField   `json:"requiredRequestFields,omitempty"`    // Request body fields
-	RequiredParameters     []ContractField   `json:"requiredParameters,omitempty"`       // URL/query/header parameters
-	RequiredHeaders        map[string]string `json:"requiredHeaders,omitempty"`
+	Route                 string            `json:"route"`
+	Protocol              string            `json:"protocol,omitempty"`
+	ExpectedStatus        []int             `json:"expectedStatus,omitempty"`
+	RequiredFields        []ContractField   `json:"requiredFields,omitempty"`        // Response body fields
+	RequiredRequestFields []ContractField   `json:"requiredRequestFields,omitempty"` // Request body fields
+	RequiredParameters    []ContractField   `json:"requiredParameters,omitempty"`    // URL/query/header parameters
+	RequiredHeaders       map[string]string `json:"requiredHeaders,omitempty"`
 }
 
 // ContractField describes a field the consumer depends on.
@@ -714,7 +714,7 @@ type CanIDeployV2Request struct {
 	Role            string `json:"role"`                      // "consumer" or "provider"
 	ContractID      string `json:"contractId,omitempty"`      // For consumer check
 	RegistryEntryID string `json:"registryEntryId,omitempty"` // For provider check
-	NewSpec         string `json:"newSpec,omitempty"`          // Future spec (pre-deploy)
+	NewSpec         string `json:"newSpec,omitempty"`         // Future spec (pre-deploy)
 	NewSpecURL      string `json:"newSpecUrl,omitempty"`
 }
 
@@ -764,17 +764,17 @@ type ParseEndpointsResult struct {
 
 // ParsedEndpoint is a single endpoint extracted from a spec.
 type ParsedEndpoint struct {
-	Route       string   `json:"route"`
-	Protocol    string   `json:"protocol"`
-	Summary     string   `json:"summary,omitempty"`
-	StatusCodes []int    `json:"statusCodes,omitempty"`
-	Deprecated  bool     `json:"deprecated,omitempty"`
+	Route       string `json:"route"`
+	Protocol    string `json:"protocol"`
+	Summary     string `json:"summary,omitempty"`
+	StatusCodes []int  `json:"statusCodes,omitempty"`
+	Deprecated  bool   `json:"deprecated,omitempty"`
 }
 
 // ParseFieldsResult is the result of parsing response fields for an endpoint.
 type ParseFieldsResult struct {
-	Route  string          `json:"route"`
-	Fields []FieldNode     `json:"fields"`
+	Route  string      `json:"route"`
+	Fields []FieldNode `json:"fields"`
 }
 
 // FieldNode is a tree node representing a response field.

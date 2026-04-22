@@ -167,6 +167,39 @@ func (a *TestRunAPI) ImportReport(ctx context.Context, data []byte) error {
 	return a.client.do(ctx, "POST", "/api/v1/api-tester/reports/import", body, nil)
 }
 
+// TestRunReportFormat enumerates the aggregated report formats served by
+// GET /api/v1/api-tester/test-runs/:id/report. Works for every mode
+// (functional / load / fuzz / chaos / contract / merged).
+const (
+	TestRunReportFormatAllureZip   = "allure_zip"
+	TestRunReportFormatAllureJSON  = "allure_json"
+	TestRunReportFormatJUnit       = "junit"
+	TestRunReportFormatMarkdown    = "markdown"
+	TestRunReportFormatUnifiedJSON = "unified_json"
+	TestRunReportFormatHTML        = "html"
+)
+
+// GetTestRunReport fetches the aggregated report for a test run in the
+// requested format. Pass the empty string to default to unified_json. The
+// returned bytes are the server's raw response body; callers can Unmarshal
+// into their own type for JSON formats or consume as-is for the others.
+//
+// Fuzz / chaos / contract runs expand into per-item AllureResults (one row
+// per finding / fault / case); functional / load / merged runs emit a single
+// summary row. All six formats produce deterministic byte output so CI
+// checksums stay stable across retries.
+//
+// GET /api/v1/api-tester/test-runs/:id/report?format=...
+func (a *TestRunAPI) GetTestRunReport(ctx context.Context, runID, format string) ([]byte, error) {
+	if format == "" {
+		format = TestRunReportFormatUnifiedJSON
+	}
+	q := url.Values{}
+	q.Set("format", format)
+	path := "/api/v1/api-tester/test-runs/" + url.PathEscape(runID) + "/report?" + q.Encode()
+	return a.client.doJSON(ctx, "GET", path, nil)
+}
+
 // MergedTestRun is the parent row of a test_runs row with mode='merged'. It is
 // the same shape as a regular TestRun projected onto the cluster-wide
 // ActiveTestRunRow, but the JSON keys come from the server's Go field names
@@ -248,4 +281,76 @@ func (a *TestRunAPI) AddMergeSource(ctx context.Context, mergedRunID, sourceRunI
 func (a *TestRunAPI) RemoveMergeSource(ctx context.Context, mergedRunID, sourceRunID string) error {
 	path := "/api/v1/test-runs/merges/" + url.PathEscape(mergedRunID) + "/sources/" + url.PathEscape(sourceRunID)
 	return a.client.do(ctx, "DELETE", path, nil, nil)
+}
+
+// ListMergedRunsResponse is the paginated list envelope returned by the list
+// endpoint. Fields alignment-sorted.
+type ListMergedRunsResponse struct {
+	Items  []MergedRunView `json:"items"`
+	Total  int             `json:"total"`
+	Limit  int             `json:"limit"`
+	Offset int             `json:"offset"`
+}
+
+// ListMergedRunsOptions scopes the list call. Zero values mean server default
+// (limit=50, offset=0). The server hard-caps limit at 500.
+type ListMergedRunsOptions struct {
+	Limit  int
+	Offset int
+}
+
+// ListMergedRuns returns the paginated list of merged runs in the client's
+// namespace, newest first. Each item carries the parent row plus the current
+// snapshot of every attached source.
+//
+// GET /api/v1/test-runs/merges
+func (a *TestRunAPI) ListMergedRuns(ctx context.Context, opts ListMergedRunsOptions) (*ListMergedRunsResponse, error) {
+	q := url.Values{}
+	if opts.Limit > 0 {
+		q.Set("limit", intToString(opts.Limit))
+	}
+	if opts.Offset > 0 {
+		q.Set("offset", intToString(opts.Offset))
+	}
+	path := "/api/v1/test-runs/merges"
+	if encoded := q.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var resp ListMergedRunsResponse
+	if err := a.client.do(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// DeleteMergedRun removes a merge parent row. The source runs are untouched.
+// Edges in test_run_merges are dropped by ON DELETE CASCADE at the DB layer.
+//
+// DELETE /api/v1/test-runs/merges/:id
+func (a *TestRunAPI) DeleteMergedRun(ctx context.Context, mergedRunID string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/test-runs/merges/"+url.PathEscape(mergedRunID), nil, nil)
+}
+
+// MergedRunReportFormat enumerates the report formats supported by the merged
+// run aggregator. Only two formats are served — merged runs span heterogeneous
+// sources with no plan/DAG shape, so Allure/JUnit/HTML are not available.
+const (
+	MergedRunReportFormatUnified  = "unified"
+	MergedRunReportFormatMarkdown = "markdown"
+)
+
+// GetMergedRunReport fetches the aggregated report for a merged run in the
+// requested format. Pass the empty string to default to the unified native JSON
+// envelope. The return bytes are the server's raw response body; callers can
+// Unmarshal into their own type for unified, or consume as-is for markdown.
+//
+// GET /api/v1/test-runs/merges/:id/report?format=unified|markdown
+func (a *TestRunAPI) GetMergedRunReport(ctx context.Context, mergedRunID, format string) ([]byte, error) {
+	if format == "" {
+		format = MergedRunReportFormatUnified
+	}
+	q := url.Values{}
+	q.Set("format", format)
+	path := "/api/v1/test-runs/merges/" + url.PathEscape(mergedRunID) + "/report?" + q.Encode()
+	return a.client.doJSON(ctx, "GET", path, nil)
 }

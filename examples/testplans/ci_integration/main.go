@@ -2,11 +2,11 @@
 // Licensed under the MIT License. See LICENSE file for details.
 
 // Example: testplans/ci_integration — full CI scenario:
-//   1. Attach a webhook to a Plan
-//   2. Trigger the Plan
-//   3. Wait for the result
-//   4. Download the Allure zip to ./report.zip
-//   5. Exit with a non-zero status on failure so the CI job fails fast.
+//  1. Attach a webhook to a Plan
+//  2. Trigger the Plan
+//  3. Wait for the result
+//  4. Download the Allure zip to ./report.zip
+//  5. Exit with a non-zero status on failure so the CI job fails fast.
 package main
 
 import (
