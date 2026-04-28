@@ -607,7 +607,7 @@ func (a *TestPlansAPI) ListRuns(ctx context.Context, planID string, limit, offse
 }
 
 // ---------------------------------------------------------------------------
-// Compare runs (Phase-4 task #82)
+// Compare runs — run-vs-run diff.
 // ---------------------------------------------------------------------------
 
 // CompareItemSide mirrors the per-run snapshot the server emits.

@@ -61,6 +61,7 @@ type Client struct {
 	entitySearchAPI      *EntitySearchAPI
 	secretsAPI           *SecretsAPI
 	promptsAPI           *PromptsAPI
+	meAPI                *MeAPI
 }
 
 // NewClient creates a new Mockarty API client.

@@ -337,7 +337,49 @@ func (a *TestRunAPI) DeleteMergedRun(ctx context.Context, mergedRunID string) er
 const (
 	MergedRunReportFormatUnified  = "unified"
 	MergedRunReportFormatMarkdown = "markdown"
+	// HTML (print-to-PDF) and JUnit XML are supported by the transient
+	// aggregate endpoint — see AggregateRunsReport below. Kept separate
+	// from the legacy merged endpoint constants above for clarity.
 )
+
+// AggregateReportFormat enumerates formats for the transient aggregate
+// endpoint POST /test-runs/reports/aggregate — the replacement for the
+// removed persistent merge.
+type AggregateReportFormat = string
+
+const (
+	AggregateReportFormatUnified  AggregateReportFormat = "unified"
+	AggregateReportFormatMarkdown AggregateReportFormat = "markdown"
+	AggregateReportFormatHTML     AggregateReportFormat = "html"
+	AggregateReportFormatJUnit    AggregateReportFormat = "junit"
+)
+
+// AggregateRunsReportRequest is the POST body for the aggregate endpoint.
+// Name is optional (server falls back to "Aggregate of N runs").
+type AggregateRunsReportRequest struct {
+	Name   string   `json:"name,omitempty"`
+	RunIDs []string `json:"run_ids"`
+}
+
+// AggregateRunsReport builds a release-ready aggregated report over the
+// provided test-run IDs and returns the raw response bytes. The endpoint
+// is transient — nothing is persisted server-side; each call recomputes.
+//
+// POST /api/v1/test-runs/reports/aggregate?format=<format>
+//
+// HTML output is self-contained (inline CSS + inline SVG charts) and
+// print-friendly, so saving as PDF via the browser print dialog is the
+// supported PDF export path (avoids a server-side headless-Chrome
+// dependency in distroless builds).
+func (a *TestRunAPI) AggregateRunsReport(ctx context.Context, req AggregateRunsReportRequest, format AggregateReportFormat) ([]byte, error) {
+	if format == "" {
+		format = AggregateReportFormatUnified
+	}
+	q := url.Values{}
+	q.Set("format", format)
+	path := "/api/v1/test-runs/reports/aggregate?" + q.Encode()
+	return a.client.doJSON(ctx, "POST", path, req)
+}
 
 // GetMergedRunReport fetches the aggregated report for a merged run in the
 // requested format. Pass the empty string to default to the unified native JSON
