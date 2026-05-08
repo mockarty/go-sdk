@@ -1,6 +1,11 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
 // Licensed under the MIT License. See LICENSE file for details.
 
+// ns_models.go holds payload types used by NamespaceSettingsAPI (members,
+// cleanup policy). Do not add platform-admin payloads here — the SDK is
+// scoped to user automation (CI/CD, scripts), not platform admin or
+// support tooling.
+
 package mockarty
 
 // NamespaceUser represents a user's membership in a namespace.
