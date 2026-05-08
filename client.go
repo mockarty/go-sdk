@@ -57,7 +57,6 @@ type Client struct {
 	environmentAPI       *EnvironmentAPI
 	chaosAPI             *ChaosAPI
 	testPlansAPI         *TestPlansAPI
-	trashAPI             *TrashAPI
 	entitySearchAPI      *EntitySearchAPI
 	secretsAPI           *SecretsAPI
 	promptsAPI           *PromptsAPI
@@ -282,15 +281,6 @@ func (c *Client) TestPlans() *TestPlansAPI {
 		c.testPlansAPI = &TestPlansAPI{client: c}
 	}
 	return c.testPlansAPI
-}
-
-// Trash returns the Recycle Bin / Soft-Delete API for listing, restoring,
-// and purging soft-deleted entities (cascade-aware).
-func (c *Client) Trash() *TrashAPI {
-	if c.trashAPI == nil {
-		c.trashAPI = &TrashAPI{client: c}
-	}
-	return c.trashAPI
 }
 
 // Secrets returns the centralised Secrets Storage API (Phase A0 —
