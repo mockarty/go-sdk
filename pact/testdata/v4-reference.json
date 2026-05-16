@@ -1,0 +1,37 @@
+{
+  "consumer": {"name": "OrderService"},
+  "provider": {"name": "PaymentService"},
+  "interactions": [
+    {
+      "type": "Synchronous/HTTP",
+      "description": "a charge request",
+      "providerStates": [
+        {"name": "payment service is up"}
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/charge",
+        "headers": {"Content-Type": "application/json"},
+        "body": {"amount": 100},
+        "matchingRules": {
+          "body": {
+            "$.amount": {"matchers": [{"match": "type"}]}
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": {"id": "abc"},
+        "matchingRules": {
+          "body": {
+            "$.id": {"matchers": [{"match": "type"}]}
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "pactSpecification": {"version": "4.0"}
+  }
+}
