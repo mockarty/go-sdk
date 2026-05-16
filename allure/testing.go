@@ -121,6 +121,10 @@ func T(t *testing.T, opts ...Option) *AllureT {
 		scope: s,
 		ctx:   withScope(context.Background(), s),
 	}
+	// Register the test against its suite (BeforeAll/AfterAll wiring). Only
+	// useful if the user actually called BeforeAll/AfterAll — otherwise the
+	// suite registry stays inert.
+	RegisterChild(t.Name(), s.result.UUID)
 	t.Cleanup(at.flush)
 	return at
 }
@@ -202,11 +206,52 @@ func (a *AllureT) AttachString(name, body string) {
 	a.Attachment(name, []byte(body), "text/plain")
 }
 
-// AttachJSON marshals body using net/http.DetectContentType (after caller
-// pre-serialises it) — this stub is a convenience for already-serialised
-// JSON strings; pass raw bytes if marshalling is needed.
-func (a *AllureT) AttachJSON(name string, raw []byte) {
-	a.Attachment(name, raw, "application/json")
+// AttachJSON marshals body to JSON and attaches it. When body is already
+// a []byte, it is attached verbatim (no double-encoding).
+func (a *AllureT) AttachJSON(name string, body any) {
+	if raw, ok := body.([]byte); ok {
+		a.Attachment(name, raw, "application/json")
+		return
+	}
+	AttachJSON(a.ctx, name, body)
+}
+
+// AttachPNG attaches a PNG screenshot. See [AttachPNG].
+func (a *AllureT) AttachPNG(name string, png []byte) { AttachPNG(a.ctx, name, png) }
+
+// ParameterEx adds a parameter with mode/excluded controls. See
+// [WithParameterEx].
+func (a *AllureT) ParameterEx(name, value string, mode ParameterMode, excluded bool) {
+	if a == nil || a.scope == nil {
+		return
+	}
+	a.scope.mu.Lock()
+	defer a.scope.mu.Unlock()
+	p := AllureParameter{Name: name, Value: value, Mode: mode, Excluded: excluded}
+	if top := a.scope.currentStepLocked(); top != nil {
+		top.Parameters = append(top.Parameters, p)
+		return
+	}
+	a.scope.result.Parameters = append(a.scope.result.Parameters, p)
+}
+
+// ParentSuite attaches the "parentSuite" label.
+func (a *AllureT) ParentSuite(value string) { a.scope.addLabel(LabelParentSuite, value) }
+
+// SubSuite attaches the "subSuite" label.
+func (a *AllureT) SubSuite(value string) { a.scope.addLabel(LabelSubSuite, value) }
+
+// Suite attaches the "suite" label.
+func (a *AllureT) Suite(value string) { a.scope.addLabel(LabelSuite, value) }
+
+// DescriptionHTML sets the HTML-rendered description.
+func (a *AllureT) DescriptionHTML(html string) {
+	if a == nil || a.scope == nil {
+		return
+	}
+	a.scope.mu.Lock()
+	defer a.scope.mu.Unlock()
+	a.scope.result.DescriptionHTML = html
 }
 
 // Feature attaches the "feature" label.

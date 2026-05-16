@@ -6,6 +6,7 @@ package allure
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -37,6 +38,34 @@ func Attachment(ctx context.Context, name string, content []byte, mime string) {
 		mime = http.DetectContentType(content)
 	}
 	s.addAttachment(name, mime, content)
+}
+
+// AttachJSON marshals body to JSON and attaches it as application/json.
+// Serialisation errors are recorded as a `.error` plaintext attachment so
+// the test itself does not fail when an attachment is malformed.
+func AttachJSON(ctx context.Context, name string, body any) {
+	s := fromContext(ctx)
+	if s == nil {
+		return
+	}
+	data, err := json.MarshalIndent(body, "", "  ")
+	if err != nil {
+		s.addAttachment(name+".error", "text/plain",
+			[]byte(fmt.Sprintf("AttachJSON marshal failed: %v", err)))
+		return
+	}
+	s.addAttachment(name, "application/json", data)
+}
+
+// AttachText is a convenience wrapper for plaintext attachments.
+func AttachText(ctx context.Context, name, body string) {
+	Attachment(ctx, name, []byte(body), "text/plain")
+}
+
+// AttachPNG attaches a PNG screenshot. MIME is always "image/png" — the
+// Allure UI renders these inline as preview thumbnails.
+func AttachPNG(ctx context.Context, name string, png []byte) {
+	Attachment(ctx, name, png, "image/png")
 }
 
 // AttachFile reads a file from disk and attaches its contents. MIME is
