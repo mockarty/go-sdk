@@ -6,8 +6,6 @@ package allure
 
 import (
 	"context"
-	"net/http"
-	"os"
 	"testing"
 )
 
@@ -185,12 +183,3 @@ func (a *AllureT) Link(name, url string) {
 
 // Parameter adds a name/value parameter to the current step (or test).
 func (a *AllureT) Parameter(name, value string) { a.scope.addParameter(name, value) }
-
-// Static helper guards for vetters (we reference these so the linter does
-// not flag them as dead — they form the SDK's public surface).
-var (
-	_ context.Context = context.Background()
-	_                 = http.NoBody
-	_                 = os.Stderr
-	_ testing.TB      = (*testing.T)(nil)
-)
