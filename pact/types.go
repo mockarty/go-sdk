@@ -27,7 +27,7 @@ const (
 	//   - Nested `matchingRules` keyed by category (`body`, `header`,
 	//     `query`, `path`) with `{combine, matchers}` entries.
 	//   - Plural `providerStates`, each carrying free-form parameters.
-	//   - Interaction `type` discriminator (Synchronous/HTTP in Phase 1).
+	//   - Interaction `type` discriminator (Synchronous/HTTP today).
 	//   - Optional `generators` and `plugins` metadata blocks.
 	//
 	// V4 is required for plugin-backed transports (gRPC, async messaging).
@@ -73,9 +73,11 @@ type PactSpec struct {
 	Version string `json:"version"`
 }
 
-// PluginEntry is a placeholder for V4 plugin metadata. Plugins are
-// recorded for round-trip fidelity but the SDK does not load or invoke
-// them in Phase 1 — that is a Phase 2 follow-up.
+// PluginEntry is the V4 plugin manifest entry written into
+// `metadata.plugins[]`. Plugins are recorded for round-trip fidelity
+// AND wired into the in-process mock server runtime via the
+// `pact/plugins` package — see [Consumer.WithPlugin] for the live
+// dispatch semantics.
 type PluginEntry struct {
 	Configuration map[string]any `json:"configuration,omitempty"`
 	Name          string         `json:"name"`
@@ -163,9 +165,9 @@ type MatcherRule struct {
 }
 
 // GeneratorCat is V4's `generators` block — provider-side hints for
-// generating dynamic values during verification. Phase 1 emits empty
-// generator blocks; the type exists so V4 round-trips don't drop the
-// field if the parser surfaces it.
+// generating dynamic values during verification. The current emitter
+// produces empty generator blocks; the type exists so V4 round-trips
+// don't drop the field if the parser surfaces it.
 type GeneratorCat struct {
 	Generators map[string]Generator `json:"generators,omitempty"`
 }
@@ -178,5 +180,6 @@ type Generator struct {
 }
 
 // HTTPInteractionType is the V4 discriminator value for HTTP/sync
-// interactions — the only kind Phase 1 produces.
+// interactions — the only kind currently produced; async messaging
+// is on the follow-up backlog.
 const HTTPInteractionType = "Synchronous/HTTP"

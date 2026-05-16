@@ -70,10 +70,10 @@ to pick a dialect. The default is V4.
 | Aspect              | V3 (`SpecV3` = `"3.0.0"`)             | V4 (`SpecV4` = `"4.0"`)                   |
 |---------------------|---------------------------------------|-------------------------------------------|
 | Provider states     | Single `providerState`                | Plural `providerStates[]` with `params`   |
-| Interaction `type`  | absent                                | `Synchronous/HTTP` (Phase 1)              |
+| Interaction `type`  | absent                                | `Synchronous/HTTP`                        |
 | matchingRules shape | Flat (`"$.body.id": {matchers:[...]}`) | Nested by category (`body`/`header`/...)  |
-| Plugins             | Not emitted (silently dropped)        | Recorded in `metadata.plugins` (no-op)    |
-| Async/message       | Not supported in Phase 1              | Not supported in Phase 1                  |
+| Plugins             | Not emitted (silently dropped)        | Recorded + dispatched via `pact/plugins`  |
+| Async/message       | Not supported                         | Not yet supported                         |
 
 The same DSL works in both modes; the writer produces the right shape
 on serialisation. Both reference fixtures used in the schema round-trip
@@ -133,17 +133,41 @@ that is the provider team's responsibility. Two production paths:
 - **Not a verifier.** No reverse direction: replaying a `pact.json`
   against a live provider is out of scope here. See "Provider
   verification" above.
-- **Not a plugin runtime.** `WithPlugin` records metadata for V4
-  round-trip fidelity only; the SDK does not load gRPC plugins or
-  speak HTTP/2 in Phase 1.
+- **Not an HTTP/2 server.** The plugin runtime validates gRPC
+  *payloads* (length-prefixed frames + protobuf bytes) but does NOT
+  embed a real `google.golang.org/grpc` server. Authors needing a
+  full HTTP/2 transport should bridge to Mockarty admin's gRPC mock
+  surface and use this package for the contract.
 
-## Phase 2 follow-ups
+## Plugin runtime (Wave 4)
 
-The Wave 2 plan (`docs/research/SDK_FRAMEWORK_PLAN.md` §3) flags the
-following items for a subsequent phase:
+`WithPlugin` records V4 plugin metadata AND wires the named plugin
+into the in-process mock server. Two plugins ship in the SDK:
 
-- **V4 plugin runtime** — gRPC plugin client + HTTP/2 transport so
-  protobuf / gRPC contracts can be served by the consumer mock.
+- `pact/plugins/protobuf` — validates `application/x-protobuf` bodies
+  by wire format (byte-exact or per-field shape).
+- `pact/plugins/grpc` — validates `application/grpc` length-prefixed
+  frames and delegates the inner payload to the protobuf plugin.
+
+Side-effect import the plugin once:
+
+```go
+import _ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+```
+
+then declare:
+
+```go
+pact.WithPlugin("protobuf", "1.0.0", map[string]any{
+    "fields": map[string]any{"1": map[string]any{"wire": 0, "value": 42}},
+})
+```
+
+Third-party plugins implement the `pact/plugins.Plugin` SPI and
+register through `plugins.Register(...)` at init time.
+
+## Follow-up backlog
+
 - **Asynchronous and Synchronous/Messages interactions** —
   `Asynchronous/Messages` (V3 + V4) and `Synchronous/Messages` (V4
   only) for event-driven contracts.

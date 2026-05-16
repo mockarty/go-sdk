@@ -25,16 +25,45 @@ type Option func(*Consumer)
 // builds, then forks to many test goroutines using Start). The Start
 // method returns a [MockServer] which IS safe for concurrent use.
 type Consumer struct {
-	logger       *log.Logger
-	consumer     string
-	provider     string
-	outputDir    string
-	specVersion  SpecVersion
-	interactions []*Interaction
-	plugins      []PluginEntry
-	mu           sync.Mutex
-	closed       bool
+	logger         *log.Logger
+	consumer       string
+	provider       string
+	outputDir      string
+	specVersion    SpecVersion
+	interactions   []*Interaction
+	plugins        []PluginEntry
+	pluginRuntimes []pluginBinding
+	mu             sync.Mutex
+	closed         bool
 }
+
+// pluginBinding pairs a runtime Plugin (from pact/plugins.Default)
+// with the per-Consumer configuration the user supplied via
+// WithPlugin. The mock server dispatches incoming requests through
+// these bindings in declaration order; first match wins.
+type pluginBinding struct {
+	plugin pluginRuntime
+	config map[string]any
+}
+
+// pluginRuntime is the local interface satisfied by
+// pact/plugins.Plugin. Keeping the interface local avoids a hard
+// import-cycle when the plugins package itself wants to depend on the
+// pact root package (e.g. for reusing strict_matcher helpers in a
+// future plugin). The runtime hook in pluginLookup is provided by an
+// init() in plugin_runtime.go.
+type pluginRuntime interface {
+	Name() string
+	Version() string
+	SupportedContentTypes() []string
+	MatchRequest(ctx context.Context, expected map[string]any, actual []byte, contentType string) error
+	GenerateResponse(ctx context.Context, expected map[string]any, contentType string) ([]byte, error)
+}
+
+// pluginLookup is set at package init time by plugin_runtime.go to
+// avoid an import cycle (pact → pact/plugins → pact). Tests can swap
+// the hook for fakes by replacing the variable.
+var pluginLookup = func(name string) (pluginRuntime, bool) { return nil, false }
 
 // NewConsumer builds a Consumer. consumer is the service-under-test
 // name; provider is set via [WithProvider] (defaults to
@@ -74,28 +103,60 @@ func WithOutputDir(dir string) Option { return func(c *Consumer) { c.outputDir =
 // teardown errors when no t.Logf is available, etc.).
 func WithLogger(l *log.Logger) Option { return func(c *Consumer) { c.logger = l } }
 
-// WithPlugin records a V4 plugin manifest in the emitted pact file.
+// WithPlugin records a V4 plugin manifest in the emitted pact file
+// AND wires the plugin into the in-process mock server so live
+// requests get validated through the plugin's MatchRequest hook.
 //
-// IMPORTANT: Phase 1 does NOT load or invoke plugins — calling this
-// option on a V3 consumer is a no-op and on a V4 consumer it only
-// records metadata for round-trip fidelity. A WARNING is logged so the
-// caller knows the contract will not be testable against a plugin
-// runtime until Phase 2.
+// Plugin lookup is performed via the package-level
+// `pact/plugins.Default` registry: import the relevant plugin
+// subpackage (e.g. `_ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"`)
+// once and it will self-register through its init().
+//
+// If the plugin name is not registered when this option is applied the
+// metadata is still recorded (so downstream verifiers see the
+// declaration) but the mock server falls back to the JSON-shape
+// matcher engine. A warning is logged unless `WithLogger` was used to
+// silence stdout.
 func WithPlugin(name, version string, config map[string]any) Option {
 	return func(c *Consumer) {
-		c.plugins = append(c.plugins, PluginEntry{
+		entry := PluginEntry{
 			Name:          name,
 			Version:       version,
 			Configuration: config,
-		})
+		}
+		c.plugins = append(c.plugins, entry)
+		// Bind the plugin's runtime to this Consumer so the mock
+		// server can dispatch requests by content type.
+		if p, ok := pluginLookup(name); ok {
+			c.pluginRuntimes = append(c.pluginRuntimes, pluginBinding{
+				plugin: p,
+				config: cloneConfig(config),
+			})
+			return
+		}
+		// Plugin not registered — log so the caller knows the metadata
+		// will round-trip but the mock won't enforce the plugin's
+		// per-request matcher.
+		msg := "pact: WithPlugin(%q) — plugin not registered in pact/plugins; metadata recorded, runtime fallback to JSON-shape matcher"
 		if c.logger != nil {
-			c.logger.Printf("pact: WithPlugin(%q) — Phase 1 records metadata only; "+
-				"verification against this plugin will not run client-side", name)
+			c.logger.Printf(msg, name)
 		} else {
-			log.Printf("pact: WithPlugin(%q) — Phase 1 records metadata only; "+
-				"verification against this plugin will not run client-side", name)
+			log.Printf(msg, name)
 		}
 	}
+}
+
+// cloneConfig produces a defensive copy so post-construction mutation
+// of the caller's map does not bleed into the consumer's snapshot.
+func cloneConfig(in map[string]any) map[string]any {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]any, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // SpecVersion returns the version selected at construction time.

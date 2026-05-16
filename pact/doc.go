@@ -44,12 +44,15 @@
 //   - V4 emits nested category paths (`body`, `header`, `query`, `path`),
 //     plural `providerStates`, the rich `matchingRules` block with typed
 //     matcher entries, and an interaction `type` of
-//     `Synchronous/HTTP` (HTTP/sync is the only supported interaction
-//     type in Phase 1).
+//     `Synchronous/HTTP` (HTTP/sync is the supported interaction type
+//     today; async messaging is on the follow-up backlog).
 //
-// Async messaging and the V4 plugin runtime are stubbed: [WithPlugin] is
-// recorded in the metadata for round-trip fidelity but is otherwise a
-// no-op and emits a warning.
+// V4 plugin runtime is wired through the `pact/plugins` subpackage:
+// import `_ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"`
+// (or `.../grpc`) to enable runtime payload validation for the
+// `application/x-protobuf` / `application/grpc` content types.
+// Third-party plugins implement `pact/plugins.Plugin` and call
+// `plugins.Register` from their init().
 //
 // # Quick start
 //
@@ -77,9 +80,9 @@
 //	    if err := srv.Verify(); err != nil { t.Fatal(err) }
 //	}
 //
-// # Phase 2 (forthcoming)
+// # Follow-up backlog
 //
-//   - V4 plugin runtime (gRPC plugin client, HTTP/2 transport).
+//   - Real HTTP/2 gRPC transport (current runtime is payload-level only).
 //   - Asynchronous and Synchronous/Messages interaction types.
 //   - Provider-side verification client (consumes the pact.json this
 //     package emits and replays it against a live provider).

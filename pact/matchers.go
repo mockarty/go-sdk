@@ -123,6 +123,10 @@ func EachLike(example any, min int) Matcher {
 
 // MinType matches a typed array of at least min elements (V4-leaning,
 // but V3 accepts it as well). Equivalent to EachLike with min set.
+//
+// Each element of the actual array is validated against the example's
+// JSON type (delegated to a typed Like child) so strict-mode mock
+// servers reject e.g. a number element where a string was expected.
 func MinType(example any, min int) Matcher {
 	if min < 0 {
 		min = 0
@@ -132,6 +136,10 @@ func MinType(example any, min int) Matcher {
 		Example: []any{example},
 		Type:    "type",
 		Rule:    MatcherRule{Match: "type", Min: &m},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     Like(example),
+		}},
 	}
 }
 
@@ -145,6 +153,10 @@ func MaxType(example any, max int) Matcher {
 		Example: []any{example},
 		Type:    "type",
 		Rule:    MatcherRule{Match: "type", Max: &mx},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     Like(example),
+		}},
 	}
 }
 
@@ -161,6 +173,99 @@ func MinMaxType(example any, min, max int) Matcher {
 		Example: []any{example},
 		Type:    "type",
 		Rule:    MatcherRule{Match: "type", Min: &mn, Max: &mx},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     Like(example),
+		}},
+	}
+}
+
+// EachLikeBounded is the V4-flavour [EachLike] that takes both a min
+// and a max. min and max are clamped (negatives → 0, max<min → max=min)
+// to keep the emitted contract self-consistent.
+func EachLikeBounded(example any, min, max int) Matcher {
+	if min < 0 {
+		min = 0
+	}
+	if max < min {
+		max = min
+	}
+	mn, mx := min, max
+	return Matcher{
+		Example: []any{example},
+		Type:    "type",
+		Rule:    MatcherRule{Match: "type", Min: &mn, Max: &mx},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     Like(example),
+		}},
+	}
+}
+
+// JSONPath wraps a child matcher into a JSONPath-rooted matching rule.
+// The mock-server engine evaluates the expression against the actual
+// JSON payload and applies the child matcher at the resolved location.
+//
+// Only the strict-dotted JSONPath subset is supported in-process
+// (`$.a.b[0].c`). Full query syntax (wildcards, filters, descent) is
+// plugin territory — register a Plugin via the `pact/plugins` package
+// to handle it.
+func JSONPath(expr string, child Matcher) Matcher {
+	return Matcher{
+		Example: expr,
+		Type:    "jsonpath",
+		Rule:    MatcherRule{Match: "jsonpath", Value: expr},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     child,
+		}},
+	}
+}
+
+// XMLPath is the XML/XPath sibling of [JSONPath]. The SDK does not
+// embed an XML parser to keep the dep footprint thin
+// (feedback_sdk_thin_layer.md); the matcher round-trips into the
+// emitted pact.json so a plugin-aware verifier can apply XPath at
+// provider-replay time. The in-process mock server only confirms the
+// actual is a string body — strict XPath evaluation requires a
+// registered XML plugin.
+func XMLPath(expr string, child Matcher) Matcher {
+	return Matcher{
+		Example: expr,
+		Type:    "xmlpath",
+		Rule:    MatcherRule{Match: "xmlpath", Value: expr},
+		Children: []ChildMatcher{{
+			PathSegment: "[*]",
+			Matcher:     child,
+		}},
+	}
+}
+
+// Include matches when the actual string contains the example string
+// as a substring. Useful for log-line / message-fragment assertions.
+func Include(substring string) Matcher {
+	return Matcher{
+		Example: substring,
+		Type:    "include",
+		Rule:    MatcherRule{Match: "include", Value: substring},
+	}
+}
+
+// Null matches the JSON null literal.
+func Null() Matcher {
+	return Matcher{
+		Example: nil,
+		Type:    "null",
+		Rule:    MatcherRule{Match: "null"},
+	}
+}
+
+// Number matches any JSON number (integer or decimal).
+func Number(example float64) Matcher {
+	return Matcher{
+		Example: example,
+		Type:    "number",
+		Rule:    MatcherRule{Match: "number"},
 	}
 }
 

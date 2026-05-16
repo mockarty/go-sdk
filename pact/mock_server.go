@@ -28,9 +28,25 @@ type MockServer struct {
 	consumer     *Consumer
 	server       *httptest.Server
 	interactions []*recordedInteraction
-	mu           sync.Mutex
-	closeOnce    sync.Once
-	closed       atomic.Bool
+	// unmatched accumulates the structured failure reports for every
+	// request that did not match any declared interaction. The slice is
+	// the source of truth for Verify() — it returns one error per
+	// unmatched request, with the full per-matcher mismatch breakdown.
+	unmatched []UnmatchedRequest
+	mu        sync.Mutex
+	closeOnce sync.Once
+	closed    atomic.Bool
+}
+
+// UnmatchedRequest is one wire-side request that the mock server could
+// not pair with any declared interaction. Mismatches is the per-
+// interaction strict-mode failure breakdown collected while trying
+// each candidate.
+type UnmatchedRequest struct {
+	Method      string                          `json:"method"`
+	Path        string                          `json:"path"`
+	Body        string                          `json:"body,omitempty"`
+	Mismatches  map[string][]MatchMismatch      `json:"mismatches,omitempty"`
 }
 
 // recordedInteraction is the mock-server-side view of an interaction:
@@ -76,6 +92,11 @@ func (s *MockServer) URL() string {
 // Verify returns an error if any declared interaction was never hit,
 // or if the server saw any unmatched requests. It does NOT close the
 // server — call Close separately.
+//
+// The error message lists every uncalled interaction AND every wire-
+// side request that produced a 404, including the per-matcher
+// mismatch breakdown so the test author can see exactly which JSON
+// path failed which matcher.
 func (s *MockServer) Verify() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -86,11 +107,41 @@ func (s *MockServer) Verify() error {
 				rec.ix.Request.Method, rec.ix.Request.Path, rec.ix.Description))
 		}
 	}
+	parts := []string{}
 	if len(missed) > 0 {
-		return fmt.Errorf("pact: %d interaction(s) declared but never invoked:\n  - %s",
-			len(missed), strings.Join(missed, "\n  - "))
+		parts = append(parts, fmt.Sprintf("%d interaction(s) declared but never invoked:\n  - %s",
+			len(missed), strings.Join(missed, "\n  - ")))
+	}
+	if len(s.unmatched) > 0 {
+		var lines []string
+		for _, u := range s.unmatched {
+			var detail []string
+			for desc, mms := range u.Mismatches {
+				for _, mm := range mms {
+					detail = append(detail, fmt.Sprintf("    [%s] %s", desc, mm.Error()))
+				}
+			}
+			lines = append(lines, fmt.Sprintf("  - %s %s\n%s", u.Method, u.Path, strings.Join(detail, "\n")))
+		}
+		parts = append(parts, fmt.Sprintf("%d unmatched request(s):\n%s",
+			len(s.unmatched), strings.Join(lines, "\n")))
+	}
+	if len(parts) > 0 {
+		return fmt.Errorf("pact: %s", strings.Join(parts, "\n"))
 	}
 	return nil
+}
+
+// UnmatchedRequests returns a defensive copy of every wire-side
+// request that did not match any declared interaction, including the
+// strict-mode failure breakdown per candidate. Useful for tests that
+// want to assert mismatches without parsing the error string.
+func (s *MockServer) UnmatchedRequests() []UnmatchedRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]UnmatchedRequest, len(s.unmatched))
+	copy(out, s.unmatched)
+	return out
 }
 
 // Close shuts the underlying httptest.Server down and writes the
@@ -129,7 +180,8 @@ func (s *MockServer) Calls() []int {
 // serve is the http.Handler that picks the first declared interaction
 // matching the incoming request, increments its call counter, and
 // writes the declared response. Unmatched requests get a 404 with a
-// debug body identifying the closest miss.
+// debug body identifying the closest miss AND the per-matcher
+// mismatch breakdown for every candidate.
 func (s *MockServer) serve(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -138,13 +190,38 @@ func (s *MockServer) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = r.Body.Close()
 
+	// Walk every candidate; collect per-interaction mismatches so the
+	// 404 explains why each candidate was rejected.
+	perCandidate := map[string][]MatchMismatch{}
 	for _, rec := range s.interactions {
-		if matchRequest(rec, r, body) {
+		mismatches := matchRequestStrict(rec, r, body)
+		if len(mismatches) == 0 {
+			// JSON-shape match passed. Run any registered plugin
+			// matcher on top — a plugin can refuse a payload that the
+			// generic engine waved through (e.g. malformed protobuf
+			// inside a `application/x-protobuf` body).
+			if pluginErrs := s.runPluginMatchers(r, body); len(pluginErrs) > 0 {
+				key := fmt.Sprintf("%s %s %q", rec.ix.Request.Method, rec.ix.Request.Path, rec.ix.Description)
+				perCandidate[key] = pluginErrs
+				continue
+			}
 			atomic.AddInt64(&rec.called, 1)
 			writeResponse(w, rec.ix.Response)
 			return
 		}
+		key := fmt.Sprintf("%s %s %q", rec.ix.Request.Method, rec.ix.Request.Path, rec.ix.Description)
+		perCandidate[key] = mismatches
 	}
+
+	// Record the unmatched request for Verify() and the test report.
+	s.mu.Lock()
+	s.unmatched = append(s.unmatched, UnmatchedRequest{
+		Method:     r.Method,
+		Path:       r.URL.Path,
+		Body:       string(body),
+		Mismatches: perCandidate,
+	})
+	s.mu.Unlock()
 
 	// Build a useful 404 with the closest declared interaction and the
 	// reason it didn't match. Helps the user spot a typo in their
@@ -157,8 +234,68 @@ func (s *MockServer) serve(w http.ResponseWriter, r *http.Request) {
 		"path":        r.URL.Path,
 		"declared":    summariseDeclared(s.interactions),
 		"requestBody": string(body),
+		"mismatches":  perCandidate,
 	}
 	_ = json.NewEncoder(w).Encode(debug)
+}
+
+// runPluginMatchers dispatches the incoming request through every
+// registered V4 plugin whose SupportedContentTypes claims the
+// request's Content-Type. Plugin failures surface as MatchMismatch
+// entries with a `$.plugins.<name>` path so the 404 debug envelope
+// distinguishes them from JSON-shape failures.
+//
+// Returns nil when every plugin accepts (or no plugin claims the
+// content type, which is the common case for plain HTTP/JSON pacts).
+func (s *MockServer) runPluginMatchers(r *http.Request, body []byte) []MatchMismatch {
+	if len(s.consumer.pluginRuntimes) == 0 {
+		return nil
+	}
+	ct := r.Header.Get("Content-Type")
+	var out []MatchMismatch
+	for _, b := range s.consumer.pluginRuntimes {
+		if !pluginClaimsContentType(b.plugin, ct) {
+			continue
+		}
+		if err := b.plugin.MatchRequest(r.Context(), b.config, body, ct); err != nil {
+			out = append(out, MatchMismatch{
+				Path:     "$.plugins." + b.plugin.Name(),
+				Reason:   err.Error(),
+				Expected: b.config,
+				Actual:   "<binary>",
+			})
+		}
+	}
+	return out
+}
+
+// pluginClaimsContentType returns true when the plugin's declared
+// content-type list covers the supplied MIME (with `; charset=...`
+// stripping and `type/*` wildcard support).
+func pluginClaimsContentType(p pluginRuntime, mime string) bool {
+	if mime == "" {
+		return false
+	}
+	mime = strings.ToLower(strings.TrimSpace(mime))
+	if idx := strings.Index(mime, ";"); idx >= 0 {
+		mime = strings.TrimSpace(mime[:idx])
+	}
+	for _, ct := range p.SupportedContentTypes() {
+		ct = strings.ToLower(strings.TrimSpace(ct))
+		if ct == mime {
+			return true
+		}
+		if strings.HasSuffix(ct, "/*") {
+			prefix := strings.TrimSuffix(ct, "/*")
+			if idx := strings.Index(mime, "/"); idx > 0 && mime[:idx] == prefix {
+				return true
+			}
+		}
+		if ct == "*/*" {
+			return true
+		}
+	}
+	return false
 }
 
 // summariseDeclared returns a compact view of declared interactions
@@ -176,15 +313,33 @@ func summariseDeclared(in []*recordedInteraction) []map[string]any {
 	return out
 }
 
-// matchRequest compares an incoming request against one declared
-// interaction. Matching is intentionally lenient — matchers in the
-// declared body are compared via JSON-shape parity, not literal-equal.
-func matchRequest(rec *recordedInteraction, r *http.Request, body []byte) bool {
+// matchRequestStrict compares an incoming request against one
+// declared interaction. Unlike the original lenient matcher, it
+// returns a structured per-path mismatch list so the 404 debug
+// envelope can explain exactly which expectation failed.
+//
+// An empty return slice means full match.
+func matchRequestStrict(rec *recordedInteraction, r *http.Request, body []byte) []MatchMismatch {
+	var mm []MatchMismatch
 	if !strings.EqualFold(rec.ix.Request.Method, r.Method) {
-		return false
+		mm = append(mm, MatchMismatch{
+			Path:     "$.method",
+			Reason:   "method mismatch",
+			Expected: rec.ix.Request.Method,
+			Actual:   r.Method,
+		})
+		// Method/path differences make it pointless to compare bodies —
+		// return early so the failure list stays terse.
+		return mm
 	}
 	if rec.ix.Request.Path != r.URL.Path {
-		return false
+		mm = append(mm, MatchMismatch{
+			Path:     "$.path",
+			Reason:   "path mismatch",
+			Expected: rec.ix.Request.Path,
+			Actual:   r.URL.Path,
+		})
+		return mm
 	}
 	// Headers — every declared header value must appear in the request
 	// (case-insensitive name).
@@ -197,10 +352,16 @@ func matchRequest(rec *recordedInteraction, r *http.Request, body []byte) bool {
 			}
 		}
 		if len(gotAll) == 0 {
-			return false
+			mm = append(mm, MatchMismatch{
+				Path:     "$.header." + name,
+				Reason:   "header missing",
+				Expected: expected,
+				Actual:   nil,
+			})
+			continue
 		}
-		matched := false
 		for _, want := range expected {
+			matched := false
 			for _, got := range gotAll {
 				if strings.EqualFold(strings.TrimSpace(got), strings.TrimSpace(want)) {
 					matched = true
@@ -214,12 +375,14 @@ func matchRequest(rec *recordedInteraction, r *http.Request, body []byte) bool {
 					break
 				}
 			}
-			if matched {
-				break
+			if !matched {
+				mm = append(mm, MatchMismatch{
+					Path:     "$.header." + name,
+					Reason:   "header value mismatch",
+					Expected: want,
+					Actual:   gotAll,
+				})
 			}
-		}
-		if !matched {
-			return false
 		}
 	}
 	// Query parameters — every declared key/value pair must appear.
@@ -227,7 +390,13 @@ func matchRequest(rec *recordedInteraction, r *http.Request, body []byte) bool {
 	for name, expected := range rec.ix.Request.Query {
 		gotAll := q[name]
 		if len(gotAll) == 0 {
-			return false
+			mm = append(mm, MatchMismatch{
+				Path:     "$.query." + name,
+				Reason:   "query missing",
+				Expected: expected,
+				Actual:   nil,
+			})
+			continue
 		}
 		for _, want := range expected {
 			found := false
@@ -238,152 +407,51 @@ func matchRequest(rec *recordedInteraction, r *http.Request, body []byte) bool {
 				}
 			}
 			if !found {
-				return false
+				mm = append(mm, MatchMismatch{
+					Path:     "$.query." + name,
+					Reason:   "query value mismatch",
+					Expected: want,
+					Actual:   gotAll,
+				})
 			}
 		}
 	}
-	// Body — JSON-shape parity if the declared body is non-nil.
+	// Body — strict shape & matcher rules.
 	if rec.bodyJSON != nil {
-		if !jsonShapeMatches(rec.bodyJSON, body) {
-			return false
-		}
+		bodyMM := bodyMismatches(rec.bodyJSON, body)
+		mm = append(mm, bodyMM...)
 	}
-	return true
+	return mm
 }
 
-// jsonShapeMatches reports whether actualBytes parse to a JSON value
-// whose shape matches expected, where:
-//
-//   - Matchers compare by their underlying example (no type-checking
-//     on the actual value — keeping the mock permissive is the right
-//     trade-off because the user's tests are the verifier here).
-//   - Objects compare by key set (declared keys MUST be present, but
-//     extras are allowed).
-//   - Slices compare by length AND element-wise shape.
-//   - Scalars compare by Go equality after JSON normalisation
-//     (numbers become float64, etc.).
-func jsonShapeMatches(expected any, actualBytes []byte) bool {
+// bodyMismatches runs the strict-mode walker against the request body
+// and returns every mismatch. An empty actual body where one was
+// declared still counts as a mismatch — declaring a body asserts the
+// caller will send one.
+func bodyMismatches(expected any, actualBytes []byte) []MatchMismatch {
 	var actual any
 	if len(actualBytes) == 0 {
-		return expected == nil
+		if expected == nil {
+			return nil
+		}
+		return []MatchMismatch{{
+			Path:     "$.body",
+			Reason:   "empty body where one was expected",
+			Expected: expected,
+			Actual:   nil,
+		}}
 	}
 	if err := json.Unmarshal(actualBytes, &actual); err != nil {
-		// Non-JSON actual body, but declared body expects JSON — no match.
-		return false
+		return []MatchMismatch{{
+			Path:     "$.body",
+			Reason:   "actual body is not valid JSON: " + err.Error(),
+			Expected: expected,
+			Actual:   string(actualBytes),
+		}}
 	}
-	return jsonShapeMatchesValue(expected, actual)
-}
-
-// jsonShapeMatchesValue is the recursive shape comparison.
-func jsonShapeMatchesValue(expected, actual any) bool {
-	switch v := expected.(type) {
-	case Matcher:
-		// Matchers compare by shape, not value: as long as the actual
-		// value has the JSON type the matcher describes, it counts as a
-		// match. We delegate the type check to matcherAcceptsActual.
-		return matcherAcceptsActual(v, actual)
-	case map[string]any:
-		am, ok := actual.(map[string]any)
-		if !ok {
-			return false
-		}
-		for k, e := range v {
-			a, present := am[k]
-			if !present {
-				return false
-			}
-			if !jsonShapeMatchesValue(e, a) {
-				return false
-			}
-		}
-		return true
-	case []any:
-		as, ok := actual.([]any)
-		if !ok {
-			return false
-		}
-		if len(v) == 0 {
-			// Empty declared array means "any array".
-			return true
-		}
-		// Compare each declared position against the same actual
-		// position; extras in actual are allowed.
-		for i, e := range v {
-			if i >= len(as) {
-				return false
-			}
-			if !jsonShapeMatchesValue(e, as[i]) {
-				return false
-			}
-		}
-		return true
-	case []Matcher:
-		as, ok := actual.([]any)
-		if !ok {
-			return false
-		}
-		for i, e := range v {
-			if i >= len(as) {
-				return false
-			}
-			if !jsonShapeMatchesValue(e, as[i]) {
-				return false
-			}
-		}
-		return true
-	case nil:
-		return actual == nil
-	default:
-		return normalisedEqual(expected, actual)
-	}
-}
-
-// matcherAcceptsActual reports whether the given matcher accepts the
-// given actual JSON value, by JSON type. Used by the mock server's
-// request-body matcher — the mock is intentionally permissive (it is
-// not the contract verifier; that is the provider's job).
-//
-// Compound matchers recurse into their Example so EachLike(map{Like(x)})
-// still checks the inner type.
-func matcherAcceptsActual(m Matcher, actual any) bool {
-	switch m.Rule.Match {
-	case "type", "":
-		return sameJSONType(m.Example, actual)
-	case "integer":
-		switch v := actual.(type) {
-		case float64:
-			return v == float64(int64(v))
-		case int, int32, int64:
-			return true
-		}
-		return false
-	case "decimal":
-		_, ok := actual.(float64)
-		return ok
-	case "boolean":
-		_, ok := actual.(bool)
-		return ok
-	case "regex":
-		s, ok := actual.(string)
-		if !ok {
-			return false
-		}
-		// We deliberately accept any string in the mock; provider-side
-		// verification re-applies the regex strictly.
-		_ = s
-		return true
-	case "values", "each-key", "each-value":
-		_, ok := actual.(map[string]any)
-		return ok
-	case "arrayContains":
-		_, ok := actual.([]any)
-		return ok
-	case "equality":
-		return normalisedEqual(m.Example, actual)
-	}
-	// Unknown matcher kinds default to lenient acceptance — the user's
-	// pact verifier will reject mismatches at provider-side replay.
-	return true
+	result := MatchResult{Root: actual}
+	strictMatch(expected, actual, "$.body", &result)
+	return result.Mismatches
 }
 
 // sameJSONType compares the JSON-type of two Go values after JSON

@@ -137,7 +137,7 @@ func TestV4PathSplittingAllCategories(t *testing.T) {
 func TestMatcherAcceptsActualAllKinds(t *testing.T) {
 	t.Parallel()
 	// Drive each matcher kind through the mock server end-to-end so the
-	// matcherAcceptsActual switch is fully covered.
+	// strict matcher engine's dispatch table is fully covered.
 	tests := []struct {
 		body       any
 		actual     map[string]any
