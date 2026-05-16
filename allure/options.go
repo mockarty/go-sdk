@@ -14,19 +14,26 @@ import "time"
 type Option func(*config)
 
 type config struct {
-	now        func() time.Time
-	resultsDir string
-	name       string
-	fullName   string
-	suite      string
-	feature    string
-	story      string
-	epic       string
-	owner      string
-	severity   Severity
-	labels     []AllureLabel
-	links      []AllureLink
-	parameters []AllureParameter
+	now         func() time.Time
+	resultsDir  string
+	name        string
+	fullName    string
+	description string
+	descrHTML   string
+	suite       string
+	parentSuite string
+	subSuite    string
+	feature     string
+	story       string
+	epic        string
+	owner       string
+	pkg         string
+	testClass   string
+	testMethod  string
+	severity    Severity
+	labels      []AllureLabel
+	links       []AllureLink
+	parameters  []AllureParameter
 }
 
 // WithResultsDir overrides the output directory for this test only.
@@ -45,6 +52,32 @@ func WithFullName(fullName string) Option { return func(c *config) { c.fullName 
 
 // WithSuite seeds the "suite" label.
 func WithSuite(s string) Option { return func(c *config) { c.suite = s } }
+
+// WithParentSuite seeds the "parentSuite" label (top of the Allure tree).
+func WithParentSuite(s string) Option { return func(c *config) { c.parentSuite = s } }
+
+// WithSubSuite seeds the "subSuite" label (third tier under suite).
+func WithSubSuite(s string) Option { return func(c *config) { c.subSuite = s } }
+
+// WithPackage seeds the "package" label. Defaults to the calling package
+// detected via runtime.Caller when [T] is used.
+func WithPackage(p string) Option { return func(c *config) { c.pkg = p } }
+
+// WithTestClass seeds the "testClass" label. For Go this is typically the
+// parent test function name when subtests are used.
+func WithTestClass(name string) Option { return func(c *config) { c.testClass = name } }
+
+// WithTestMethod seeds the "testMethod" label. Defaults to the subtest /
+// test function name.
+func WithTestMethod(name string) Option { return func(c *config) { c.testMethod = name } }
+
+// WithDescription seeds the plain-text description shown in the Allure UI.
+func WithDescription(desc string) Option { return func(c *config) { c.description = desc } }
+
+// WithDescriptionHTML seeds the HTML-rendered description. Allure renders
+// descriptionHtml verbatim — use this for rich (links, lists, code blocks)
+// content. Plain text should go through [WithDescription].
+func WithDescriptionHTML(html string) Option { return func(c *config) { c.descrHTML = html } }
 
 // WithFeature seeds the "feature" label.
 func WithFeature(f string) Option { return func(c *config) { c.feature = f } }
@@ -93,6 +126,31 @@ func WithTmsLink(name, url string) Option {
 func WithParameter(name, value string) Option {
 	return func(c *config) {
 		c.parameters = append(c.parameters, AllureParameter{Name: name, Value: value})
+	}
+}
+
+// WithParameterEx adds a parameter with explicit mode/excluded flags. Use
+// when the value should be masked, hidden, or kept out of history-id.
+func WithParameterEx(name, value string, mode ParameterMode, excluded bool) Option {
+	return func(c *config) {
+		c.parameters = append(c.parameters, AllureParameter{
+			Name:     name,
+			Value:    value,
+			Mode:     mode,
+			Excluded: excluded,
+		})
+	}
+}
+
+// WithIssuePattern overrides ALLURE_ISSUE_LINK_PATTERN at the scope level.
+// Rarely needed — the env-var is the canonical control.
+//
+// Kept as a no-op stub for forward compatibility; the actual pattern lives
+// in package-level state (see Issue/IssueLink builders).
+func WithIssuePattern(pattern string) Option {
+	return func(c *config) {
+		// Stored on the config so RuntimeIssue can read it later if needed.
+		c.labels = append(c.labels, AllureLabel{Name: "_internal.issuePattern", Value: pattern})
 	}
 }
 

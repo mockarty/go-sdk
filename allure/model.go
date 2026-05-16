@@ -28,14 +28,21 @@ const (
 	StatusSkipped Status = "skipped" // test skipped
 )
 
-// Stage marks the lifecycle phase of a result or step. We always emit
-// "finished" — the other values (scheduled, running, pending) are reserved
-// for live-update writers we do not implement here.
+// Stage marks the lifecycle phase of a result or step.
+//
+// Stages flow scheduled → running → finished. The SDK emits "scheduled" on
+// scope creation (so any reader observing a half-written allure-results
+// directory sees an intentional state), "running" when the first step is
+// pushed, and "finished" on flush. Steps follow the same lifecycle: each
+// pushStep marks the step "running" until popStep flips it to "finished".
 type Stage string
 
-// Stage enum values.
+// Stage enum values (every value accepted by allure-generate is enumerated).
 const (
-	StageFinished Stage = "finished"
+	StageScheduled Stage = "scheduled"
+	StageRunning   Stage = "running"
+	StagePending   Stage = "pending"
+	StageFinished  Stage = "finished"
 )
 
 // Severity is the priority label Allure renders as a colored chip.
@@ -45,7 +52,9 @@ type Severity string
 const (
 	SeverityBlocker  Severity = "blocker"
 	SeverityCritical Severity = "critical"
+	SeverityHigh     Severity = "critical" // alias — Allure has no "high"; map to critical.
 	SeverityNormal   Severity = "normal"
+	SeverityLow      Severity = "minor" // alias — Allure has no "low"; map to minor.
 	SeverityMinor    Severity = "minor"
 	SeverityTrivial  Severity = "trivial"
 )
@@ -119,10 +128,28 @@ type AllureLink struct {
 	Type string `json:"type,omitempty"`
 }
 
+// ParameterMode controls how a parameter is rendered/compared in the
+// Allure report. Empty value = "default" (rendered + counted for history).
+type ParameterMode string
+
+// ParameterMode enum values per Allure schema.
+const (
+	ParameterModeDefault ParameterMode = ""        // rendered, history-counted
+	ParameterModeHidden  ParameterMode = "hidden"  // not rendered
+	ParameterModeMasked  ParameterMode = "masked"  // value replaced with "******"
+)
+
 // AllureParameter is a name/value pair surfaced in the test header.
+//
+// Mode controls rendering (default/hidden/masked). Excluded=true removes
+// the parameter from history-id computation — useful for values that
+// legitimately vary across runs (timestamps, request-ids) without
+// generating a new history-id per execution.
 type AllureParameter struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+	Name     string        `json:"name"`
+	Value    string        `json:"value"`
+	Mode     ParameterMode `json:"mode,omitempty"`
+	Excluded bool          `json:"excluded,omitempty"`
 }
 
 // AllureAttachment references a file written next to the result JSON.

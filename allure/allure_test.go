@@ -122,7 +122,7 @@ func TestT_ResultShape(t *testing.T) {
 		t.Errorf("description = %q", r.Description)
 	}
 	wantLabels := map[string]string{
-		LabelFramework: "mockarty",
+		LabelFramework: FrameworkName,
 		LabelLanguage:  "go",
 		LabelSuite:     "auth-smoke",
 		LabelFeature:   "Login",

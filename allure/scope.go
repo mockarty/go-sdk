@@ -5,7 +5,13 @@
 package allure
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
+	"os"
+	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -57,7 +63,7 @@ func newScope(cfg config, writer ResultWriter) *scope {
 		Name:        name,
 		FullName:    fullName,
 		Status:      StatusPassed,
-		Stage:       StageFinished,
+		Stage:       StageScheduled,
 		Start:       s.startNS,
 		Labels:      []AllureLabel{},
 		Links:       []AllureLink{},
@@ -65,14 +71,89 @@ func newScope(cfg config, writer ResultWriter) *scope {
 		Steps:       []AllureStep{},
 		Attachments: []AllureAttachment{},
 	}
-	// Stable historyId — derived from fullName so re-runs cluster in Allure's
-	// history view. uuid.NewSHA1 with a stable namespace gives us 32 hex chars.
-	hid := uuid.NewSHA1(uuid.NameSpaceURL, []byte(fullName))
-	s.result.HistoryID = hid.String()
-	s.result.TestCaseID = hid.String()
+	// Stable historyId — derived from fullName + parameter values that are
+	// NOT marked excluded. uuid.NewSHA1 with a stable namespace gives us 32
+	// hex chars. Re-runs of the same parameter combination cluster together
+	// in Allure's history view; differing parameters fork into distinct
+	// history series.
+	s.result.HistoryID = computeHistoryID(fullName, cfg.parameters)
+	// AS_ID (Allure stable ID) is a short hash of testClass+testMethod used
+	// for history navigation. We compute it lazily from the bootstrap labels
+	// when applyConfigLabels runs.
+	s.result.TestCaseID = s.result.HistoryID
 
 	s.applyConfigLabels()
+	if cfg.description != "" {
+		s.result.Description = cfg.description
+	}
+	if cfg.descrHTML != "" {
+		s.result.DescriptionHTML = cfg.descrHTML
+	}
 	return s
+}
+
+// computeHistoryID is a deterministic hash of fullName + non-excluded
+// parameter values. Allure's history-id contract: two runs with the same
+// history-id are considered "the same test". Parameterised tests rely on
+// distinct parameter combinations producing distinct history-ids.
+func computeHistoryID(fullName string, params []AllureParameter) string {
+	h := sha1.New()
+	h.Write([]byte(fullName))
+	for _, p := range params {
+		if p.Excluded {
+			continue
+		}
+		h.Write([]byte{0})
+		h.Write([]byte(p.Name))
+		h.Write([]byte{0})
+		h.Write([]byte(p.Value))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// goroutineID parses the current goroutine ID out of runtime.Stack output.
+// This is the canonical pattern used by allure-java's thread label — the
+// goroutine ID is the closest analogue to a thread name in Go.
+//
+// Returns 0 on parse failure (very defensive — runtime.Stack format has
+// been stable across all Go versions).
+func goroutineID() int64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	// Format: "goroutine N [status]:\n..."
+	const prefix = "goroutine "
+	if n < len(prefix) {
+		return 0
+	}
+	b := buf[len(prefix):n]
+	end := bytes.IndexByte(b, ' ')
+	if end < 0 {
+		return 0
+	}
+	id, err := strconv.ParseInt(string(b[:end]), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+// hostName resolves the host label. We cache it once per process — the
+// hostname does not change mid-test-run and the syscall is non-trivial on
+// some platforms.
+var (
+	hostOnce sync.Once
+	hostVal  string
+)
+
+func hostName() string {
+	hostOnce.Do(func() {
+		if v, err := os.Hostname(); err == nil && v != "" {
+			hostVal = v
+			return
+		}
+		hostVal = "unknown"
+	})
+	return hostVal
 }
 
 func (s *scope) applyConfigLabels() {
@@ -82,20 +163,59 @@ func (s *scope) applyConfigLabels() {
 		}
 		s.result.Labels = append(s.result.Labels, AllureLabel{Name: name, Value: value})
 	}
-	push(LabelFramework, "mockarty")
+	// Framework identity — pinned to product (NOT "mockarty" raw, but the
+	// canonical SDK identifier so the Allure report attributes the run
+	// correctly when results are mixed across go/python/java).
+	push(LabelFramework, FrameworkName)
 	push(LabelLanguage, "go")
+	push(LabelHost, hostName())
+	push(LabelThread, strconv.FormatInt(goroutineID(), 10))
 	push(LabelSuite, s.cfg.suite)
+	push(LabelParentSuite, s.cfg.parentSuite)
+	push(LabelSubSuite, s.cfg.subSuite)
 	push(LabelFeature, s.cfg.feature)
 	push(LabelStory, s.cfg.story)
 	push(LabelEpic, s.cfg.epic)
 	push(LabelOwner, s.cfg.owner)
+	push(LabelPackage, s.cfg.pkg)
+	push(LabelTestClass, s.cfg.testClass)
+	push(LabelTestMethod, s.cfg.testMethod)
 	if s.cfg.severity != "" {
 		push(LabelSeverity, string(s.cfg.severity))
+	}
+	// AS_ID — short stable identifier used by Allure for history navigation
+	// when testClass+testMethod are both available. Falls back to fullName
+	// hash otherwise so parameterised tests still get an identity.
+	if asID := s.computeAllureStableID(); asID != "" {
+		push(LabelAllureID, asID)
 	}
 	s.result.Labels = append(s.result.Labels, s.cfg.labels...)
 	s.result.Links = append(s.result.Links, s.cfg.links...)
 	s.result.Parameters = append(s.result.Parameters, s.cfg.parameters...)
 }
+
+// computeAllureStableID builds a short hex digest of testClass+testMethod
+// (or fullName as fallback). 16 hex chars is enough collision-resistance
+// for a test catalogue and matches allure-java's AS_ID length.
+func (s *scope) computeAllureStableID() string {
+	key := s.cfg.testClass + "::" + s.cfg.testMethod
+	if s.cfg.testClass == "" && s.cfg.testMethod == "" {
+		key = s.cfg.fullName
+		if key == "" {
+			key = s.cfg.name
+		}
+	}
+	if key == "" {
+		return ""
+	}
+	sum := sha1.Sum([]byte(key))
+	return hex.EncodeToString(sum[:8])
+}
+
+// FrameworkName is the canonical framework label value emitted by this
+// SDK. Stays stable across releases — used by Allure to group runs by
+// originating tool.
+const FrameworkName = "mockarty-go-sdk"
 
 // scopeKey is the context.Context key for the current scope.
 type scopeKey struct{}
@@ -191,11 +311,15 @@ func (s *scope) pushStep(name string) *AllureStep {
 	step := AllureStep{
 		Name:        name,
 		Status:      StatusPassed,
-		Stage:       StageFinished,
+		Stage:       StageRunning,
 		Start:       s.now().UnixMilli(),
 		Parameters:  []AllureParameter{},
 		Steps:       []AllureStep{},
 		Attachments: []AllureAttachment{},
+	}
+	// First step push flips the test from scheduled → running.
+	if s.result.Stage == StageScheduled {
+		s.result.Stage = StageRunning
 	}
 	parent := s.currentStepLocked()
 	if parent != nil {
@@ -222,6 +346,7 @@ func (s *scope) popStep(status Status, detail *StatusDetail) {
 	idx := len(s.stepStack) - 1
 	cur := s.stepStack[idx]
 	cur.Stop = s.now().UnixMilli()
+	cur.Stage = StageFinished
 	if status != "" {
 		cur.Status = status
 	}
@@ -314,10 +439,12 @@ func (s *scope) finish() error {
 	s.finishOnce.Do(func() {
 		s.mu.Lock()
 		s.result.Stop = s.now().UnixMilli()
+		s.result.Stage = StageFinished
 		// Any step left open is closed at scope.finish so flush is idempotent.
 		for len(s.stepStack) > 0 {
 			idx := len(s.stepStack) - 1
 			s.stepStack[idx].Stop = s.result.Stop
+			s.stepStack[idx].Stage = StageFinished
 			s.stepStack = s.stepStack[:idx]
 		}
 		out := s.result

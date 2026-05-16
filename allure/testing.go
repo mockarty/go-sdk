@@ -6,8 +6,57 @@ package allure
 
 import (
 	"context"
+	"runtime"
+	"strings"
 	"testing"
 )
+
+// detectCallerPackage uses runtime.Caller(skip) to extract the calling
+// package name. Skip is the number of stack frames between the call site
+// and the actual user test function. Returns ("", "") on parse failure.
+func detectCallerPackage(skip int) (pkg, fn string) {
+	pc, _, _, ok := runtime.Caller(skip)
+	if !ok {
+		return "", ""
+	}
+	f := runtime.FuncForPC(pc)
+	if f == nil {
+		return "", ""
+	}
+	full := f.Name()
+	// Format: "github.com/x/y/pkg.TestFoo" or
+	//        "github.com/x/y/pkg.TestFoo.func1" (for closures in t.Run).
+	lastSlash := strings.LastIndex(full, "/")
+	tail := full
+	if lastSlash >= 0 {
+		tail = full[lastSlash+1:]
+	}
+	dot := strings.Index(tail, ".")
+	if dot < 0 {
+		return full, ""
+	}
+	if lastSlash >= 0 {
+		pkg = full[:lastSlash+1] + tail[:dot]
+	} else {
+		pkg = tail[:dot]
+	}
+	fn = tail[dot+1:]
+	return pkg, fn
+}
+
+// splitTestPath splits the full t.Name() into the top-level class and the
+// subtest method. For "TestLogin/happy/path" returns ("TestLogin", "happy/path").
+// For "TestLogin" returns ("TestLogin", "TestLogin").
+func splitTestPath(name string) (class, method string) {
+	if name == "" {
+		return "", ""
+	}
+	slash := strings.IndexByte(name, '/')
+	if slash < 0 {
+		return name, name
+	}
+	return name[:slash], name[slash+1:]
+}
 
 // AllureT is the Allure-aware wrapper returned by [T]. It exposes the same
 // surface as the package-level annotation functions but bound to a single
@@ -36,8 +85,33 @@ type AllureT struct {
 func T(t *testing.T, opts ...Option) *AllureT {
 	t.Helper()
 	cfg := config{name: t.Name(), fullName: t.Name()}
+	// Auto-detect package + testClass + testMethod when caller did not
+	// supply them. We rely on runtime.Caller(1) — the user test function
+	// that invoked T(). This stays stable across Go versions and matches
+	// allure-pytest/allure-java conventions.
+	if pkg, _ := detectCallerPackage(2); pkg != "" {
+		cfg.pkg = pkg
+	}
+	cls, mtd := splitTestPath(t.Name())
+	if cls != "" {
+		cfg.testClass = cls
+	}
+	if mtd != "" {
+		cfg.testMethod = mtd
+	}
 	for _, o := range opts {
 		o(&cfg)
+	}
+	// Parameterised tests stash their per-case parameters; pick them up so
+	// each iteration's Allure result reflects the case payload.
+	if pending := consumePendingParameters(t.Name()); len(pending) > 0 {
+		cfg.parameters = append(cfg.parameters, pending...)
+	}
+	// FullName follows allure-pytest convention: "<package>::<testMethod>".
+	if cfg.fullName == "" || cfg.fullName == t.Name() {
+		if cfg.pkg != "" {
+			cfg.fullName = cfg.pkg + "::" + t.Name()
+		}
 	}
 	dir := ResolveResultsDir(cfg.resultsDir)
 	writer := NewFileWriter(dir)
