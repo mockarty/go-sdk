@@ -1,2 +1,10 @@
 # Compiled example binaries
 examples/*/example
+
+# Allure results directories produced by the test suite. They should
+# never be committed — the acceptance tests use t.TempDir(), but the
+# EnsureExecutor / TestMain helpers fall back to ./allure-results when
+# callers don't pass WithResultsDir, and unit tests covering those
+# helpers leave artefacts behind.
+allure-results/
+**/allure-results/

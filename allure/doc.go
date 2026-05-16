@@ -58,10 +58,62 @@
 //
 // Both APIs share the same writer; mixing them within one test is supported.
 //
-// # Phase 2 (forthcoming)
+// # Lifecycle hooks
 //
-// A future release will add reflection-based discovery of a hypothetical
-// `github.com/allure-framework/allure-go` import so existing Allure-Go test
-// suites can swap a single import and keep working. Phase 1 (this file set)
-// is the baseline writer + idiomatic Go annotation API.
+// BeforeAll / AfterAll / BeforeEach / AfterEach reproduce TestNG /
+// JUnit5 / pytest setup-teardown semantics on top of Go's bare `testing`
+// package. Hooks emit Allure Container files so the report renderer
+// shows them as Set up / Tear down panels.
+//
+//	func TestThings(t *testing.T) {
+//	    allure.BeforeAll(t, "db", func(t *testing.T) { setupDB(t) })
+//	    allure.AfterAll(t, "db", func(t *testing.T) { teardownDB(t) })
+//	    allure.BeforeEach(t, "txn", func(t *testing.T) { ... })
+//	    for _, name := range []string{"one","two"} {
+//	        t.Run(name, func(tt *testing.T) {
+//	            allure.RunWithHooks(tt, func(inner *testing.T) {
+//	                a := allure.T(inner)
+//	                a.Step("body", func() {})
+//	            })
+//	        })
+//	    }
+//	}
+//
+// # Parameterised tests
+//
+// ParameterizedTest reflects over a struct payload and turns each
+// exported field into an Allure parameter. Each iteration produces a
+// distinct history-id so the Allure tree clusters runs of the same case
+// together while keeping different cases separated.
+//
+//	type Tc struct{ Input, Want string }
+//	cases := []allure.ParameterCase[Tc]{
+//	    {Name: "happy", Payload: Tc{"a","b"}},
+//	    {Name: "empty", Payload: Tc{"",""}},
+//	}
+//	allure.ParameterizedTest(t, cases, func(tt *testing.T, c Tc) {
+//	    a := allure.T(tt)
+//	    a.Step("act", func() { ... })
+//	})
+//
+// # TestMain
+//
+// An optional convenience entry point that writes executor.json on start
+// and flushes leftover containers on exit. Drop it next to your tests:
+//
+//	func TestMain(m *testing.M) {
+//	    os.Exit(allure.TestMain(m))
+//	}
+//
+// # External-runs bridge
+//
+// Once your tests have produced an allure-results directory, push it to
+// Mockarty TCM via externalruns.FromAllureDir + Client.CreateRun:
+//
+//	runs, _ := externalruns.FromAllureDir("./allure-results")
+//	for _, r := range runs {
+//	    run, _ := cli.CreateRun(ctx, r.Request)
+//	    _ = cli.AddSteps(ctx, run.ID, r.Steps)
+//	    _ = cli.FinishRun(ctx, run.ID, r.FinishRequest)
+//	}
 package allure

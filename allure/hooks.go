@@ -170,17 +170,27 @@ func RunWithHooks(t *testing.T, fn func(t *testing.T)) {
 
 // RegisterChild records a test UUID against the active suite so the
 // Allure container references its children. AllureT auto-registers.
+//
+// IMPORTANT: this is a no-op when no BeforeAll/AfterAll has been
+// registered for the suite yet — recording children without hooks would
+// create suite registry entries that never flush (and a stray
+// flushAllSuites() at the end of a process would emit unintended
+// container files in the default results dir). The contract: the
+// container only exists if the user explicitly opted in via a lifecycle
+// hook.
 func RegisterChild(testName, uuid string) {
 	if uuid == "" {
 		return
 	}
 	cls, _ := splitTestPath(testName)
-	h := suiteFor(cls)
+	suiteRegistryMu.Lock()
+	h, ok := suiteRegistry[cls]
+	suiteRegistryMu.Unlock()
+	if !ok {
+		return
+	}
 	h.mu.Lock()
 	h.children = append(h.children, uuid)
-	if h.dir == "" {
-		h.dir = ResolveResultsDir("")
-	}
 	h.mu.Unlock()
 }
 
