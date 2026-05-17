@@ -33,18 +33,18 @@ type Hook func(t *testing.T)
 // for a single class (Go test function). It survives between t.Run
 // invocations of the same parent test.
 type suiteHooks struct {
-	beforeAlls  []Hook
-	afterAlls   []Hook
-	beforeEachs []Hook
-	afterEachs  []Hook
-	children    []string
-	containerID string
-	dir         string
-	beforeSteps []AllureStep
-	afterSteps  []AllureStep
-	startMS     int64
+	beforeAlls    []Hook
+	afterAlls     []Hook
+	beforeEachs   []Hook
+	afterEachs    []Hook
+	children      []string
+	containerID   string
+	dir           string
+	beforeSteps   []AllureStep
+	afterSteps    []AllureStep
+	startMS       int64
 	beforeAllDone bool
-	mu          sync.Mutex
+	mu            sync.Mutex
 }
 
 var (

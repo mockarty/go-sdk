@@ -14,10 +14,10 @@ import (
 // set, callers can pass just the short id (e.g. "JIRA-123") and the SDK
 // expands "{0}" / "{}" in the pattern to build the full URL.
 //
-//   ALLURE_ISSUE_LINK_PATTERN — for Issue()
-//   ALLURE_TMS_LINK_PATTERN   — for TmsLink()
-//   ALLURE_LINK_PATTERN_PREFIX — wildcard pattern for custom link types
-//                                (e.g. ALLURE_LINK_PATTERN_DOCS for type=docs).
+//	ALLURE_ISSUE_LINK_PATTERN — for Issue()
+//	ALLURE_TMS_LINK_PATTERN   — for TmsLink()
+//	ALLURE_LINK_PATTERN_PREFIX — wildcard pattern for custom link types
+//	                             (e.g. ALLURE_LINK_PATTERN_DOCS for type=docs).
 const (
 	IssuePatternEnv = "ALLURE_ISSUE_LINK_PATTERN"
 	TmsPatternEnv   = "ALLURE_TMS_LINK_PATTERN"

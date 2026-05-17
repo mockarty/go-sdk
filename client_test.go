@@ -620,21 +620,26 @@ func TestClient_ConcurrentSubAPIAccess_RaceFree(t *testing.T) {
 // EntitySearch / Secrets / Prompts) are also eagerly initialised and stable.
 // The previous lazy-init path created a new instance on every nil deref,
 // which is now impossible with the eager pattern from NewClient.
+//
+// We bind both reads to local variables before comparing — `c.Me() != c.Me()`
+// inline gets folded by staticcheck SA4000 ("always false") because the
+// compiler can prove the two calls are pure when looking only at the call
+// site. The local binding hides that and exercises the accessor twice.
 func TestClient_SubAPISingletons_NewlyEager(t *testing.T) {
 	c := NewClient("http://localhost:5770")
-	if c.Me() == nil || c.Me() != c.Me() {
+	if a, b := c.Me(), c.Me(); a == nil || a != b {
 		t.Error("Me singleton broken")
 	}
-	if c.TestPlans() == nil || c.TestPlans() != c.TestPlans() {
+	if a, b := c.TestPlans(), c.TestPlans(); a == nil || a != b {
 		t.Error("TestPlans singleton broken")
 	}
-	if c.EntitySearch() == nil || c.EntitySearch() != c.EntitySearch() {
+	if a, b := c.EntitySearch(), c.EntitySearch(); a == nil || a != b {
 		t.Error("EntitySearch singleton broken")
 	}
-	if c.Secrets() == nil || c.Secrets() != c.Secrets() {
+	if a, b := c.Secrets(), c.Secrets(); a == nil || a != b {
 		t.Error("Secrets singleton broken")
 	}
-	if c.Prompts() == nil || c.Prompts() != c.Prompts() {
+	if a, b := c.Prompts(), c.Prompts(); a == nil || a != b {
 		t.Error("Prompts singleton broken")
 	}
 }

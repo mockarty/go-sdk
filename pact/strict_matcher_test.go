@@ -130,8 +130,8 @@ func TestStrictEachKeyEachValue(t *testing.T) {
 		UponReceiving("typed map").
 		WithRequest(http.MethodPost, "/x").
 		WithJSONBody(map[string]any{
-			"keys":  pact.EachKey(pact.Term("k", `^k\d+$`)),
-			"vals":  pact.EachValue(pact.Integer(0)),
+			"keys": pact.EachKey(pact.Term("k", `^k\d+$`)),
+			"vals": pact.EachValue(pact.Integer(0)),
 		}).
 		WillRespondWith(200)
 	srv, _ := c.Start(context.Background())

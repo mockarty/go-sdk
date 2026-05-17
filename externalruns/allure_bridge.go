@@ -94,7 +94,7 @@ type allureResult struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
 	} `json:"parameters,omitempty"`
-	Steps []allureStep `json:"steps,omitempty"`
+	Steps       []allureStep `json:"steps,omitempty"`
 	Attachments []struct {
 		Name   string `json:"name"`
 		Source string `json:"source"`

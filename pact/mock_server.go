@@ -43,10 +43,10 @@ type MockServer struct {
 // interaction strict-mode failure breakdown collected while trying
 // each candidate.
 type UnmatchedRequest struct {
-	Method      string                          `json:"method"`
-	Path        string                          `json:"path"`
-	Body        string                          `json:"body,omitempty"`
-	Mismatches  map[string][]MatchMismatch      `json:"mismatches,omitempty"`
+	Method     string                     `json:"method"`
+	Path       string                     `json:"path"`
+	Body       string                     `json:"body,omitempty"`
+	Mismatches map[string][]MatchMismatch `json:"mismatches,omitempty"`
 }
 
 // recordedInteraction is the mock-server-side view of an interaction:

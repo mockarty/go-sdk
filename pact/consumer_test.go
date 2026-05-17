@@ -262,4 +262,3 @@ func TestAddInteractionAfterStartReturnsNil(t *testing.T) {
 		t.Fatalf("AddInteraction after Start should return nil; got %v", b)
 	}
 }
-

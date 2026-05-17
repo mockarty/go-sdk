@@ -134,9 +134,9 @@ type ParameterMode string
 
 // ParameterMode enum values per Allure schema.
 const (
-	ParameterModeDefault ParameterMode = ""        // rendered, history-counted
-	ParameterModeHidden  ParameterMode = "hidden"  // not rendered
-	ParameterModeMasked  ParameterMode = "masked"  // value replaced with "******"
+	ParameterModeDefault ParameterMode = ""       // rendered, history-counted
+	ParameterModeHidden  ParameterMode = "hidden" // not rendered
+	ParameterModeMasked  ParameterMode = "masked" // value replaced with "******"
 )
 
 // AllureParameter is a name/value pair surfaced in the test header.
