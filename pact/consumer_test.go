@@ -242,3 +242,24 @@ func TestAddInteractionAfterCloseReturnsNil(t *testing.T) {
 		t.Fatalf("AddInteraction after Close should return nil")
 	}
 }
+
+func TestAddInteractionAfterStartReturnsNil(t *testing.T) {
+	t.Parallel()
+	c := pact.NewConsumer("A", pact.WithOutputDir(t.TempDir()))
+	c.AddInteraction().
+		UponReceiving("x").
+		WithRequest(http.MethodGet, "/x").
+		WillRespondWith(200)
+	srv, err := c.Start(context.Background())
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() { _ = srv.Close() }()
+	// Once Start has snapshotted the interactions the mock server is
+	// already serving, AddInteraction must be a no-op — otherwise the new
+	// interaction silently misses the snapshot the mock is serving.
+	if b := c.AddInteraction(); b != nil {
+		t.Fatalf("AddInteraction after Start should return nil; got %v", b)
+	}
+}
+

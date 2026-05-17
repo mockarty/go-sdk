@@ -34,7 +34,15 @@ type Consumer struct {
 	plugins        []PluginEntry
 	pluginRuntimes []pluginBinding
 	mu             sync.Mutex
-	closed         bool
+	// started flips when Start() is called. Once true, AddInteraction
+	// rejects new interactions — the mock server has already snapshotted
+	// the slice and serving more interactions after the snapshot would
+	// silently miss them.
+	started bool
+	// closed flips when finalize() runs (i.e. after MockServer.Close).
+	// Distinct from started because writing the pact file needs the
+	// final snapshot, not just "started serving".
+	closed bool
 }
 
 // pluginBinding pairs a runtime Plugin (from pact/plugins.Default)
@@ -186,8 +194,14 @@ func (c *Consumer) OutputDir() string { return c.outputDir }
 func (c *Consumer) AddInteraction() *InteractionBuilder {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.closed {
-		// Defensively reject mutations after writes — the contract is sealed.
+	if c.started || c.closed {
+		// Defensively reject mutations after the mock server has snapshotted
+		// the interactions (or after the contract is sealed). The contract
+		// must be fully built BEFORE Start; mutations after Start would
+		// silently miss the snapshot the mock server is already serving.
+		// Returning nil keeps the doc-promised semantics ("calling
+		// AddInteraction after Start panics" is enforced one level up by
+		// InteractionBuilder methods deref'ing the nil receiver).
 		return nil
 	}
 	ix := &Interaction{}
@@ -233,6 +247,13 @@ func (c *Consumer) Start(ctx context.Context) (*MockServer, error) {
 	for i, ix := range c.interactions {
 		snapshot[i] = *ix
 	}
+	// Flip the gate BEFORE returning so any AddInteraction call after
+	// Start is rejected. The pact-jvm / pact-python contract is "fully
+	// build, then start, then serve" — mutations after the snapshot
+	// would silently miss the live mock. Start may be called multiple
+	// times (each returns a fresh mock against the same snapshot), but
+	// once any Start ran, AddInteraction is sealed.
+	c.started = true
 	c.mu.Unlock()
 	return newMockServer(c, snapshot)
 }
