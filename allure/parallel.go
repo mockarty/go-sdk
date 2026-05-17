@@ -20,9 +20,11 @@ import (
 //
 // ParallelStep is RACE-SAFE: each branch's pushStep/popStep call goes
 // through the scope mutex, and we serialise the per-branch completion via
-// a sync.WaitGroup. The branches MUST NOT panic — panics inside a branch
-// are caught and marked "broken" on that branch's step (the panic does
-// not crash the test).
+// a sync.WaitGroup. Branches MAY panic — Step (one level down) already
+// marks the panicking child step as "broken" and re-raises the panic.
+// We swallow that re-raised panic here so a single branch failure does
+// NOT crash the test, while keeping the original "broken" step the user
+// can see in the Allure report.
 func ParallelStep(ctx context.Context, parent string, branches map[string]func()) {
 	if parent == "" {
 		parent = "(unnamed parallel step)"
@@ -38,22 +40,13 @@ func ParallelStep(ctx context.Context, parent string, branches map[string]func()
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				defer func() {
-					// Swallow panics inside a branch: the wrapping Step (one level
-					// up) will not see them, so we record an explicit "broken"
-					// child step.
-					if r := recover(); r != nil {
-						s := fromContext(ctx)
-						if s == nil {
-							return
-						}
-						st := s.pushStep(name + " (panicked)")
-						_ = st
-						s.popStep(StatusBroken, &StatusDetail{
-							Message: "branch panicked",
-						})
-					}
-				}()
+				// Swallow any panic re-raised by Step's inner defer. Step has
+				// ALREADY popped the panicking child step as StatusBroken with
+				// the actual panic message + stack trace — recording a second
+				// "(panicked)" step here would duplicate the failure in the
+				// Allure report (two child rows for one event, the second
+				// carrying only a generic "branch panicked" string).
+				defer func() { _ = recover() }()
 				Step(ctx, name, fn)
 			}()
 		}

@@ -210,6 +210,13 @@ func TestAllOptionWrappers(t *testing.T) {
 
 // TestParallelStep_PanicCapturedAsBroken — panic inside a branch lands
 // as a broken child step but doesn't crash the test.
+//
+// Also verifies the post-fix invariant: each branch is recorded as EXACTLY
+// one child step (no duplicates). The previous ParallelStep implementation
+// recorded two steps for a panicking branch — once via Step's defer
+// (StatusBroken with the real panic + stack) and once via ParallelStep's
+// own recover handler (a second "(panicked)" step with a generic message).
+// The duplicate cluttered the Allure report and lost the original trace.
 func TestParallelStep_PanicCapturedAsBroken(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "allure-results")
 	t.Run("scoped", func(inner *testing.T) {
@@ -220,6 +227,38 @@ func TestParallelStep_PanicCapturedAsBroken(t *testing.T) {
 			"bad":  func() { panic("argh") },
 		})
 	})
+	r := readResultFile(t, dir)
+	if len(r.Steps) != 1 || r.Steps[0].Name != "fan" {
+		t.Fatalf("expected 1 parent step named 'fan', got %+v", r.Steps)
+	}
+	children := r.Steps[0].Steps
+	// Exactly two children — one per branch. The prior bug would surface
+	// here as 3 (good + bad + bad (panicked)).
+	if len(children) != 2 {
+		var names []string
+		for _, c := range children {
+			names = append(names, c.Name)
+		}
+		t.Errorf("expected exactly 2 child steps (one per branch), got %d: %v", len(children), names)
+	}
+	// Locate the bad child — must be broken AND carry the real panic message
+	// (not the generic "branch panicked" string the prior code produced).
+	var bad *AllureStep
+	for i := range children {
+		if children[i].Name == "bad" {
+			bad = &children[i]
+			break
+		}
+	}
+	if bad == nil {
+		t.Fatalf("missing 'bad' child step; got %+v", children)
+	}
+	if bad.Status != StatusBroken {
+		t.Errorf("bad.Status=%q, want broken", bad.Status)
+	}
+	if bad.StatusDetails == nil || bad.StatusDetails.Message != "argh" {
+		t.Errorf("bad.StatusDetails should carry the real panic message 'argh', got %+v", bad.StatusDetails)
+	}
 }
 
 // TestParallelStep_EmptyBranches stops at the parent step.
