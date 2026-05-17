@@ -269,6 +269,9 @@ func TestStartRejectsNilContext(t *testing.T) {
 		UponReceiving("x").
 		WithRequest(http.MethodGet, "/x").
 		WillRespondWith(200)
+	//nolint:staticcheck // SA1012 intentional — verifying the documented
+	// "Start(nil) returns error" guard for callers that wrap us and might
+	// pass a nil context by mistake.
 	if _, err := c.Start(nil); err == nil {
 		t.Fatalf("Start(nil) must error")
 	}

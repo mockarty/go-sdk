@@ -23,9 +23,11 @@ func gframe(payload []byte) []byte {
 }
 
 // protoVarint produces a wire-type-0 protobuf field for testing.
+// The protobuf tag layout is `(field_number << 3) | wire_type`; for varints
+// wire_type = 0, so the OR-with-zero collapses to a pure left shift.
 func protoVarint(field int, value uint64) []byte {
 	out := []byte{}
-	tag := uint64(field)<<3 | 0
+	tag := uint64(field) << 3 // wire type 0 (varint) — OR omitted because it's zero
 	for tag >= 0x80 {
 		out = append(out, byte(tag)|0x80)
 		tag >>= 7

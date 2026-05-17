@@ -5,6 +5,7 @@
 package allure
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -62,15 +63,20 @@ func TestSetClock_InjectsDeterministicTime(t *testing.T) {
 // TestNoScope_AnnotationsAreNoOps — package-level helpers introduced in
 // this branch (CustomLink/IssueLink/TmsLinkID/AttachJSON/AttachText/AttachPNG)
 // must be no-ops when called without an active scope.
+//
+// We use context.TODO() rather than nil: fromContext returns the same nil
+// scope in both cases (TODO has no scopeKey value), and TODO is what
+// staticcheck (SA1012) expects when the caller has no specific Context.
 func TestNoScope_AnnotationsAreNoOps(t *testing.T) {
 	// No panic = success.
 	type Foo struct{ A int }
-	IssueLink(nil, "X")
-	TmsLinkID(nil, "X")
-	CustomLink(nil, "design", "X")
-	AttachJSON(nil, "x", Foo{A: 1})
-	AttachText(nil, "x", "hi")
-	AttachPNG(nil, "x", []byte{0x89, 0x50})
+	ctx := context.TODO()
+	IssueLink(ctx, "X")
+	TmsLinkID(ctx, "X")
+	CustomLink(ctx, "design", "X")
+	AttachJSON(ctx, "x", Foo{A: 1})
+	AttachText(ctx, "x", "hi")
+	AttachPNG(ctx, "x", []byte{0x89, 0x50})
 	if got := expandLinkPattern("", "X"); got != "X" {
 		t.Errorf("empty pattern returns id, got %q", got)
 	}
@@ -284,7 +290,7 @@ func TestFlushAllSuites_NoOpWhenEmpty(t *testing.T) {
 // we drive it manually here.
 func TestScope_MarkFailure(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "allure-results")
-	ctx, finish := WithTest(nil, "manual", WithResultsDir(dir))
+	ctx, finish := WithTest(context.TODO(), "manual", WithResultsDir(dir))
 	s := fromContext(ctx)
 	s.markFailure(StatusFailed, "msg", "stack")
 	// Setting again must update message/trace fields.
@@ -304,7 +310,7 @@ func TestLinkHelpers_WithScope(t *testing.T) {
 	t.Setenv(IssuePatternEnv, "https://j/{0}")
 	t.Setenv(TmsPatternEnv, "https://t/{0}")
 	t.Setenv(LinkPatternPfx+"DOCS", "https://d/{0}")
-	ctx, finish := WithTest(nil, "x", WithResultsDir(dir))
+	ctx, finish := WithTest(context.TODO(), "x", WithResultsDir(dir))
 	IssueLink(ctx, "I1")
 	TmsLinkID(ctx, "T1")
 	CustomLink(ctx, "docs", "D1")
@@ -357,7 +363,7 @@ func TestAllureT_FlushCapturesSkippedAndFailed(t *testing.T) {
 
 // TestBeginStep_NoScope returns a usable nil-safe handle.
 func TestBeginStep_NoScope(t *testing.T) {
-	h := BeginStep(nil, "")
+	h := BeginStep(context.TODO(), "")
 	if h == nil {
 		t.Fatal("handle is nil")
 	}

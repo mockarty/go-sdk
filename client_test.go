@@ -367,23 +367,25 @@ func TestClient_DoJSON(t *testing.T) {
 func TestClient_SubAPISingletons(t *testing.T) {
 	c := NewClient("http://localhost")
 
-	// Each accessor should return the same pointer
-	if c.Mocks() != c.Mocks() {
+	// Each accessor should return the same pointer. We bind to locals
+	// before comparing — `c.Foo() != c.Foo()` inline trips staticcheck
+	// SA4000 ("always false") because the call is pure.
+	if a, b := c.Mocks(), c.Mocks(); a != b {
 		t.Error("Mocks() should return the same instance")
 	}
-	if c.Namespaces() != c.Namespaces() {
+	if a, b := c.Namespaces(), c.Namespaces(); a != b {
 		t.Error("Namespaces() should return the same instance")
 	}
-	if c.Stores() != c.Stores() {
+	if a, b := c.Stores(), c.Stores(); a != b {
 		t.Error("Stores() should return the same instance")
 	}
-	if c.Collections() != c.Collections() {
+	if a, b := c.Collections(), c.Collections(); a != b {
 		t.Error("Collections() should return the same instance")
 	}
-	if c.Perf() != c.Perf() {
+	if a, b := c.Perf(), c.Perf(); a != b {
 		t.Error("Perf() should return the same instance")
 	}
-	if c.Health() != c.Health() {
+	if a, b := c.Health(), c.Health(); a != b {
 		t.Error("Health() should return the same instance")
 	}
 }
@@ -610,7 +612,7 @@ func TestClient_ConcurrentSubAPIAccess_RaceFree(t *testing.T) {
 		<-done
 	}
 	// Sanity: every sub-API is the SAME pointer across goroutines.
-	if c.Mocks() != c.Mocks() {
+	if a, b := c.Mocks(), c.Mocks(); a != b {
 		t.Error("Mocks() returned different pointers across calls")
 	}
 }

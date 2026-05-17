@@ -1186,49 +1186,53 @@ func TestCollectionAPI_BatchDelete(t *testing.T) {
 func TestClient_NewSubAPISingletons(t *testing.T) {
 	c := NewClient("http://localhost")
 
-	if c.Generator() != c.Generator() {
+	// Bind both reads to local variables before comparing — `c.Foo() != c.Foo()`
+	// inline trips staticcheck SA4000 ("always false") because the
+	// compiler can prove the two calls are pure. The local binding hides
+	// that and exercises the accessor twice as intended.
+	if a, b := c.Generator(), c.Generator(); a != b {
 		t.Error("Generator() should return the same instance")
 	}
-	if c.Fuzzing() != c.Fuzzing() {
+	if a, b := c.Fuzzing(), c.Fuzzing(); a != b {
 		t.Error("Fuzzing() should return the same instance")
 	}
-	if c.Contracts() != c.Contracts() {
+	if a, b := c.Contracts(), c.Contracts(); a != b {
 		t.Error("Contracts() should return the same instance")
 	}
-	if c.Recorder() != c.Recorder() {
+	if a, b := c.Recorder(), c.Recorder(); a != b {
 		t.Error("Recorder() should return the same instance")
 	}
-	if c.Templates() != c.Templates() {
+	if a, b := c.Templates(), c.Templates(); a != b {
 		t.Error("Templates() should return the same instance")
 	}
-	if c.Import() != c.Import() {
+	if a, b := c.Import(), c.Import(); a != b {
 		t.Error("Import() should return the same instance")
 	}
-	if c.TestRuns() != c.TestRuns() {
+	if a, b := c.TestRuns(), c.TestRuns(); a != b {
 		t.Error("TestRuns() should return the same instance")
 	}
-	if c.Tags() != c.Tags() {
+	if a, b := c.Tags(), c.Tags(); a != b {
 		t.Error("Tags() should return the same instance")
 	}
-	if c.Folders() != c.Folders() {
+	if a, b := c.Folders(), c.Folders(); a != b {
 		t.Error("Folders() should return the same instance")
 	}
-	if c.Undefined() != c.Undefined() {
+	if a, b := c.Undefined(), c.Undefined(); a != b {
 		t.Error("Undefined() should return the same instance")
 	}
-	if c.Stats() != c.Stats() {
+	if a, b := c.Stats(), c.Stats(); a != b {
 		t.Error("Stats() should return the same instance")
 	}
-	if c.AgentTasks() != c.AgentTasks() {
+	if a, b := c.AgentTasks(), c.AgentTasks(); a != b {
 		t.Error("AgentTasks() should return the same instance")
 	}
-	if c.NamespaceSettings() != c.NamespaceSettings() {
+	if a, b := c.NamespaceSettings(), c.NamespaceSettings(); a != b {
 		t.Error("NamespaceSettings() should return the same instance")
 	}
-	if c.Proxy() != c.Proxy() {
+	if a, b := c.Proxy(), c.Proxy(); a != b {
 		t.Error("Proxy() should return the same instance")
 	}
-	if c.Environments() != c.Environments() {
+	if a, b := c.Environments(), c.Environments(); a != b {
 		t.Error("Environments() should return the same instance")
 	}
 }

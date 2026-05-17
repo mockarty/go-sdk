@@ -768,7 +768,7 @@ func (a *TestPlansAPI) StreamRun(ctx context.Context, runID string) (<-chan RunE
 	if a.client.apiKey != "" {
 		req.Header.Set(headerAPIKey, a.client.apiKey)
 	}
-	resp, err := a.client.httpClient.Do(req)
+	resp, err := a.client.httpClient.Do(req) //nolint:bodyclose // closed in the goroutine below (SSE stream lifetime)
 	if err != nil {
 		return nil, fmt.Errorf("mockarty: stream run: %w", err)
 	}

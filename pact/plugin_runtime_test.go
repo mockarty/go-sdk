@@ -18,9 +18,11 @@ import (
 )
 
 // protoVarint inline helper — keeps test file independent.
+// The protobuf tag layout is `(field_number << 3) | wire_type`; for varints
+// wire_type = 0, so the OR-with-zero collapses to a pure left shift.
 func tpVarint(field int, value uint64) []byte {
 	out := []byte{}
-	tag := uint64(field)<<3 | 0
+	tag := uint64(field) << 3 // wire type 0 (varint) — OR omitted because it's zero
 	for tag >= 0x80 {
 		out = append(out, byte(tag)|0x80)
 		tag >>= 7
