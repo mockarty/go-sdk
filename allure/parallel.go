@@ -5,10 +5,9 @@
 package allure
 
 import (
+	"context"
 	"fmt"
 	"runtime/debug"
-
-	"context"
 	"sync"
 )
 
