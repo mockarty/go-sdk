@@ -168,10 +168,8 @@ func main() {
 
 	// Pact verification checks that the provider actually satisfies
 	// the consumer's expectations defined in the pact.
-	verifyResult, err := client.Contracts().VerifyPact(ctx, map[string]any{
-		"consumer":  "web-frontend",
-		"provider":  "user-service",
-		"targetUrl": "http://localhost:5770",
+	verifyResult, err := client.Contracts().VerifyPact(ctx, &mockarty.PactVerifyRequest{
+		ProviderBaseURL: "http://localhost:5770",
 	})
 	if err != nil {
 		fmt.Printf("Verify pact returned: %v\n", err)
@@ -256,9 +254,8 @@ func main() {
 
 	// Drift detection compares the current live behavior of a service
 	// against its contract to find silent breaking changes.
-	driftResult, err := client.Contracts().DetectDrift(ctx, map[string]any{
-		"specUrl":   "https://petstore.swagger.io/v2/swagger.json",
-		"targetUrl": "http://localhost:5770",
+	driftResult, err := client.Contracts().DetectDrift(ctx, &mockarty.DriftDetectionRequest{
+		BaseURL: "http://localhost:5770",
 	})
 	if err != nil {
 		fmt.Printf("Detect drift returned: %v\n", err)
@@ -272,8 +269,8 @@ func main() {
 	fmt.Println("\n--- Verify Provider ---")
 
 	providerResult, err := client.Contracts().VerifyProvider(ctx, &mockarty.ContractValidationRequest{
-		SpecURL:   "https://petstore.swagger.io/v2/swagger.json",
-		TargetURL: "http://localhost:5770",
+		SpecURL: "https://petstore.swagger.io/v2/swagger.json",
+		BaseURL: "http://localhost:5770",
 	})
 	if err != nil {
 		fmt.Printf("Verify provider returned: %v\n", err)

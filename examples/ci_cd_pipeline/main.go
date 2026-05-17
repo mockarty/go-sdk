@@ -165,10 +165,9 @@ func main() {
 			pact.ID, pact.Consumer, pact.Provider)
 
 		// 3b. Verify the pact
-		verification, err := client.Contracts().VerifyPact(ctx, map[string]any{
-			"consumer":  "ci-frontend",
-			"provider":  "ci-service",
-			"targetUrl": targetURL,
+		verification, err := client.Contracts().VerifyPact(ctx, &mockarty.PactVerifyRequest{
+			PactID:          pact.ID,
+			ProviderBaseURL: targetURL,
 		})
 		if err != nil {
 			fmt.Printf("  WARN: Pact verification failed: %v\n", err)
