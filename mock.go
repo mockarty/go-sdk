@@ -3,6 +3,12 @@
 
 package mockarty
 
+import "encoding/json"
+
+// jsonUnmarshal is a thin indirection so tests can swap the decoder
+// without touching call sites. Keeps the public surface stable.
+var jsonUnmarshal = json.Unmarshal
+
 // Protocol represents the communication protocol of a mock.
 type Protocol string
 
@@ -406,9 +412,49 @@ type Mock struct {
 // ---------------------------------------------------------------------------
 
 // SaveMockResponse is the response from creating/updating a mock.
+//
+// Wire shape (admin node, POST /api/v1/mocks):
+//
+//	{"id":"...","mock":{...},"isNew":<bool>,"success":true,"message":"..."}
+//
+// The server's `isNew` field is semantically "was overwrite" — it's
+// true when an existing mock with the same id was replaced. The legacy
+// field name `overwritten` was never emitted by the server (carried
+// over from an internal draft model), so older SDKs silently observed
+// `false` for genuine overwrites. We bind to `isNew` as the canonical
+// wire name and surface both `IsNew` and `Overwritten` as accessors so
+// existing call sites keep compiling. The full envelope (id, success,
+// message) is exposed too so callers can correlate by id.
 type SaveMockResponse struct {
-	Overwritten bool `json:"overwritten"`
-	Mock        Mock `json:"mock"`
+	Mock    Mock   `json:"mock"`
+	ID      string `json:"id,omitempty"`
+	Message string `json:"message,omitempty"`
+	IsNew   bool   `json:"isNew"`
+	// Overwritten is a deprecated alias for IsNew — kept for back-compat
+	// with code that read the old field name. Always equals IsNew after
+	// UnmarshalJSON.
+	Overwritten bool `json:"-"`
+	Success     bool `json:"success,omitempty"`
+}
+
+// UnmarshalJSON propagates IsNew into the deprecated Overwritten field
+// AND accepts the legacy `"overwritten"` wire shape so a downgraded
+// server (still emitting the old key) is decoded correctly.
+func (s *SaveMockResponse) UnmarshalJSON(data []byte) error {
+	type alias SaveMockResponse
+	var aux struct {
+		alias
+		LegacyOverwritten *bool `json:"overwritten,omitempty"`
+	}
+	if err := jsonUnmarshal(data, &aux); err != nil {
+		return err
+	}
+	*s = SaveMockResponse(aux.alias)
+	if aux.LegacyOverwritten != nil && !s.IsNew {
+		s.IsNew = *aux.LegacyOverwritten
+	}
+	s.Overwritten = s.IsNew
+	return nil
 }
 
 // MockListResponse is the response from listing mocks.
