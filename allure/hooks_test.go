@@ -6,12 +6,14 @@ package allure
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // TestLifecycleHooks_OrderingBeforeAllBeforeEachAfterEachAfterAll verifies
@@ -154,6 +156,46 @@ func TestLifecycleHooks_BeforeAllAutoFiresWithoutRunWithHooks(t *testing.T) {
 	}
 	if containers != 1 {
 		t.Errorf("container count=%d, want 1", containers)
+	}
+}
+
+// TestLifecycleHooks_BeforeAllAutoFireUnderParallelSubtests proves that
+// the auto-fire path is race-safe under `t.Parallel()` subtests. Without
+// the sync.Once guard a subtest could observe `beforeAllDone=true`
+// before the first goroutine actually finished the hook body — the
+// exact regression the fix was supposed to prevent. We deliberately
+// give the hook a 50ms sleep so every parallel subtest racing to start
+// would observe `setupComplete=false` if the guard is broken.
+func TestLifecycleHooks_BeforeAllAutoFireUnderParallelSubtests(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "allure-results")
+	t.Setenv(ResultsDirEnv, dir)
+
+	var fireCount atomic.Int32
+	var setupComplete atomic.Bool
+
+	t.Run("parallel-suite", func(parent *testing.T) {
+		BeforeAll(parent, "slow-setup", func(_ *testing.T) {
+			fireCount.Add(1)
+			time.Sleep(50 * time.Millisecond)
+			setupComplete.Store(true)
+		})
+
+		for i := 0; i < 4; i++ {
+			i := i
+			parent.Run(fmt.Sprintf("case-%d", i), func(inner *testing.T) {
+				inner.Parallel()
+				a := T(inner, WithResultsDir(dir))
+				if !setupComplete.Load() {
+					inner.Errorf("BeforeAll incomplete when T() returned — parallel race")
+				}
+				a.Step("body", func() {})
+			})
+		}
+	})
+
+	// BeforeAll must have fired exactly once even with 4 parallel callers.
+	if got := fireCount.Load(); got != 1 {
+		t.Errorf("BeforeAll fired %d times under parallel; want 1", got)
 	}
 }
 
