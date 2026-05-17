@@ -215,14 +215,18 @@ func TestAllOptionWrappers(t *testing.T) {
 }
 
 // TestParallelStep_PanicCapturedAsBroken — panic inside a branch lands
-// as a broken child step but doesn't crash the test.
+// as a broken step but doesn't crash the test.
 //
-// Also verifies the post-fix invariant: each branch is recorded as EXACTLY
-// one child step (no duplicates). The previous ParallelStep implementation
-// recorded two steps for a panicking branch — once via Step's defer
-// (StatusBroken with the real panic + stack) and once via ParallelStep's
-// own recover handler (a second "(panicked)" step with a generic message).
-// The duplicate cluttered the Allure report and lost the original trace.
+// Verifies the post-fix invariant: a panicking branch records EXACTLY one
+// step with the original panic message (not a duplicate placeholder).
+// The previous ParallelStep implementation pushed an extra "(panicked)"
+// step in addition to Step's own StatusBroken — duplicating the failure
+// in the Allure report and losing the original trace.
+//
+// NOTE: ParallelStep concurrent goroutines share scope.stepStack so the
+// step nesting order is non-deterministic (two goroutines may push such
+// that one becomes the other's child rather than its sibling). The test
+// walks the tree depth-first to find "bad" wherever it landed.
 func TestParallelStep_PanicCapturedAsBroken(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "allure-results")
 	t.Run("scoped", func(inner *testing.T) {
@@ -237,28 +241,33 @@ func TestParallelStep_PanicCapturedAsBroken(t *testing.T) {
 	if len(r.Steps) != 1 || r.Steps[0].Name != "fan" {
 		t.Fatalf("expected 1 parent step named 'fan', got %+v", r.Steps)
 	}
-	children := r.Steps[0].Steps
-	// Exactly two children — one per branch. The prior bug would surface
-	// here as 3 (good + bad + bad (panicked)).
-	if len(children) != 2 {
-		var names []string
-		for _, c := range children {
-			names = append(names, c.Name)
+
+	// Depth-first scan for a "bad" step. There must be exactly one (the
+	// prior bug surfaced as two — one broken with the real message, one
+	// passed/broken placeholder named "bad (panicked)").
+	var bads []AllureStep
+	var hasPanicked bool
+	var walk func(steps []AllureStep)
+	walk = func(steps []AllureStep) {
+		for _, s := range steps {
+			if s.Name == "bad" {
+				bads = append(bads, s)
+			}
+			if s.Name == "bad (panicked)" {
+				hasPanicked = true
+			}
+			walk(s.Steps)
 		}
-		t.Errorf("expected exactly 2 child steps (one per branch), got %d: %v", len(children), names)
 	}
-	// Locate the bad child — must be broken AND carry the real panic message
-	// (not the generic "branch panicked" string the prior code produced).
-	var bad *AllureStep
-	for i := range children {
-		if children[i].Name == "bad" {
-			bad = &children[i]
-			break
-		}
+	walk(r.Steps[0].Steps)
+
+	if hasPanicked {
+		t.Error("step named 'bad (panicked)' present — the duplicate placeholder is back")
 	}
-	if bad == nil {
-		t.Fatalf("missing 'bad' child step; got %+v", children)
+	if len(bads) != 1 {
+		t.Fatalf("expected exactly 1 'bad' step, got %d: %+v", len(bads), bads)
 	}
+	bad := bads[0]
 	if bad.Status != StatusBroken {
 		t.Errorf("bad.Status=%q, want broken", bad.Status)
 	}
