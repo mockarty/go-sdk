@@ -5,6 +5,9 @@
 package allure
 
 import (
+	"fmt"
+	"runtime/debug"
+
 	"context"
 	"sync"
 )
@@ -18,13 +21,15 @@ import (
 // renderer will show one parent step with N children, each annotated
 // with its goroutine ID (via the "thread" label inherited from the scope).
 //
-// ParallelStep is RACE-SAFE: each branch's pushStep/popStep call goes
-// through the scope mutex, and we serialise the per-branch completion via
-// a sync.WaitGroup. Branches MAY panic — Step (one level down) already
-// marks the panicking child step as "broken" and re-raises the panic.
-// We swallow that re-raised panic here so a single branch failure does
-// NOT crash the test, while keeping the original "broken" step the user
-// can see in the Allure report.
+// Implementation note: parallel branches CANNOT use the scope's normal
+// pushStep/popStep mechanism — that machinery walks a single shared
+// stepStack to determine the current parent, and concurrent pushes from
+// N goroutines would non-deterministically nest into each other (the
+// goroutine that pushes second sees the first goroutine's still-open
+// step as "current parent"). Instead we run each branch in isolation,
+// then collect the produced step records into the parent step's Steps
+// slice under the scope lock. Panics in branches are caught and recorded
+// as broken with the real panic message + stack trace.
 func ParallelStep(ctx context.Context, parent string, branches map[string]func()) {
 	if parent == "" {
 		parent = "(unnamed parallel step)"
@@ -34,22 +39,108 @@ func ParallelStep(ctx context.Context, parent string, branches map[string]func()
 		return
 	}
 	Step(ctx, parent, func() {
-		var wg sync.WaitGroup
+		s := fromContext(ctx)
+		if s == nil {
+			// No scope = run the branches anyway so user code executes.
+			runBranchesNoScope(branches)
+			return
+		}
+
+		// Build each branch's result step in isolation (no shared state) and
+		// merge under the scope lock at the end. This avoids the stepStack
+		// nesting race entirely.
+		var (
+			wg      sync.WaitGroup
+			produce = make(chan AllureStep, len(branches))
+		)
 		for name, fn := range branches {
 			name, fn := name, fn
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				// Swallow any panic re-raised by Step's inner defer. Step has
-				// ALREADY popped the panicking child step as StatusBroken with
-				// the actual panic message + stack trace — recording a second
-				// "(panicked)" step here would duplicate the failure in the
-				// Allure report (two child rows for one event, the second
-				// carrying only a generic "branch panicked" string).
-				defer func() { _ = recover() }()
-				Step(ctx, name, fn)
+				produce <- runIsolatedBranch(s, name, fn)
 			}()
 		}
 		wg.Wait()
+		close(produce)
+
+		// Attach all produced steps as children of the current parent step
+		// (which Step has open for us). We do this under s.mu to avoid
+		// stomping on concurrent step writes from outside ParallelStep.
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		parentStep := s.currentStepLocked()
+		for ch := range produce {
+			// Bubble strongest child failure into the parent + result.
+			if statusPriority(ch.Status) > statusPriority(parentStep.Status) {
+				parentStep.Status = ch.Status
+				if ch.StatusDetails != nil && parentStep.StatusDetails == nil {
+					parentStep.StatusDetails = ch.StatusDetails
+				}
+			}
+			if parentStep != nil {
+				parentStep.Steps = append(parentStep.Steps, ch)
+			} else {
+				s.result.Steps = append(s.result.Steps, ch)
+			}
+			if statusPriority(ch.Status) > statusPriority(s.result.Status) {
+				s.result.Status = ch.Status
+				if ch.StatusDetails != nil && s.result.StatusDetails == nil {
+					s.result.StatusDetails = ch.StatusDetails
+				}
+			}
+		}
 	})
+}
+
+// runIsolatedBranch executes one branch in its own logical step and
+// returns the captured AllureStep. Panics are caught and rendered as
+// StatusBroken with the real message + stack — matching what Step does
+// for the sequential path.
+func runIsolatedBranch(s *scope, name string, fn func()) AllureStep {
+	step := AllureStep{
+		Name:        name,
+		Status:      StatusPassed,
+		Stage:       StageRunning,
+		Start:       s.now().UnixMilli(),
+		Parameters:  []AllureParameter{},
+		Steps:       []AllureStep{},
+		Attachments: []AllureAttachment{},
+	}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				step.Status = StatusBroken
+				step.StatusDetails = &StatusDetail{
+					Message: fmt.Sprintf("%v", r),
+					Trace:   string(debug.Stack()),
+				}
+			}
+			step.Stop = s.now().UnixMilli()
+			step.Stage = StageFinished
+		}()
+		if fn != nil {
+			fn()
+		}
+	}()
+	return step
+}
+
+// runBranchesNoScope is the fallback path when ParallelStep is called
+// outside a WithTest scope (degraded mode). The branches still run but
+// no step records are produced.
+func runBranchesNoScope(branches map[string]func()) {
+	var wg sync.WaitGroup
+	for _, fn := range branches {
+		fn := fn
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { _ = recover() }()
+			if fn != nil {
+				fn()
+			}
+		}()
+	}
+	wg.Wait()
 }
