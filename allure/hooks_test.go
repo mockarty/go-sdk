@@ -90,6 +90,73 @@ func TestLifecycleHooks_OrderingBeforeAllBeforeEachAfterEachAfterAll(t *testing.
 	}
 }
 
+// TestLifecycleHooks_BeforeAllAutoFiresWithoutRunWithHooks proves the UX
+// contract added 2026-05-17: calling allure.T() inside a test that has
+// registered a BeforeAll runs the hook BEFORE the test body, even when
+// the caller never invokes RunWithHooks. Prior to the fix, BeforeAll
+// silently skipped because beforeAllDone could only be set by
+// RunWithHooks — a hidden coupling caught by live SDK demos.
+func TestLifecycleHooks_BeforeAllAutoFiresWithoutRunWithHooks(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "allure-results")
+	t.Setenv(ResultsDirEnv, dir)
+
+	var setupFired atomic.Bool
+	var teardownFired atomic.Bool
+
+	t.Run("auto-fire-suite", func(parent *testing.T) {
+		BeforeAll(parent, "setup", func(_ *testing.T) { setupFired.Store(true) })
+		AfterAll(parent, "teardown", func(_ *testing.T) { teardownFired.Store(true) })
+
+		parent.Run("case-A", func(inner *testing.T) {
+			a := T(inner, WithResultsDir(dir))
+			if !setupFired.Load() {
+				inner.Fatal("BeforeAll did not fire before T() returned — auto-wire regression")
+			}
+			a.Step("body", func() {})
+		})
+		parent.Run("case-B", func(inner *testing.T) {
+			// Second subtest must NOT re-run BeforeAll — it is once per suite.
+			before := setupFired.Load()
+			_ = T(inner, WithResultsDir(dir))
+			if !before {
+				inner.Fatal("BeforeAll should already be marked done")
+			}
+		})
+	})
+
+	// AfterAll runs on parent t.Cleanup — by the time the outer test
+	// continues here, the cleanup chain has already flushed.
+	if !teardownFired.Load() {
+		t.Error("AfterAll did not fire on parent cleanup")
+	}
+
+	// Container.json must reference both subtest UUIDs + capture the
+	// single BeforeAll/AfterAll step.
+	entries, _ := os.ReadDir(dir)
+	var containers int
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), "-container.json") {
+			continue
+		}
+		containers++
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		var c Container
+		_ = json.Unmarshal(data, &c)
+		if len(c.Children) != 2 {
+			t.Errorf("container.Children=%d, want 2 (one per subtest)", len(c.Children))
+		}
+		if len(c.Befores) != 1 {
+			t.Errorf("container.Befores=%d, want 1", len(c.Befores))
+		}
+		if len(c.Afters) != 1 {
+			t.Errorf("container.Afters=%d, want 1", len(c.Afters))
+		}
+	}
+	if containers != 1 {
+		t.Errorf("container count=%d, want 1", containers)
+	}
+}
+
 // TestLifecycleHooks_PanicMarksBroken verifies that a panic inside a hook
 // is captured as a broken hook step rather than crashing the test.
 func TestLifecycleHooks_PanicMarksBroken(t *testing.T) {

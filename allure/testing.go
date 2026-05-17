@@ -125,6 +125,11 @@ func T(t *testing.T, opts ...Option) *AllureT {
 	// useful if the user actually called BeforeAll/AfterAll — otherwise the
 	// suite registry stays inert.
 	RegisterChild(t.Name(), s.result.UUID)
+	// Auto-fire any BeforeAll hooks registered against this suite. This
+	// removes the need for callers to wrap their test body in
+	// [RunWithHooks] just to get setup hooks to run. The check is a
+	// no-op when no hooks were registered.
+	maybeFireBeforeAll(t)
 	t.Cleanup(at.flush)
 	return at
 }

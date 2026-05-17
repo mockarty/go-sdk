@@ -77,6 +77,11 @@ func suiteFor(parent string) *suiteHooks {
 //
 // The hook's runtime is captured as an Allure container `befores` step,
 // which Allure renders as a "Set up" entry above the test in the report.
+//
+// You do NOT need to wrap your test body in [RunWithHooks] — the hook
+// fires automatically on the first [T] call inside the same test class.
+// [RunWithHooks] remains available for users who want the JUnit-style
+// BeforeEach/AfterEach chain too.
 func BeforeAll(t *testing.T, name string, fn Hook) {
 	t.Helper()
 	cls, _ := splitTestPath(t.Name())
@@ -87,6 +92,12 @@ func BeforeAll(t *testing.T, name string, fn Hook) {
 		h.dir = ResolveResultsDir("")
 	}
 	h.mu.Unlock()
+	// Register a parent-scoped cleanup that flushes the suite container so
+	// the BeforeAll/AfterAll bookkeeping reaches disk even if the user
+	// never called AfterAll explicitly. flushSuite is idempotent.
+	t.Cleanup(func() {
+		flushSuite(cls)
+	})
 }
 
 // AfterAll registers teardown that runs once after the entire class. Use
@@ -129,6 +140,38 @@ func AfterEach(t *testing.T, name string, fn Hook) {
 	h := suiteFor(cls)
 	h.mu.Lock()
 	h.afterEachs = append(h.afterEachs, namedHook(name, fn))
+	h.mu.Unlock()
+}
+
+// maybeFireBeforeAll runs the registered BeforeAll hooks for the test
+// class IF they are present and have not fired yet. Called by [T] so
+// users don't need to wrap their test body in [RunWithHooks]. Safe to
+// call multiple times — the second call observes beforeAllDone=true and
+// returns immediately. No-op when the suite has no hooks registered.
+func maybeFireBeforeAll(t *testing.T) {
+	t.Helper()
+	cls, _ := splitTestPath(t.Name())
+	suiteRegistryMu.Lock()
+	h, ok := suiteRegistry[cls]
+	suiteRegistryMu.Unlock()
+	if !ok {
+		return
+	}
+	h.mu.Lock()
+	if h.beforeAllDone || len(h.beforeAlls) == 0 {
+		h.mu.Unlock()
+		return
+	}
+	h.beforeAllDone = true
+	hooks := append([]Hook(nil), h.beforeAlls...)
+	h.mu.Unlock()
+
+	steps := make([]AllureStep, 0, len(hooks))
+	for _, hk := range hooks {
+		steps = append(steps, runHookCaptured(t, hk))
+	}
+	h.mu.Lock()
+	h.beforeSteps = append(h.beforeSteps, steps...)
 	h.mu.Unlock()
 }
 
