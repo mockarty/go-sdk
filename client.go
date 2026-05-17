@@ -69,6 +69,10 @@ type Client struct {
 //	    mockarty.WithAPIKey("mk_..."),
 //	    mockarty.WithNamespace("production"),
 //	)
+//
+// The returned *Client is safe for concurrent use by multiple goroutines:
+// every sub-API singleton (Mocks(), Namespaces(), ...) is initialised
+// eagerly here so the accessor methods do not race on lazy assignment.
 func NewClient(baseURL string, opts ...Option) *Client {
 	baseURL = strings.TrimRight(baseURL, "/")
 
@@ -85,6 +89,38 @@ func NewClient(baseURL string, opts ...Option) *Client {
 		opt(c)
 	}
 
+	// Eagerly construct every sub-API so accessor methods are race-free.
+	// Each binding is a single-field struct (8 bytes), so the up-front cost
+	// is negligible — far cheaper than guarding 28 lazy slots with a mutex
+	// or sync.Once each.
+	c.mockAPI = &MockAPI{client: c}
+	c.namespaceAPI = &NamespaceAPI{client: c}
+	c.storeAPI = &StoreAPI{client: c}
+	c.collectionAPI = &CollectionAPI{client: c}
+	c.perfAPI = &PerfAPI{client: c}
+	c.healthAPI = &HealthAPI{client: c}
+	c.generatorAPI = &GeneratorAPI{client: c}
+	c.fuzzingAPI = &FuzzingAPI{client: c}
+	c.contractAPI = &ContractAPI{client: c}
+	c.recorderAPI = &RecorderAPI{client: c}
+	c.templateAPI = &TemplateAPI{client: c}
+	c.importAPI = &ImportAPI{client: c}
+	c.testRunAPI = &TestRunAPI{client: c}
+	c.tagAPI = &TagAPI{client: c}
+	c.folderAPI = &FolderAPI{client: c}
+	c.undefinedAPI = &UndefinedAPI{client: c}
+	c.statsAPI = &StatsAPI{client: c}
+	c.agentTaskAPI = &AgentTaskAPI{client: c}
+	c.namespaceSettingsAPI = &NamespaceSettingsAPI{client: c}
+	c.proxyAPI = &ProxyAPI{client: c}
+	c.environmentAPI = &EnvironmentAPI{client: c}
+	c.chaosAPI = &ChaosAPI{client: c}
+	c.testPlansAPI = &TestPlansAPI{client: c}
+	c.entitySearchAPI = &EntitySearchAPI{client: c}
+	c.secretsAPI = &SecretsAPI{client: c}
+	c.promptsAPI = &PromptsAPI{client: c}
+	c.meAPI = &MeAPI{client: c}
+
 	return c
 }
 
@@ -95,222 +131,93 @@ func (c *Client) BaseURL() string { return c.baseURL }
 func (c *Client) Namespace() string { return c.namespace }
 
 // ---------------------------------------------------------------------------
-// Sub-API accessors
+// Sub-API accessors (each returns the eagerly-initialised singleton; safe
+// for concurrent use — see NewClient).
 // ---------------------------------------------------------------------------
 
 // Mocks returns the Mock CRUD API.
-func (c *Client) Mocks() *MockAPI {
-	if c.mockAPI == nil {
-		c.mockAPI = &MockAPI{client: c}
-	}
-	return c.mockAPI
-}
+func (c *Client) Mocks() *MockAPI { return c.mockAPI }
 
 // Namespaces returns the Namespace API.
-func (c *Client) Namespaces() *NamespaceAPI {
-	if c.namespaceAPI == nil {
-		c.namespaceAPI = &NamespaceAPI{client: c}
-	}
-	return c.namespaceAPI
-}
+func (c *Client) Namespaces() *NamespaceAPI { return c.namespaceAPI }
 
 // Stores returns the Store API.
-func (c *Client) Stores() *StoreAPI {
-	if c.storeAPI == nil {
-		c.storeAPI = &StoreAPI{client: c}
-	}
-	return c.storeAPI
-}
+func (c *Client) Stores() *StoreAPI { return c.storeAPI }
 
 // Collections returns the Collection API.
-func (c *Client) Collections() *CollectionAPI {
-	if c.collectionAPI == nil {
-		c.collectionAPI = &CollectionAPI{client: c}
-	}
-	return c.collectionAPI
-}
+func (c *Client) Collections() *CollectionAPI { return c.collectionAPI }
 
 // Perf returns the Performance Testing API.
-func (c *Client) Perf() *PerfAPI {
-	if c.perfAPI == nil {
-		c.perfAPI = &PerfAPI{client: c}
-	}
-	return c.perfAPI
-}
+func (c *Client) Perf() *PerfAPI { return c.perfAPI }
 
 // Health returns the Health API.
-func (c *Client) Health() *HealthAPI {
-	if c.healthAPI == nil {
-		c.healthAPI = &HealthAPI{client: c}
-	}
-	return c.healthAPI
-}
+func (c *Client) Health() *HealthAPI { return c.healthAPI }
 
 // Generator returns the Generator API for creating mocks from specifications.
-func (c *Client) Generator() *GeneratorAPI {
-	if c.generatorAPI == nil {
-		c.generatorAPI = &GeneratorAPI{client: c}
-	}
-	return c.generatorAPI
-}
+func (c *Client) Generator() *GeneratorAPI { return c.generatorAPI }
 
 // Fuzzing returns the Fuzzing API for security and fuzz testing.
-func (c *Client) Fuzzing() *FuzzingAPI {
-	if c.fuzzingAPI == nil {
-		c.fuzzingAPI = &FuzzingAPI{client: c}
-	}
-	return c.fuzzingAPI
-}
+func (c *Client) Fuzzing() *FuzzingAPI { return c.fuzzingAPI }
 
 // Contracts returns the Contract Testing API.
-func (c *Client) Contracts() *ContractAPI {
-	if c.contractAPI == nil {
-		c.contractAPI = &ContractAPI{client: c}
-	}
-	return c.contractAPI
-}
+func (c *Client) Contracts() *ContractAPI { return c.contractAPI }
 
 // Recorder returns the Recorder API for traffic recording.
-func (c *Client) Recorder() *RecorderAPI {
-	if c.recorderAPI == nil {
-		c.recorderAPI = &RecorderAPI{client: c}
-	}
-	return c.recorderAPI
-}
+func (c *Client) Recorder() *RecorderAPI { return c.recorderAPI }
 
 // Templates returns the Template API for managing response templates.
-func (c *Client) Templates() *TemplateAPI {
-	if c.templateAPI == nil {
-		c.templateAPI = &TemplateAPI{client: c}
-	}
-	return c.templateAPI
-}
+func (c *Client) Templates() *TemplateAPI { return c.templateAPI }
 
 // Import returns the Import API for importing API definitions.
-func (c *Client) Import() *ImportAPI {
-	if c.importAPI == nil {
-		c.importAPI = &ImportAPI{client: c}
-	}
-	return c.importAPI
-}
+func (c *Client) Import() *ImportAPI { return c.importAPI }
 
 // TestRuns returns the Test Run API for managing test executions.
-func (c *Client) TestRuns() *TestRunAPI {
-	if c.testRunAPI == nil {
-		c.testRunAPI = &TestRunAPI{client: c}
-	}
-	return c.testRunAPI
-}
+func (c *Client) TestRuns() *TestRunAPI { return c.testRunAPI }
 
 // Tags returns the Tag API for managing mock tags.
-func (c *Client) Tags() *TagAPI {
-	if c.tagAPI == nil {
-		c.tagAPI = &TagAPI{client: c}
-	}
-	return c.tagAPI
-}
+func (c *Client) Tags() *TagAPI { return c.tagAPI }
 
 // Folders returns the Folder API for managing mock folders.
-func (c *Client) Folders() *FolderAPI {
-	if c.folderAPI == nil {
-		c.folderAPI = &FolderAPI{client: c}
-	}
-	return c.folderAPI
-}
+func (c *Client) Folders() *FolderAPI { return c.folderAPI }
 
 // Undefined returns the Undefined API for managing unmatched requests.
-func (c *Client) Undefined() *UndefinedAPI {
-	if c.undefinedAPI == nil {
-		c.undefinedAPI = &UndefinedAPI{client: c}
-	}
-	return c.undefinedAPI
-}
+func (c *Client) Undefined() *UndefinedAPI { return c.undefinedAPI }
 
 // Stats returns the Stats API for retrieving platform statistics.
-func (c *Client) Stats() *StatsAPI {
-	if c.statsAPI == nil {
-		c.statsAPI = &StatsAPI{client: c}
-	}
-	return c.statsAPI
-}
+func (c *Client) Stats() *StatsAPI { return c.statsAPI }
 
 // AgentTasks returns the Agent Task API for managing AI agent tasks.
-func (c *Client) AgentTasks() *AgentTaskAPI {
-	if c.agentTaskAPI == nil {
-		c.agentTaskAPI = &AgentTaskAPI{client: c}
-	}
-	return c.agentTaskAPI
-}
+func (c *Client) AgentTasks() *AgentTaskAPI { return c.agentTaskAPI }
 
 // NamespaceSettings returns the Namespace Settings API.
-func (c *Client) NamespaceSettings() *NamespaceSettingsAPI {
-	if c.namespaceSettingsAPI == nil {
-		c.namespaceSettingsAPI = &NamespaceSettingsAPI{client: c}
-	}
-	return c.namespaceSettingsAPI
-}
+func (c *Client) NamespaceSettings() *NamespaceSettingsAPI { return c.namespaceSettingsAPI }
 
 // Proxy returns the Proxy API for proxying requests.
-func (c *Client) Proxy() *ProxyAPI {
-	if c.proxyAPI == nil {
-		c.proxyAPI = &ProxyAPI{client: c}
-	}
-	return c.proxyAPI
-}
+func (c *Client) Proxy() *ProxyAPI { return c.proxyAPI }
 
 // Environments returns the Environment API for managing API Tester environments.
-func (c *Client) Environments() *EnvironmentAPI {
-	if c.environmentAPI == nil {
-		c.environmentAPI = &EnvironmentAPI{client: c}
-	}
-	return c.environmentAPI
-}
+func (c *Client) Environments() *EnvironmentAPI { return c.environmentAPI }
 
 // Chaos returns the Chaos Engineering API for managing chaos experiments.
-func (c *Client) Chaos() *ChaosAPI {
-	if c.chaosAPI == nil {
-		c.chaosAPI = &ChaosAPI{client: c}
-	}
-	return c.chaosAPI
-}
+func (c *Client) Chaos() *ChaosAPI { return c.chaosAPI }
 
 // TestPlans returns the Test Plans API — the master orchestrator for
 // functional / fuzz / chaos / load / contract runs under a single plan.
-func (c *Client) TestPlans() *TestPlansAPI {
-	if c.testPlansAPI == nil {
-		c.testPlansAPI = &TestPlansAPI{client: c}
-	}
-	return c.testPlansAPI
-}
+func (c *Client) TestPlans() *TestPlansAPI { return c.testPlansAPI }
 
 // Secrets returns the centralised Secrets Storage API (Phase A0 —
 // namespace-scoped encrypted key/value stores with optional Vault backend).
-func (c *Client) Secrets() *SecretsAPI {
-	if c.secretsAPI == nil {
-		c.secretsAPI = &SecretsAPI{client: c}
-	}
-	return c.secretsAPI
-}
+func (c *Client) Secrets() *SecretsAPI { return c.secretsAPI }
 
 // Prompts returns the Prompts Storage API — managed AI prompts with
 // FIFO-20 version history and rollback.
-func (c *Client) Prompts() *PromptsAPI {
-	if c.promptsAPI == nil {
-		c.promptsAPI = &PromptsAPI{client: c}
-	}
-	return c.promptsAPI
-}
+func (c *Client) Prompts() *PromptsAPI { return c.promptsAPI }
 
 // EntitySearch returns the unified entity-picker API. Use it to look up
 // mocks / Test Plans / perf configs / fuzz configs / chaos experiments /
 // contract pacts by case-insensitive name match — the same backend the
 // admin UI pickers consume.
-func (c *Client) EntitySearch() *EntitySearchAPI {
-	if c.entitySearchAPI == nil {
-		c.entitySearchAPI = &EntitySearchAPI{client: c}
-	}
-	return c.entitySearchAPI
-}
+func (c *Client) EntitySearch() *EntitySearchAPI { return c.entitySearchAPI }
 
 // ---------------------------------------------------------------------------
 // Internal HTTP helpers

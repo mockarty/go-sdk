@@ -191,13 +191,9 @@ type MeAPI struct {
 	client *Client
 }
 
-// Me returns the per-caller endpoints. Lazily constructed.
-func (c *Client) Me() *MeAPI {
-	if c.meAPI == nil {
-		c.meAPI = &MeAPI{client: c}
-	}
-	return c.meAPI
-}
+// Me returns the per-caller endpoints. The singleton is initialised
+// eagerly in NewClient so this accessor is race-free.
+func (c *Client) Me() *MeAPI { return c.meAPI }
 
 // AwaitingManualSummary is one row from the awaiting-manual list.
 type AwaitingManualSummary struct {

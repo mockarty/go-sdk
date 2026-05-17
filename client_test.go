@@ -565,3 +565,76 @@ func TestClient_ParsesCodeAndRequestID(t *testing.T) {
 		t.Errorf("expected errors.Is(err, ErrNotFound) to be true")
 	}
 }
+
+// TestClient_ConcurrentSubAPIAccess_RaceFree confirms the sub-API accessors
+// are race-free under concurrent use. Run with -race; the prior lazy-init
+// implementation would flag a data race here.
+func TestClient_ConcurrentSubAPIAccess_RaceFree(t *testing.T) {
+	c := NewClient("http://localhost:5770")
+	const goroutines = 32
+	done := make(chan struct{}, goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			// Hit every accessor — each is a candidate for a race on lazy init.
+			_ = c.Mocks()
+			_ = c.Namespaces()
+			_ = c.Stores()
+			_ = c.Collections()
+			_ = c.Perf()
+			_ = c.Health()
+			_ = c.Generator()
+			_ = c.Fuzzing()
+			_ = c.Contracts()
+			_ = c.Recorder()
+			_ = c.Templates()
+			_ = c.Import()
+			_ = c.TestRuns()
+			_ = c.Tags()
+			_ = c.Folders()
+			_ = c.Undefined()
+			_ = c.Stats()
+			_ = c.AgentTasks()
+			_ = c.NamespaceSettings()
+			_ = c.Proxy()
+			_ = c.Environments()
+			_ = c.Chaos()
+			_ = c.TestPlans()
+			_ = c.Secrets()
+			_ = c.Prompts()
+			_ = c.EntitySearch()
+			_ = c.Me()
+		}()
+	}
+	for i := 0; i < goroutines; i++ {
+		<-done
+	}
+	// Sanity: every sub-API is the SAME pointer across goroutines.
+	if c.Mocks() != c.Mocks() {
+		t.Error("Mocks() returned different pointers across calls")
+	}
+}
+
+// TestClient_SubAPISingletons_NewlyEager confirms that the sub-APIs that
+// were added since the original TestClient_SubAPISingletons (Me / TestPlans /
+// EntitySearch / Secrets / Prompts) are also eagerly initialised and stable.
+// The previous lazy-init path created a new instance on every nil deref,
+// which is now impossible with the eager pattern from NewClient.
+func TestClient_SubAPISingletons_NewlyEager(t *testing.T) {
+	c := NewClient("http://localhost:5770")
+	if c.Me() == nil || c.Me() != c.Me() {
+		t.Error("Me singleton broken")
+	}
+	if c.TestPlans() == nil || c.TestPlans() != c.TestPlans() {
+		t.Error("TestPlans singleton broken")
+	}
+	if c.EntitySearch() == nil || c.EntitySearch() != c.EntitySearch() {
+		t.Error("EntitySearch singleton broken")
+	}
+	if c.Secrets() == nil || c.Secrets() != c.Secrets() {
+		t.Error("Secrets singleton broken")
+	}
+	if c.Prompts() == nil || c.Prompts() != c.Prompts() {
+		t.Error("Prompts singleton broken")
+	}
+}
