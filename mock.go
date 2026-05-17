@@ -5,10 +5,6 @@ package mockarty
 
 import "encoding/json"
 
-// jsonUnmarshal is a thin indirection so tests can swap the decoder
-// without touching call sites. Keeps the public surface stable.
-var jsonUnmarshal = json.Unmarshal
-
 // Protocol represents the communication protocol of a mock.
 type Protocol string
 
@@ -446,7 +442,7 @@ func (s *SaveMockResponse) UnmarshalJSON(data []byte) error {
 		alias
 		LegacyOverwritten *bool `json:"overwritten,omitempty"`
 	}
-	if err := jsonUnmarshal(data, &aux); err != nil {
+	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
 	*s = SaveMockResponse(aux.alias)
@@ -458,9 +454,51 @@ func (s *SaveMockResponse) UnmarshalJSON(data []byte) error {
 }
 
 // MockListResponse is the response from listing mocks.
+//
+// Wire shape (admin node, GET /api/v1/mocks):
+//
+//	{"mocks":[...], "count":N, "limit":N, "message":"..."}
+//
+// The legacy field names (`items` / `total`) were never emitted by the
+// server — they were carried over from an internal draft. SDKs binding
+// to the old names silently received empty slices on every call (the
+// drift would surface as `len(resp.Items) == 0` even when mocks
+// existed). Re-bound to the canonical wire names; legacy keys still
+// accepted via UnmarshalJSON for forward-compat with downgraded
+// servers. Surfaced 2026-05-17 by the same bug-pattern hunt that
+// caught SaveMockResponse.isNew.
 type MockListResponse struct {
-	Items []Mock `json:"items"`
-	Total int    `json:"total"`
+	Items   []Mock `json:"mocks"`
+	Message string `json:"message,omitempty"`
+	Count   int    `json:"count"`
+	Limit   int    `json:"limit,omitempty"`
+	// Total is a deprecated alias for Count — populated by
+	// UnmarshalJSON so legacy callers don't break.
+	Total int `json:"-"`
+}
+
+// UnmarshalJSON accepts both the canonical {mocks, count} shape and the
+// legacy {items, total} shape so a downgraded admin server still
+// decodes correctly. Total is mirrored to Count after either path.
+func (r *MockListResponse) UnmarshalJSON(data []byte) error {
+	type alias MockListResponse
+	var aux struct {
+		alias
+		LegacyItems *[]Mock `json:"items,omitempty"`
+		LegacyTotal *int    `json:"total,omitempty"`
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	*r = MockListResponse(aux.alias)
+	if len(r.Items) == 0 && aux.LegacyItems != nil {
+		r.Items = *aux.LegacyItems
+	}
+	if r.Count == 0 && aux.LegacyTotal != nil {
+		r.Count = *aux.LegacyTotal
+	}
+	r.Total = r.Count
+	return nil
 }
 
 // RequestLog represents a single request log entry.

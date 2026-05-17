@@ -78,3 +78,69 @@ func TestSaveMockResponse_NewIsFalse(t *testing.T) {
 		t.Errorf("IsNew=%v Overwritten=%v; want both false", got.IsNew, got.Overwritten)
 	}
 }
+
+// TestMockListResponse_DecodesCanonicalWireShape proves the SDK decodes
+// the actual admin-node wire shape — `mocks` (not `items`) and `count`
+// (not `total`). Surfaced 2026-05-17 alongside the SaveMockResponse fix
+// by a sibling-instance hunt: Mocks.List() had been silently returning
+// empty slices because the SDK was binding `items`/`total` which the
+// server never emits.
+func TestMockListResponse_DecodesCanonicalWireShape(t *testing.T) {
+	payload := []byte(`{
+		"count": 2,
+		"limit": 50,
+		"message": "Mock list retrieved successfully",
+		"mocks": [{"id":"m1","namespace":"ns"},{"id":"m2","namespace":"ns"}]
+	}`)
+	var got MockListResponse
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Count != 2 {
+		t.Errorf("Count = %d; want 2", got.Count)
+	}
+	if got.Total != got.Count {
+		t.Errorf("Total mirror = %d; want = Count = 2", got.Total)
+	}
+	if got.Limit != 50 {
+		t.Errorf("Limit = %d; want 50", got.Limit)
+	}
+	if len(got.Items) != 2 {
+		t.Fatalf("len(Items) = %d; want 2", len(got.Items))
+	}
+	if got.Items[0].ID != "m1" || got.Items[1].ID != "m2" {
+		t.Errorf("Items = %+v; want m1, m2", got.Items)
+	}
+	if got.Message == "" {
+		t.Errorf("Message empty; want server message")
+	}
+}
+
+// TestMockListResponse_AcceptsLegacyItemsTotal proves a downgraded
+// server emitting the older `{items, total}` shape still decodes.
+func TestMockListResponse_AcceptsLegacyItemsTotal(t *testing.T) {
+	payload := []byte(`{"items":[{"id":"m1"}],"total":1}`)
+	var got MockListResponse
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.Items) != 1 || got.Items[0].ID != "m1" {
+		t.Errorf("Items = %+v; want legacy items promoted", got.Items)
+	}
+	if got.Count != 1 || got.Total != 1 {
+		t.Errorf("Count=%d Total=%d; want 1 each", got.Count, got.Total)
+	}
+}
+
+// TestMockListResponse_EmptyResultStillDecodes — defensive guard
+// against the new UnmarshalJSON failing on a zero-result page.
+func TestMockListResponse_EmptyResultStillDecodes(t *testing.T) {
+	payload := []byte(`{"count":0,"mocks":[],"limit":50,"message":"ok"}`)
+	var got MockListResponse
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Count != 0 || len(got.Items) != 0 {
+		t.Errorf("Count=%d len(Items)=%d; want 0", got.Count, len(got.Items))
+	}
+}
