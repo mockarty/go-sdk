@@ -23,10 +23,19 @@ func (a *NamespaceAPI) Create(ctx context.Context, name string) error {
 }
 
 // List returns all available namespaces.
+//
+// The admin server returns the list inside an envelope:
+//
+//	{"namespaces": ["sandbox", ...]}
+//
+// We decode the envelope and surface the bare slice so callers don't
+// have to know about the wire shape.
 func (a *NamespaceAPI) List(ctx context.Context) ([]string, error) {
-	var namespaces []string
-	if err := a.client.do(ctx, "GET", "/api/v1/namespaces", nil, &namespaces); err != nil {
+	var resp struct {
+		Namespaces []string `json:"namespaces"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/namespaces", nil, &resp); err != nil {
 		return nil, err
 	}
-	return namespaces, nil
+	return resp.Namespaces, nil
 }
