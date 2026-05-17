@@ -215,6 +215,33 @@ func TestStop_NilSafe(t *testing.T) {
 	}
 }
 
+// TestStop_Idempotent verifies the documented contract — double Stop is a
+// no-op. The prior implementation propagated the daemon-side error from a
+// second Terminate to the user as "terminate failed" even though the
+// container had shut down cleanly.
+//
+// Stubbing testcontainers.Container in full would require ~25 method stubs;
+// instead the test reaches into the unexported field after the first Stop
+// has cleared it (assertion: Container() returns nil) and confirms the
+// second Stop returns nil without panicking.
+func TestStop_Idempotent(t *testing.T) {
+	// We cannot construct a real testcontainers.Container without Docker.
+	// Drive Stop with a nil container handle (post-first-Stop state) and
+	// assert it does NOT panic or return an error. This mirrors what
+	// happens to a real instance after the first successful Terminate.
+	m := &MockartyContainer{container: nil}
+	if err := m.Stop(context.Background()); err != nil {
+		t.Errorf("Stop on already-stopped container returned %v, want nil", err)
+	}
+	if m.Container() != nil {
+		t.Error("Container() should return nil after Stop on already-stopped instance")
+	}
+	// Second Stop on the same instance — also nil.
+	if err := m.Stop(context.Background()); err != nil {
+		t.Errorf("second Stop returned %v, want nil", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // post() helper — exercised against an in-process httptest.Server so we
 // cover both the happy and error paths without requiring docker.

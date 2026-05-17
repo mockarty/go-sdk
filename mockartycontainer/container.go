@@ -199,13 +199,26 @@ func (m *MockartyContainer) Logs(ctx context.Context) (string, error) {
 
 // Stop terminates and removes the container.
 //
-// Stop is idempotent: calling it twice (or on a never-started
-// MockartyContainer) is a no-op error-free.
+// Stop is idempotent: the first call terminates the underlying
+// container and clears the handle; subsequent calls (and calls on a
+// never-started MockartyContainer) return nil without re-issuing the
+// terminate RPC. testcontainers.Container.Terminate is NOT idempotent
+// on the daemon side — a second Terminate after the container is gone
+// returns an error from the docker daemon, which we previously
+// propagated as a "terminate" failure to the user even though the
+// container had already shut down cleanly.
 func (m *MockartyContainer) Stop(ctx context.Context) error {
-	if m == nil || m.container == nil {
+	if m == nil {
 		return nil
 	}
-	if err := m.container.Terminate(ctx); err != nil {
+	m.mu.Lock()
+	c := m.container
+	m.container = nil // clear under the lock so concurrent Stop is also a no-op
+	m.mu.Unlock()
+	if c == nil {
+		return nil
+	}
+	if err := c.Terminate(ctx); err != nil {
 		return fmt.Errorf("mockartycontainer: terminate: %w", err)
 	}
 	return nil
@@ -213,8 +226,12 @@ func (m *MockartyContainer) Stop(ctx context.Context) error {
 
 // Container returns the underlying testcontainers handle for advanced
 // users (network attach, custom exec, etc.). Most users should not
-// need it.
-func (m *MockartyContainer) Container() testcontainers.Container { return m.container }
+// need it. Returns nil after Stop.
+func (m *MockartyContainer) Container() testcontainers.Container {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.container
+}
 
 // post is the shared JSON POST helper used by Apply / Reset.
 func (m *MockartyContainer) post(ctx context.Context, url string, body []byte) error {
