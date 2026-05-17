@@ -116,11 +116,18 @@ func TestIntegration_ContainerLifecycle(t *testing.T) {
 // TestIntegration_ContainerOptions verifies the With* options apply
 // without instantiating a container (covers the config path that runs
 // during New before docker contact).
+//
+// Gated behind requireDocker because mockartycontainer.New unconditionally
+// reaches into testcontainers.GenericContainer, which on hosts without a
+// docker daemon performs a multi-minute connection-retry loop that ignores
+// the supplied context timeout (testcontainers 0.27 bug). Previously this
+// test hung the integration suite for 4 minutes on no-docker machines —
+// the option-application path is already covered by the unit tests in
+// container_test.go, so the integration suite gets no extra signal here.
 func TestIntegration_ContainerOptions(t *testing.T) {
+	requireDocker(t)
 	t.Parallel()
-	// New with an obviously unreachable image — we just want to verify
-	// option application doesn't panic before docker engagement.
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := mockartycontainer.New(ctx,
 		mockartycontainer.WithImage("does-not-exist:never"),
