@@ -51,6 +51,7 @@ type Verifier struct {
 	requestFilter     RequestFilter
 	requestTimeout    time.Duration
 	skipPublish       bool
+	messageProducers  map[string]MessageProducer
 }
 
 // StateHandler is invoked once per provider-state declared on an
