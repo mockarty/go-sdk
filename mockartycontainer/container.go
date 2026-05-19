@@ -65,24 +65,55 @@ func New(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
 			ReadOnly: true,
 		})
 	}
+	// WithMappings(dir) — entire directory mounted at /mocks.
+	if cfg.mappingsDir != "" {
+		mounts = append(mounts, testcontainers.ContainerMount{
+			Source:   testcontainers.GenericBindMountSource{HostPath: cfg.mappingsDir},
+			Target:   testcontainers.ContainerMountTarget(MappingsMount),
+			ReadOnly: true,
+		})
+	}
+	// WithHAR(path) — single file mounted at /har/traffic.har.
+	if cfg.harFile != "" {
+		mounts = append(mounts, testcontainers.ContainerMount{
+			Source:   testcontainers.GenericBindMountSource{HostPath: cfg.harFile},
+			Target:   testcontainers.ContainerMountTarget(HARMount),
+			ReadOnly: true,
+		})
+	}
 
 	env := map[string]string{
 		FormatEnv: string(cfg.format),
+	}
+	if cfg.mappingsDir != "" {
+		env[MockDirEnv] = MappingsMount
+	}
+	if cfg.harFile != "" {
+		env[HARReplayEnv] = HARMount
 	}
 	for k, v := range cfg.envs {
 		env[k] = v
 	}
 
+	exposed := []string{MockPort, MetricsPort}
+	if cfg.hostPort > 0 {
+		// Host-pin: testcontainers honours `<host>:<container>/proto`
+		// only inside the ContainerRequest.HostConfigModifier path,
+		// but the cheaper alternative — bind the host-side port via
+		// the exposed-port form — works on every supported driver.
+		exposed = []string{fmt.Sprintf("%d:%s", cfg.hostPort, MockPort), MetricsPort}
+	}
+
 	req := testcontainers.ContainerRequest{
 		Image:        cfg.image,
-		ExposedPorts: []string{MockPort, MetricsPort},
+		ExposedPorts: exposed,
 		Env:          env,
 		Mounts:       mounts,
 		Cmd:          cfg.cmd,
 		WaitingFor: wait.ForHTTP("/health").
 			WithPort(MetricsPort).
 			WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
-			WithStartupTimeout(60 * time.Second),
+			WithStartupTimeout(cfg.startupTimeout),
 	}
 
 	c, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -101,6 +132,20 @@ func New(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
 	if err := mc.refreshEndpoints(ctx); err != nil {
 		_ = c.Terminate(ctx) // best effort
 		return nil, err
+	}
+	if cfg.logger != nil {
+		// Best-effort log streaming. Errors are logged to the user's
+		// writer (not returned) because losing logs must never break a
+		// otherwise-healthy container start.
+		go func() {
+			r, err := c.Logs(context.Background())
+			if err != nil {
+				fmt.Fprintf(cfg.logger, "mockartycontainer: open log stream: %v\n", err)
+				return
+			}
+			defer r.Close()
+			_, _ = io.Copy(cfg.logger, r)
+		}()
 	}
 	return mc, nil
 }
@@ -231,6 +276,56 @@ func (m *MockartyContainer) Container() testcontainers.Container {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.container
+}
+
+// Terminate is an alias for Stop — provided so test bodies that use
+// `defer c.Terminate(ctx)` (the canonical testcontainers-go idiom)
+// read naturally. Both methods are safe to call multiple times.
+func (m *MockartyContainer) Terminate(ctx context.Context) error {
+	return m.Stop(ctx)
+}
+
+// Run is an alternative entry point for callers who prefer the
+// testcontainers naming convention. Identical to New.
+func Run(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
+	return New(ctx, opts...)
+}
+
+// TestingT is the minimal subset of testing.TB used by MustRun. We
+// avoid importing "testing" at top-level so the package stays usable
+// from non-test code paths too (e.g. integration harness binaries).
+type TestingT interface {
+	Helper()
+	Fatalf(format string, args ...any)
+	Cleanup(func())
+}
+
+// MustRun is the t-aware convenience constructor: it starts a container
+// (failing the test on any error) and registers a Cleanup hook so the
+// container is terminated when the test ends. The returned *Container
+// is ready for traffic.
+//
+//	func TestMyAPI(t *testing.T) {
+//	    ctx := context.Background()
+//	    c := mockartycontainer.MustRun(ctx, t,
+//	        mockartycontainer.WithMappings("./mocks"),
+//	    )
+//	    resp, _ := http.Get(c.URL() + "/api/users/1")
+//	    ...
+//	}
+func MustRun(ctx context.Context, t TestingT, opts ...Option) *MockartyContainer {
+	t.Helper()
+	c, err := New(ctx, opts...)
+	if err != nil {
+		t.Fatalf("mockartycontainer.MustRun: %v", err)
+		return nil // unreachable, satisfies the compiler.
+	}
+	t.Cleanup(func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		_ = c.Stop(stopCtx)
+	})
+	return c
 }
 
 // post is the shared JSON POST helper used by Apply / Reset.

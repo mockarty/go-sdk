@@ -260,6 +260,15 @@ func TestUserAPI(t *testing.T) {
 }
 ```
 
+## Test Container
+
+For tests that need a fresh, isolated mock server per package, the
+`mockartycontainer` sub-package spawns the `mockarty/cli:latest-mock`
+Docker image via testcontainers-go. Drop-in replacement for
+`wiremock-testcontainers`. See [SDK Test Container](https://mockarty.ru/docs/sdk-testcontainer)
+and the [`examples/testcontainer_mockarty/`](./examples/testcontainer_mockarty/)
+example.
+
 ## Error Handling
 
 ```go

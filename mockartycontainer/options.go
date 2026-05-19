@@ -6,8 +6,11 @@ package mockartycontainer
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
@@ -31,6 +34,23 @@ const (
 	// FormatEnv is the env-var the CLI reads to decide which stub
 	// dialect to expect when auto-detect is disabled.
 	FormatEnv = "MOCKARTY_STUB_FORMAT"
+
+	// MockDirEnv tells the CLI which in-container directory to scan
+	// for stub files at startup. Set by WithMappings.
+	MockDirEnv = "MOCKARTY_MOCK_DIR"
+
+	// HARReplayEnv points the CLI at a HAR file to replay (in-container
+	// path). Set by WithHAR.
+	HARReplayEnv = "MOCKARTY_HAR_REPLAY"
+
+	// MockPortEnv overrides the CLI's listen port. Set by WithPort.
+	MockPortEnv = "MOCKARTY_MOCK_PORT"
+
+	// MappingsMount is the in-container directory mapped by WithMappings.
+	MappingsMount = "/mocks"
+
+	// HARMount is the in-container path mapped by WithHAR.
+	HARMount = "/har/traffic.har"
 )
 
 // Format is the stub-dialect mode passed to the container.
@@ -61,18 +81,24 @@ var validFormats = map[Format]struct{}{
 // (env vars, networks, extra mounts) is one new Option without
 // touching call-sites.
 type config struct {
-	image     string
-	format    Format
-	stubFiles []string
-	envs      map[string]string
-	cmd       []string
+	envs           map[string]string
+	logger         io.Writer
+	image          string
+	format         Format
+	mappingsDir    string // host path mounted at /mocks
+	harFile        string // host file mounted at /har/traffic.har
+	stubFiles      []string
+	cmd            []string
+	startupTimeout time.Duration
+	hostPort       int // 0 = let docker assign
 }
 
 func newConfig() *config {
 	return &config{
-		image:  DefaultImage,
-		format: FormatAuto,
-		envs:   map[string]string{},
+		image:          DefaultImage,
+		format:         FormatAuto,
+		envs:           map[string]string{},
+		startupTimeout: 60 * time.Second,
 	}
 }
 
@@ -141,6 +167,99 @@ func WithEnv(key, value string) Option {
 func WithCmd(cmd ...string) Option {
 	return func(c *config) error {
 		c.cmd = append([]string(nil), cmd...)
+		return nil
+	}
+}
+
+// WithMappings bind-mounts a host directory containing stub files
+// (WireMock / Mockoon / native Mockarty JSON) into the running
+// container at MappingsMount and tells the CLI to load it on startup
+// via MockDirEnv. Drop-in replacement for the WireMock
+// `withMappingFromResource` ergonomic.
+//
+// The path is resolved to an absolute path; the directory must exist
+// at New-time (the bind-mount will otherwise fail inside Docker).
+func WithMappings(hostDir string) Option {
+	return func(c *config) error {
+		hostDir = strings.TrimSpace(hostDir)
+		if hostDir == "" {
+			return fmt.Errorf("mockartycontainer: mappings dir must not be empty")
+		}
+		abs, err := filepath.Abs(hostDir)
+		if err != nil {
+			return fmt.Errorf("mockartycontainer: resolve mappings dir %q: %w", hostDir, err)
+		}
+		fi, err := os.Stat(abs)
+		if err != nil {
+			return fmt.Errorf("mockartycontainer: mappings dir %q: %w", abs, err)
+		}
+		if !fi.IsDir() {
+			return fmt.Errorf("mockartycontainer: mappings path %q is not a directory", abs)
+		}
+		c.mappingsDir = abs
+		return nil
+	}
+}
+
+// WithHAR bind-mounts a host-side HAR file into the container at
+// HARMount and tells the CLI to replay the captured traffic via
+// HARReplayEnv. Combine with WithMappings to layer hand-crafted stubs
+// on top of recorded traffic.
+func WithHAR(hostPath string) Option {
+	return func(c *config) error {
+		hostPath = strings.TrimSpace(hostPath)
+		if hostPath == "" {
+			return fmt.Errorf("mockartycontainer: HAR path must not be empty")
+		}
+		abs, err := filepath.Abs(hostPath)
+		if err != nil {
+			return fmt.Errorf("mockartycontainer: resolve HAR path %q: %w", hostPath, err)
+		}
+		fi, err := os.Stat(abs)
+		if err != nil {
+			return fmt.Errorf("mockartycontainer: HAR file %q: %w", abs, err)
+		}
+		if fi.IsDir() {
+			return fmt.Errorf("mockartycontainer: HAR path %q is a directory, want file", abs)
+		}
+		c.harFile = abs
+		return nil
+	}
+}
+
+// WithPort pins the host-side TCP port. Pass 0 (the default) to let
+// docker pick an ephemeral port — recommended for parallel test
+// suites. Pin a specific port only when an external consumer hard-codes
+// it (browser dev-tools, legacy CI script).
+func WithPort(hostPort int) Option {
+	return func(c *config) error {
+		if hostPort < 0 || hostPort > 65535 {
+			return fmt.Errorf("mockartycontainer: host port %d out of range", hostPort)
+		}
+		c.hostPort = hostPort
+		return nil
+	}
+}
+
+// WithLogger streams the container's stdout+stderr to the supplied
+// writer (e.g. os.Stderr, a testing.T's writer, a *bytes.Buffer). When
+// unset the container logs are only available on demand via Logs().
+func WithLogger(w io.Writer) Option {
+	return func(c *config) error {
+		c.logger = w
+		return nil
+	}
+}
+
+// WithStartupTimeout overrides the default 60s wait-for-ready timeout.
+// Bump this when running on a slow CI runner or when pulling the image
+// over a constrained network for the first time.
+func WithStartupTimeout(d time.Duration) Option {
+	return func(c *config) error {
+		if d <= 0 {
+			return fmt.Errorf("mockartycontainer: startup timeout must be positive")
+		}
+		c.startupTimeout = d
 		return nil
 	}
 }
