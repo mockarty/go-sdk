@@ -209,7 +209,10 @@ func (b *BrokerClient) Fetch(ctx context.Context, consumer, provider, version st
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8*1024))
 		return nil, fmt.Errorf("pact broker: fetch HTTP %d: %s", resp.StatusCode, string(body))
 	}
-	return io.ReadAll(resp.Body)
+	// Cap the fetch body — a misbehaving/hostile broker should not be
+	// able to OOM the consumer. 16 MiB matches the desktop push budget
+	// and is ~3 orders of magnitude over realistic pact sizes.
+	return io.ReadAll(io.LimitReader(resp.Body, 16*1024*1024))
 }
 
 // FetchLatest is shorthand for Fetch(ctx, consumer, provider, "latest").

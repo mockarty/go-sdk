@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -64,10 +63,19 @@ type Message struct {
 	ContentType string
 }
 
-// MessageBuilder is the fluent DSL handle.
+// MessageBuilder is the fluent DSL handle. Mutations resolve through
+// the index, never through a pinned pointer — that way a subsequent
+// `Given(...)` (which may grow + reallocate `p.messages`) does not
+// orphan an earlier builder.
 type MessageBuilder struct {
 	pact *MessagePact
-	msg  *Message
+	idx  int
+}
+
+// msg dereferences the live message slot. Must be called fresh on
+// every mutation — the underlying slice may have moved.
+func (b *MessageBuilder) msg() *Message {
+	return &b.pact.messages[b.idx]
 }
 
 // NewMessagePact starts a new message-pact for the given consumer +
@@ -90,34 +98,30 @@ func (p *MessagePact) WithSpecVersion(v SpecVersion) *MessagePact {
 
 // Given starts a new message with a provider state.
 func (p *MessagePact) Given(state string) *MessageBuilder {
-	m := &Message{States: []ProviderState{{Name: state}}}
-	p.messages = append(p.messages, *m)
-	// Keep a stable pointer to the just-appended slot — append may
-	// have reallocated; index the live slice.
-	return &MessageBuilder{pact: p, msg: &p.messages[len(p.messages)-1]}
+	p.messages = append(p.messages, Message{States: []ProviderState{{Name: state}}})
+	return &MessageBuilder{pact: p, idx: len(p.messages) - 1}
 }
 
 // GivenWithParams is Given with a parametrised state.
 func (p *MessagePact) GivenWithParams(state string, params map[string]any) *MessageBuilder {
-	m := Message{States: []ProviderState{{Name: state, Params: params}}}
-	p.messages = append(p.messages, m)
-	return &MessageBuilder{pact: p, msg: &p.messages[len(p.messages)-1]}
+	p.messages = append(p.messages, Message{States: []ProviderState{{Name: state, Params: params}}})
+	return &MessageBuilder{pact: p, idx: len(p.messages) - 1}
 }
 
 // ExpectsToReceive attaches the human description of the message.
 func (b *MessageBuilder) ExpectsToReceive(description string) *MessageBuilder {
-	b.msg.Description = description
+	b.msg().Description = description
 	return b
 }
 
 // WithMetadata attaches the on-wire metadata (Kafka headers, AMQP
 // properties, SNS attributes).
 func (b *MessageBuilder) WithMetadata(meta map[string]string) *MessageBuilder {
-	if b.msg.Metadata == nil {
-		b.msg.Metadata = map[string]string{}
+	if b.msg().Metadata == nil {
+		b.msg().Metadata = map[string]string{}
 	}
 	for k, v := range meta {
-		b.msg.Metadata[k] = v
+		b.msg().Metadata[k] = v
 	}
 	return b
 }
@@ -126,16 +130,16 @@ func (b *MessageBuilder) WithMetadata(meta map[string]string) *MessageBuilder {
 // inside `body` are supported just like HTTP responses — the writer
 // extracts them into `matchingRules` at serialise time.
 func (b *MessageBuilder) WithContent(body any) *MessageBuilder {
-	b.msg.Contents = body
-	if b.msg.ContentType == "" {
-		b.msg.ContentType = "application/json"
+	b.msg().Contents = body
+	if b.msg().ContentType == "" {
+		b.msg().ContentType = "application/json"
 	}
 	return b
 }
 
 // WithContentType overrides the default `application/json`.
 func (b *MessageBuilder) WithContentType(ct string) *MessageBuilder {
-	b.msg.ContentType = ct
+	b.msg().ContentType = ct
 	return b
 }
 
@@ -444,6 +448,3 @@ func stringMap(in map[string]any) map[string]string {
 	return out
 }
 
-// stub used elsewhere — ensure http isn't dropped by linters in case
-// we extend producers to HTTP-fetch bodies later.
-var _ = http.StatusOK
