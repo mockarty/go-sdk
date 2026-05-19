@@ -510,7 +510,10 @@ func compareResponse(expected Response, actualStatus int, actualHeaders http.Hea
 func headerValueMatches(got []string, want string) bool {
 	wantTrim := strings.TrimSpace(want)
 	for _, g := range got {
-		if g == want {
+		// Compare both raw and trimmed actual against the trimmed
+		// expected — a `Content-Type` declared as ` application/json`
+		// (lead space) in a pact should still match the wire form.
+		if g == want || strings.TrimSpace(g) == wantTrim {
 			return true
 		}
 		// Strip parameters after a `;` and compare the bare token.
