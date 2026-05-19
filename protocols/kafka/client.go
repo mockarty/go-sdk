@@ -91,10 +91,14 @@ func (c *Client) Produce(ctx context.Context, topic string, key string, payload 
 	if topic == "" {
 		return errors.New("mockarty kafka: empty topic")
 	}
+	// Take the start BEFORE marshalling / writer lookup so marshal-
+	// error steps record a non-zero duration consistent with the
+	// rest of the timeline (review B7).
+	start := time.Now()
 	w := c.writerFor(topic)
 	body, err := marshalPayload(payload)
 	if err != nil {
-		c.recordStep(ctx, "produce:"+topic, time.Now(), 0, "failed", err, nil)
+		c.recordStep(ctx, "produce:"+topic, start, time.Since(start), "failed", err, nil)
 		return err
 	}
 	msg := kafka.Message{
@@ -104,7 +108,6 @@ func (c *Client) Produce(ctx context.Context, topic string, key string, payload 
 	for k, v := range headers {
 		msg.Headers = append(msg.Headers, kafka.Header{Key: k, Value: []byte(v)})
 	}
-	start := time.Now()
 	err = w.WriteMessages(ctx, msg)
 	dur := time.Since(start)
 	if err != nil {
@@ -183,25 +186,32 @@ func (c *Client) Consume(ctx context.Context, opts ConsumeOptions) ([]ConsumedMe
 	defer r.Close()
 	start := time.Now()
 	out := make([]ConsumedMessage, 0, opts.MaxMessages)
+	// Build the step at the end so a Decode failure can downgrade the
+	// verdict from passed → failed without emitting a stale row first
+	// (review B5 — TCM timelines used to show a passing consume right
+	// before the decoder rejected the body).
+	stepName := "consume:" + opts.Topic
+	stepStatus := "passed"
+	var stepErr error
+	defer func() {
+		c.recordStep(ctx, stepName, start, time.Since(start), stepStatus, stepErr, map[string]string{
+			"count": strconv.Itoa(len(out)),
+			"group": opts.GroupID,
+		})
+	}()
 	for i := 0; i < opts.MaxMessages; i++ {
 		m, err := r.ReadMessage(ctx)
 		if err != nil {
-			dur := time.Since(start)
-			c.recordStep(ctx, "consume:"+opts.Topic, start, dur, classify(err), err, map[string]string{
-				"count": strconv.Itoa(len(out)),
-				"group": opts.GroupID,
-			})
+			stepStatus = classify(err)
+			stepErr = err
 			return out, err
 		}
 		out = append(out, toConsumedMessage(m))
 	}
-	dur := time.Since(start)
-	c.recordStep(ctx, "consume:"+opts.Topic, start, dur, "passed", nil, map[string]string{
-		"count": strconv.Itoa(len(out)),
-		"group": opts.GroupID,
-	})
 	if opts.Decode != nil && len(out) > 0 {
 		if err := json.Unmarshal(out[0].Value, opts.Decode); err != nil {
+			stepStatus = "failed"
+			stepErr = err
 			return out, fmt.Errorf("mockarty kafka: decode first message into %T: %w", opts.Decode, err)
 		}
 	}
@@ -285,12 +295,20 @@ func marshalPayload(p any) ([]byte, error) {
 	return b, nil
 }
 
-// classify maps a kafka-go error to a telemetry step status. Network
-// / broker-unreachable errors are "broken" (env failure); explicit
-// rejections (NotLeaderForPartition, etc.) are "failed" (assertion).
-// kafka-go doesn't expose typed sentinels for most cases, so we fall
-// back to the conservative "broken" verdict for anything we can't
-// confidently classify.
+// classify maps a kafka-go error to a telemetry step status.
+//
+// Decision tree (review B2 fix — the previous default was "failed",
+// which masked real broker-unreachable / TLS / DNS errors as if they
+// were test assertion failures):
+//
+//   - ctx.Canceled / DeadlineExceeded               → "broken" (env)
+//   - typed kafka.Error (protocol-level rejection)  → "failed"
+//   - net.Error / io.EOF / everything else          → "broken" (env)
+//
+// "Broken" is the conservative default — when the network or broker
+// is unreachable, the run is not really telling us anything about the
+// system under test, and flaky CI doesn't deserve to be coloured red
+// like a genuine assertion failure.
 func classify(err error) string {
 	if err == nil {
 		return "passed"
@@ -298,15 +316,17 @@ func classify(err error) string {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return "broken"
 	}
-	return "failed"
+	var kerr kafka.Error
+	if errors.As(err, &kerr) {
+		return "failed"
+	}
+	return "broken"
 }
 
+// capPreview is a thin alias to telemetry.CapPreview kept so the call
+// sites in this package don't have to spell out the full import path.
+// All UTF-8 boundary + truncation marker concerns live in the shared
+// helper — change there, propagates everywhere.
 func capPreview(body []byte, cap int) string {
-	if cap == 0 {
-		return ""
-	}
-	if len(body) <= cap {
-		return string(body)
-	}
-	return string(body[:cap]) + "…(truncated " + strconv.Itoa(len(body)-cap) + "B)"
+	return telemetry.CapPreview(body, cap)
 }

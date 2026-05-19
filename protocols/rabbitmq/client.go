@@ -119,10 +119,12 @@ func (c *Client) Publish(ctx context.Context, exchange, routingKey string, paylo
 		return errors.New("mockarty rabbitmq: nil client")
 	}
 	stepName := "publish:" + exchange + "/" + routingKey
-	body, err := marshalPayload(payload)
+	// Take the start BEFORE marshalling so a marshal error still
+	// records a non-zero duration step (review B7).
 	start := time.Now()
+	body, err := marshalPayload(payload)
 	if err != nil {
-		c.recordStep(ctx, stepName, start, 0, "failed", err, nil)
+		c.recordStep(ctx, stepName, start, time.Since(start), "failed", err, nil)
 		return err
 	}
 	ch, err := c.channel()
@@ -199,48 +201,51 @@ func (c *Client) Consume(ctx context.Context, opts ConsumeOptions) ([]ConsumedMe
 	}
 	stepName := "consume:" + opts.Queue
 	start := time.Now()
+	// Defer the recordStep so a Decode failure (or anything else
+	// after the consume loop) can downgrade the verdict from passed
+	// → failed without emitting a stale row first (review B5).
+	stepStatus := "passed"
+	var stepErr error
+	out := make([]ConsumedMessage, 0, opts.MaxMessages)
+	defer func() {
+		c.recordStep(ctx, stepName, start, time.Since(start), stepStatus, stepErr, map[string]string{
+			"count": strconv.Itoa(len(out)),
+		})
+	}()
 	ch, err := c.channel()
 	if err != nil {
-		c.recordStep(ctx, stepName, start, time.Since(start), "broken", err, nil)
+		stepStatus = "broken"
+		stepErr = err
 		return nil, err
 	}
-	out := make([]ConsumedMessage, 0, opts.MaxMessages)
 	for i := 0; i < opts.MaxMessages; i++ {
 		if err := ctx.Err(); err != nil {
-			c.recordStep(ctx, stepName, start, time.Since(start), "broken", err, map[string]string{
-				"count": strconv.Itoa(len(out)),
-			})
+			stepStatus = "broken"
+			stepErr = err
 			return out, err
 		}
 		msg, ok, gErr := ch.Get(opts.Queue, opts.AutoAck)
 		if gErr != nil {
-			dur := time.Since(start)
-			c.recordStep(ctx, stepName, start, dur, classify(gErr), gErr, map[string]string{
-				"count": strconv.Itoa(len(out)),
-			})
+			stepStatus = classify(gErr)
+			stepErr = gErr
 			return out, gErr
 		}
 		if !ok {
-			// Queue currently empty — return what we have.
 			break
 		}
 		out = append(out, toConsumedMessage(msg))
 		if !opts.AutoAck {
 			if err := msg.Ack(false); err != nil {
-				dur := time.Since(start)
-				c.recordStep(ctx, stepName, start, dur, "broken", err, map[string]string{
-					"count": strconv.Itoa(len(out)),
-				})
+				stepStatus = "broken"
+				stepErr = err
 				return out, fmt.Errorf("mockarty rabbitmq: ack: %w", err)
 			}
 		}
 	}
-	dur := time.Since(start)
-	c.recordStep(ctx, stepName, start, dur, "passed", nil, map[string]string{
-		"count": strconv.Itoa(len(out)),
-	})
 	if opts.Decode != nil && len(out) > 0 {
 		if err := json.Unmarshal(out[0].Body, opts.Decode); err != nil {
+			stepStatus = "failed"
+			stepErr = err
 			return out, fmt.Errorf("mockarty rabbitmq: decode first message into %T: %w", opts.Decode, err)
 		}
 	}
@@ -357,12 +362,8 @@ func classify(err error) string {
 	return "broken"
 }
 
+// capPreview is a thin alias to telemetry.CapPreview — UTF-8 rune
+// boundary handling + truncation marker live in the shared helper.
 func capPreview(body []byte, cap int) string {
-	if cap == 0 {
-		return ""
-	}
-	if len(body) <= cap {
-		return string(body)
-	}
-	return string(body[:cap]) + "…(truncated " + strconv.Itoa(len(body)-cap) + "B)"
+	return telemetry.CapPreview(body, cap)
 }

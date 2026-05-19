@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -25,12 +26,14 @@ import (
 // the typical test wires ONE Client per service and reuses it across
 // every RPC the test fires.
 type Client struct {
-	cc     *grpc.ClientConn
-	cfg    *config
-	src    descriptorSource
-	target string
-	stub   grpcdynamic.Stub
-	seq    atomic.Uint64
+	cc        *grpc.ClientConn
+	cfg       *config
+	src       descriptorSource
+	target    string
+	stub      grpcdynamic.Stub
+	closeOnce sync.Once
+	closeErr  error
+	seq       atomic.Uint64
 }
 
 // Dial connects to target (host:port) and returns a Client ready for
@@ -94,19 +97,25 @@ func (c *Client) Conn() *grpc.ClientConn { return c.cc }
 // Target returns the dial target the client was constructed with.
 func (c *Client) Target() string { return c.target }
 
-// Close releases the gRPC connection. Idempotent; second call returns
-// the cached error from the first.
+// Close releases the gRPC connection. Idempotent — the second call
+// returns the cached error from the first.
+//
+// sync.Once gates the underlying cc.Close so concurrent test cleanup
+// goroutines can't race + double-close the grpc-go ClientConn (which
+// surfaces a "the client connection is closing" error otherwise).
 func (c *Client) Close() error {
 	if c == nil {
 		return nil
 	}
-	if c.src != nil {
-		_ = c.src.Close()
-	}
-	if c.cc != nil {
-		return c.cc.Close()
-	}
-	return nil
+	c.closeOnce.Do(func() {
+		if c.src != nil {
+			_ = c.src.Close()
+		}
+		if c.cc != nil {
+			c.closeErr = c.cc.Close()
+		}
+	})
+	return c.closeErr
 }
 
 // InvokeJSON calls a unary RPC by full method name (e.g.
@@ -157,11 +166,26 @@ func (c *Client) InvokeJSON(ctx context.Context, fullMethod string, req, resp an
 		switch {
 		case err == nil:
 			step.Status = "passed"
-		case status.Code(err) != 0 && status.Code(err).String() != "Unknown":
-			step.Status = "failed"
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			// Ctx cancellation is an env failure (timeout / parent cancelled),
+			// not an assertion. Classify as broken so flaky-CI reruns don't
+			// look like real failures in the timeline.
+			step.Status = "broken"
 			step.Message = err.Error()
 		default:
-			step.Status = "broken"
+			// `status.FromError(err)` is the canonical gRPC classifier:
+			// ok=true means the server (or framework) returned a typed gRPC
+			// Status — even if the code is codes.Unknown, that's an EXPLICIT
+			// failure verdict from the peer and belongs in "failed". Untyped
+			// transport errors (network down, TLS handshake) fall through to
+			// "broken". The previous `status.Code(err)!=0 && !=Unknown` test
+			// routed every real Unknown code to broken, which masked legit
+			// server-side assertion failures.
+			if _, ok := status.FromError(err); ok {
+				step.Status = "failed"
+			} else {
+				step.Status = "broken"
+			}
 			step.Message = err.Error()
 		}
 		c.cfg.recorder.Record(ctx, step)

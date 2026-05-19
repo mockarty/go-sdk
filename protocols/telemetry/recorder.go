@@ -24,8 +24,10 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mockarty/mockarty-go/externalruns"
 )
@@ -202,4 +204,47 @@ func ToExternalStep(s Step) externalruns.Step {
 // same operation de-dup server-side on (namespace, run, step_key).
 func NewStepKey(name string, seq uint64) string {
 	return fmt.Sprintf("%s#%d", name, seq)
+}
+
+// CapPreview truncates `body` to at most `cap` bytes, rounding the
+// cut DOWN to a valid UTF-8 rune boundary so the returned string is
+// never half-a-rune. When truncation happens, the literal marker
+// `…(truncated <N>B)` (U+2026 ellipsis) is appended. The marker
+// shape is identical across every mockarty-go protocol client, the
+// Python SDK, and the Java SDK — change it in lock-step or break
+// cross-language step diffs.
+//
+// `cap == 0` returns the empty string (disables capture).
+func CapPreview(body []byte, cap int) string {
+	if cap == 0 || len(body) == 0 {
+		return ""
+	}
+	if len(body) <= cap {
+		return string(body)
+	}
+	// Round down to a valid rune boundary so we never emit a half-
+	// truncated multi-byte sequence (`u8.RuneError`).
+	cut := cap
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	if cut == 0 {
+		// Defensive: body[0] is always a rune start, so this branch
+		// only fires when the first byte was invalid UTF-8. Fall
+		// back to the byte cap to avoid losing the preview entirely.
+		cut = cap
+	}
+	return string(body[:cut]) + "…(truncated " + strconv.Itoa(len(body)-cut) + "B)"
+}
+
+// CapPreviewString is a convenience for the string overload — saves
+// a `[]byte(s)` allocation in the common case.
+func CapPreviewString(s string, cap int) string {
+	if cap == 0 || s == "" {
+		return ""
+	}
+	if len(s) <= cap {
+		return s
+	}
+	return CapPreview([]byte(s), cap)
 }

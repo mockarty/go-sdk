@@ -122,6 +122,10 @@ func TestMarshalPayload_UnmarshalableValue(t *testing.T) {
 }
 
 func TestClassify(t *testing.T) {
+	// Build a real kafka.Error so we cover the typed-protocol-error
+	// → failed branch. The Error type takes a known error code; any
+	// non-zero kafka error code is fine for the assertion.
+	typedErr := kafka.UnknownTopicOrPartition
 	cases := []struct {
 		err  error
 		want string
@@ -129,7 +133,15 @@ func TestClassify(t *testing.T) {
 		{nil, "passed"},
 		{context.Canceled, "broken"},
 		{context.DeadlineExceeded, "broken"},
-		{errors.New("auth: rejected"), "failed"},
+		// Untyped errors (network down, TLS handshake, DNS) are
+		// "broken" — the system under test gave us no answer, so
+		// this isn't a failed assertion. Owner directive (review
+		// B2): conservative default protects flaky CI from coming
+		// back red on infrastructure jitter.
+		{errors.New("read tcp 1.2.3.4:9092: i/o timeout"), "broken"},
+		{errors.New("auth: rejected"), "broken"},
+		// Typed kafka protocol error → "failed".
+		{typedErr, "failed"},
 	}
 	for _, tc := range cases {
 		got := classify(tc.err)

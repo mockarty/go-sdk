@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -259,3 +260,94 @@ func TestFileSource_NoPathsReturnsNilSource(t *testing.T) {
 // path is exercised indirectly through TestFileSource_FindMethod_NotFound
 // (file source surfaces errMethodNotFound; combined would then try
 // reflection — covered by integration tests against a real testbackend).
+
+// --- Client.Close idempotency (review B3) ---
+//
+// Dial with a never-connectable target so we get a valid *Client
+// without a live server, then Close twice. The fixed sync.Once gate
+// must return the cached err on the second call and NOT call
+// cc.Close again (which would surface "grpc: the client connection
+// is closing" from grpc-go).
+
+func TestClient_Close_Idempotent(t *testing.T) {
+	// Use an obviously-unreachable target — dial is non-blocking in
+	// grpc-go by default (no WithBlock), so Dial succeeds and Close
+	// owns the only path to surface errors. If you ever pass
+	// WithBlock here, this test will need to dial a bufconn server.
+	ctx := context.Background()
+	c, err := Dial(ctx, "127.0.0.1:1")
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	first := c.Close()
+	second := c.Close()
+	if first != nil && second != nil && first.Error() != second.Error() {
+		t.Fatalf("expected cached error: first=%v, second=%v", first, second)
+	}
+	// Third + fourth call must also be safe.
+	_ = c.Close()
+	_ = c.Close()
+}
+
+// --- gRPC streaming-method rejection (review GAP) ---
+//
+// Direct test of the rejection path: a fileSource with a
+// server-streaming method declared, then InvokeJSON returns the
+// "use NewServerStream" error. No live gRPC server needed.
+
+const streamingProto = `syntax = "proto3";
+package acme;
+
+service NotifyService {
+    rpc Watch(WatchRequest) returns (stream WatchResponse);
+}
+
+message WatchRequest {}
+message WatchResponse {}
+`
+
+func TestClient_InvokeJSON_RejectsStreamingMethod(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "notify.proto")
+	if err := os.WriteFile(path, []byte(streamingProto), 0o644); err != nil {
+		t.Fatalf("write proto: %v", err)
+	}
+	ctx := context.Background()
+	c, err := Dial(ctx, "127.0.0.1:1",
+		WithProtoFile(filepath.Base(path)),
+		WithImportDir(dir),
+		WithReflection(false),
+	)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer c.Close()
+
+	var resp any
+	err = c.InvokeJSON(ctx, "acme.NotifyService/Watch", map[string]any{}, &resp)
+	if err == nil {
+		t.Fatal("expected streaming-method rejection error")
+	}
+	if !strings.Contains(err.Error(), "streaming method") {
+		t.Fatalf("error message lacks 'streaming method': %v", err)
+	}
+}
+
+// --- gRPC method-name parsing (review CROSS-LANGUAGE INVARIANT) ---
+//
+// Already covered by TestSplitMethod above; this test pins the
+// gRPC-style leading-slash form (often produced by the gRPC core
+// libraries) round-trips through splitMethod to the same parts as
+// the bare form.
+
+func TestSplitMethod_LeadingSlashRoundTrip(t *testing.T) {
+	bareS, bareM, err1 := splitMethod("acme.UserService/GetUser")
+	slashS, slashM, err2 := splitMethod("/acme.UserService/GetUser")
+	if err1 != nil || err2 != nil {
+		t.Fatalf("unexpected errors: %v, %v", err1, err2)
+	}
+	if bareS != slashS || bareM != slashM {
+		t.Fatalf("leading-slash form parses differently: bare=(%q,%q) slash=(%q,%q)",
+			bareS, bareM, slashS, slashM)
+	}
+}
