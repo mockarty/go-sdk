@@ -200,6 +200,39 @@ mock := mockarty.NewMockBuilder().
     Build()
 ```
 
+## Protocol Clients
+
+Drive the system under test directly from CI scripts. Each protocol client
+captures every call as a TCM step (start/end/duration/status/payload
+preview) so the external run shows a per-call timeline at the end:
+
+- `protocols/grpc`     — JSON-shaped gRPC client with reflection / `.proto` file source
+- `protocols/kafka`    — Produce / Consume on segmentio/kafka-go (pure Go)
+- `protocols/rabbitmq` — Publish / Consume / DeclareQueue on amqp091-go (pure Go)
+- `protocols/telemetry` — shared `Step` / `StepRecorder` / `ExternalRunsRecorder`
+
+```go
+import (
+    "github.com/mockarty/mockarty-go/externalruns"
+    mgrpc "github.com/mockarty/mockarty-go/protocols/grpc"
+    "github.com/mockarty/mockarty-go/protocols/telemetry"
+)
+
+runs, _ := externalruns.NewClient(adminURL, "sandbox", apiToken)
+run, _ := runs.CreateRun(ctx, externalruns.CreateRunRequest{Name: "smoke", Framework: "go-test"})
+defer runs.FinishRun(ctx, run.ID, externalruns.FinishRunRequest{})
+
+rec := telemetry.NewExternalRunsRecorder(runs, run.ID); defer rec.Close()
+conn, _ := mgrpc.Dial(ctx, "service:50051", mgrpc.WithRecorder(rec))
+defer conn.Close()
+var resp map[string]any
+_ = conn.InvokeJSON(ctx, "acme.UserService/GetUser", map[string]any{"id": "u-42"}, &resp)
+```
+
+Full cross-language reference (Go / Python / Java side-by-side, every
+protocol, options, classification rules, troubleshooting):
+**[SDK Protocol Clients](https://mockarty.ru/docs/sdk-protocol-clients)**.
+
 ## Testing Helpers
 
 ```go
