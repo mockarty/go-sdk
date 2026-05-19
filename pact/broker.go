@@ -167,10 +167,18 @@ func (b *BrokerClient) Publish(ctx context.Context, pact []byte, consumerVersion
 		return fmt.Errorf("pact broker: publish HTTP %d: %s", resp.StatusCode, string(body))
 	}
 	// Apply tags (each is a separate PUT in the canonical broker API).
+	// Collect failures and report them together, but DO NOT short-circuit
+	// — the pact has already been published; we still want every other
+	// tag attempted so a partial tag set is at least maximised.
+	var tagErrs []error
 	for _, tag := range tags {
 		if err := b.tagConsumer(ctx, consumer, consumerVersion, tag); err != nil {
-			return err
+			tagErrs = append(tagErrs, fmt.Errorf("tag %q: %w", tag, err))
 		}
+	}
+	if len(tagErrs) > 0 {
+		return fmt.Errorf("pact broker: publish succeeded but %d tag(s) failed: %w",
+			len(tagErrs), errors.Join(tagErrs...))
 	}
 	return nil
 }

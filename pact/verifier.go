@@ -40,18 +40,17 @@ import (
 // rules that govern publish-time recording govern verify-time
 // matching.
 type Verifier struct {
-	http              *http.Client
-	broker            *BrokerClient
-	stateHandlers     map[string]StateHandler
-	stateSetupURL     string
-	providerURL       string
-	providerName      string
-	providerVersion   string
-	providerBranch    string
-	requestFilter     RequestFilter
-	requestTimeout    time.Duration
-	skipPublish       bool
-	messageProducers  map[string]MessageProducer
+	http             *http.Client
+	broker           *BrokerClient
+	stateHandlers    map[string]StateHandler
+	stateSetupURL    string
+	providerURL      string
+	providerName     string
+	providerVersion  string
+	providerBranch   string
+	requestFilter    RequestFilter
+	requestTimeout   time.Duration
+	messageProducers map[string]MessageProducer
 }
 
 // StateHandler is invoked once per provider-state declared on an
@@ -124,12 +123,18 @@ func WithRequestFilter(fn RequestFilter) VerifierOption {
 	return func(v *Verifier) { v.requestFilter = fn }
 }
 
-// WithRequestTimeout caps the per-interaction HTTP timeout.
+// WithRequestTimeout caps the per-interaction HTTP timeout. Applied
+// via a per-request context.WithTimeout so it works regardless of
+// whether a custom http.Client is also injected via WithHTTPClient
+// (a Client.Timeout would be overridden by the custom client).
 func WithRequestTimeout(d time.Duration) VerifierOption {
 	return func(v *Verifier) { v.requestTimeout = d }
 }
 
-// WithHTTPClient injects a custom http.Client (mTLS, custom transport).
+// WithHTTPClient injects a custom http.Client (mTLS, custom
+// transport). The per-request timeout from WithRequestTimeout still
+// applies via context — set Client.Timeout = 0 on your custom client
+// if you want the verifier's timeout to be the only deadline.
 func WithHTTPClient(c *http.Client) VerifierOption {
 	return func(v *Verifier) { v.http = c }
 }
@@ -147,7 +152,11 @@ func NewVerifier(opts ...VerifierOption) (*Verifier, error) {
 		return nil, errors.New("pact: NewVerifier requires WithProviderURL")
 	}
 	if v.http == nil {
-		v.http = &http.Client{Timeout: v.requestTimeout}
+		// Default client has no Client.Timeout — the per-request
+		// context deadline (see verifyOne) is the single source of
+		// truth so the behaviour is consistent with the custom-
+		// client path.
+		v.http = &http.Client{}
 	}
 	return v, nil
 }
@@ -299,13 +308,19 @@ func (v *Verifier) verifyOne(ctx context.Context, in Interaction) InteractionRes
 		ir.State = in.ProviderStates[0].Name
 	}
 
-	req, err := buildHTTPRequest(ctx, v.providerURL, in.Request)
+	// Apply the per-request timeout via context — works with both the
+	// default http.Client and any user-supplied client (since
+	// http.Client.Timeout would be overridden by WithHTTPClient).
+	reqCtx, cancel := v.requestContext(ctx)
+	defer cancel()
+
+	req, err := buildHTTPRequest(reqCtx, v.providerURL, in.Request)
 	if err != nil {
 		ir.Error = "build request: " + err.Error()
 		return ir
 	}
 	if v.requestFilter != nil {
-		if err := v.requestFilter(ctx, req); err != nil {
+		if err := v.requestFilter(reqCtx, req); err != nil {
 			ir.Error = "request filter: " + err.Error()
 			return ir
 		}
@@ -317,7 +332,9 @@ func (v *Verifier) verifyOne(ctx context.Context, in Interaction) InteractionRes
 	}
 	defer resp.Body.Close()
 	ir.StatusCode = resp.StatusCode
-	body, err := io.ReadAll(resp.Body)
+	// Cap the body — a misbehaving provider should not OOM the
+	// verifier; 16 MiB matches the broker.Fetch cap.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 16*1024*1024))
 	if err != nil {
 		ir.Error = "read body: " + err.Error()
 		return ir
@@ -326,6 +343,16 @@ func (v *Verifier) verifyOne(ctx context.Context, in Interaction) InteractionRes
 	ir.Mismatches = compareResponse(in.Response, resp.StatusCode, resp.Header, body)
 	ir.Passed = len(ir.Mismatches) == 0 && ir.Error == ""
 	return ir
+}
+
+// requestContext derives a context with the verifier's per-request
+// timeout. If requestTimeout <= 0 the parent context is returned
+// as-is, with a no-op cancel.
+func (v *Verifier) requestContext(parent context.Context) (context.Context, context.CancelFunc) {
+	if v.requestTimeout <= 0 {
+		return parent, func() {}
+	}
+	return context.WithTimeout(parent, v.requestTimeout)
 }
 
 func (v *Verifier) setUpStates(ctx context.Context, states []ProviderState) error {
@@ -349,17 +376,23 @@ func (v *Verifier) setUpStates(ctx context.Context, states []ProviderState) erro
 }
 
 func (v *Verifier) callStateSetup(ctx context.Context, st ProviderState) error {
-	body, _ := json.Marshal(map[string]any{
+	body, err := json.Marshal(map[string]any{
 		"state":  st.Name,
 		"params": st.Params,
 		"action": "setup",
 	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, v.stateSetupURL,
+	if err != nil {
+		return fmt.Errorf("marshal state setup: %w", err)
+	}
+	reqCtx, cancel := v.requestContext(ctx)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, v.stateSetupURL,
 		bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	resp, err := v.http.Do(req)
 	if err != nil {
 		return err
@@ -445,17 +478,20 @@ func compareResponse(expected Response, actualStatus int, actualHeaders http.Hea
 			})
 			continue
 		}
-		// Lax: same canonical name, any of expected values must
-		// appear; producers add charsets or boundary params we don't
-		// care about for the verify path.
-		joined := strings.Join(got, ",")
+		// For each expected value, look for it as either an exact match
+		// of one of the actual values OR as a parameter-of-a-parameter
+		// list (e.g. expected "application/json" matches actual
+		// "application/json; charset=utf-8"). Substring search across
+		// comma-joined values would false-match overlapping tokens
+		// (`"text/plain"` is a substring of `"application/json,text/plain"`
+		// even when the producer never sent "text/plain" on its own).
 		for _, want := range vs {
-			if !strings.Contains(joined, want) {
+			if !headerValueMatches(got, want) {
 				miss = append(miss, MatchMismatch{
 					Path:     "$.headers." + k,
 					Reason:   "header value mismatch",
 					Expected: want,
-					Actual:   joined,
+					Actual:   strings.Join(got, ","),
 				})
 			}
 		}
@@ -464,6 +500,29 @@ func compareResponse(expected Response, actualStatus int, actualHeaders http.Hea
 		miss = append(miss, bodyMismatches(expected.Body, actualBody)...)
 	}
 	return miss
+}
+
+// headerValueMatches reports whether the expected header value `want`
+// is present in any of the actual header values `got`. A value
+// matches when it equals `got[i]` verbatim OR when it equals the
+// pre-`;` token of `got[i]` (Content-Type-style parameter stripping:
+// expected "application/json" matches actual "application/json; charset=utf-8").
+func headerValueMatches(got []string, want string) bool {
+	wantTrim := strings.TrimSpace(want)
+	for _, g := range got {
+		if g == want {
+			return true
+		}
+		// Strip parameters after a `;` and compare the bare token.
+		bare := g
+		if i := strings.IndexByte(g, ';'); i >= 0 {
+			bare = strings.TrimSpace(g[:i])
+		}
+		if bare == wantTrim {
+			return true
+		}
+	}
+	return false
 }
 
 // brokerAuthHeader returns the header(s) a BrokerClient would attach

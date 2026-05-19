@@ -262,6 +262,35 @@ func TestVerifier_VerifyMessages_ProducerErrors(t *testing.T) {
 	}
 }
 
+// TestMessagePact_V3SingularStateAlwaysEmitted regression: strict V3
+// verifiers only read `providerState` (singular); we used to emit only
+// the plural `providerStates` when len > 1, dropping the primary state
+// for those verifiers. The serialiser now ALWAYS includes the singular
+// field plus the plural for V3+ extensions.
+func TestMessagePact_V3SingularStateAlwaysEmitted(t *testing.T) {
+	mp := NewMessagePact("c", "p").WithSpecVersion(SpecV3)
+	// Two states — pre-fix the singular field would be missing.
+	mp.GivenWithParams("state-A", map[string]any{"k": "v"})
+	mp.messages[0].States = append(mp.messages[0].States,
+		ProviderState{Name: "state-B"})
+	mp.messages[0].Description = "msg"
+	mp.messages[0].Contents = map[string]any{"id": 1}
+
+	raw, err := mp.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON: %v", err)
+	}
+	var doc map[string]any
+	_ = json.Unmarshal(raw, &doc)
+	msg := doc["messages"].([]any)[0].(map[string]any)
+	if msg["providerState"] != "state-A" {
+		t.Errorf("singular providerState = %v, want state-A", msg["providerState"])
+	}
+	if _, ok := msg["providerStates"].([]any); !ok {
+		t.Errorf("plural providerStates should also be emitted for multi-state")
+	}
+}
+
 // FuzzParseMessagePactDoc — never panic on adversarial bytes.
 func FuzzParseMessagePactDoc(f *testing.F) {
 	for _, s := range []string{

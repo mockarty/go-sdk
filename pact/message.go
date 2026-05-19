@@ -319,17 +319,27 @@ func serialiseMessagesV3(msgs []Message) []map[string]any {
 		mr := map[string]any{
 			"description": m.Description,
 		}
-		if len(m.States) == 1 {
+		if len(m.States) >= 1 {
+			// V3 canonically uses the SINGULAR `providerState` field —
+			// strict V3 verifiers (including older pact-jvm releases)
+			// read only this key, so we always emit the first state
+			// here. When multiple states are present we ALSO emit the
+			// non-standard plural `providerStates` so V3+ verifiers
+			// that understand the extension retain the full set; the
+			// singular field guarantees at least the primary state is
+			// always reachable.
 			mr["providerState"] = m.States[0].Name
-		} else if len(m.States) > 1 {
-			// V3 'providerStates' plural is non-standard but tolerated
-			// by many verifiers; the canonical V3 'providerState' is
-			// singular.
-			states := make([]map[string]any, 0, len(m.States))
-			for _, st := range m.States {
-				states = append(states, map[string]any{"name": st.Name})
+			if len(m.States) > 1 {
+				states := make([]map[string]any, 0, len(m.States))
+				for _, st := range m.States {
+					row := map[string]any{"name": st.Name}
+					if len(st.Params) > 0 {
+						row["params"] = st.Params
+					}
+					states = append(states, row)
+				}
+				mr["providerStates"] = states
 			}
-			mr["providerStates"] = states
 		}
 		rules := map[string]MatchCategory{}
 		mr["contents"] = walkAndExtract(m.Contents, "$.body", rules, SpecV3)

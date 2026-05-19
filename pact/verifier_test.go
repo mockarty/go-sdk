@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // helper: pact with a single interaction expecting GET /orders/42 → 200 {id:42}.
@@ -379,6 +380,61 @@ func TestParsePactDoc_V3(t *testing.T) {
 func TestParsePactDoc_GarbageJSON(t *testing.T) {
 	if _, err := parsePactDoc([]byte("<<not json>>")); err == nil {
 		t.Fatal("expected parse error")
+	}
+}
+
+// TestVerifier_HeaderValueMatchesNoSubstringFalseMatch — guards against
+// the regression where a Content-Type expectation matched any actual
+// header whose comma-joined value happened to contain the wanted token.
+func TestVerifier_HeaderValueMatchesNoSubstringFalseMatch(t *testing.T) {
+	// expected "text/plain" must NOT match actual "application/json".
+	if headerValueMatches([]string{"application/json"}, "text/plain") {
+		t.Fatal("substring/false match: text/plain in application/json")
+	}
+	// But "application/json" with charset param must match bare token.
+	if !headerValueMatches([]string{"application/json; charset=utf-8"}, "application/json") {
+		t.Fatal("parameter strip failed for Content-Type")
+	}
+	// Two distinct actual values: expected must match one of them exactly.
+	if !headerValueMatches([]string{"application/json", "text/plain"}, "text/plain") {
+		t.Fatal("multi-value exact match failed")
+	}
+	// And must NOT false-match a substring across joined values.
+	if headerValueMatches([]string{"application/json", "text/html"}, "html,application/json") {
+		t.Fatal("joined-substring false match")
+	}
+}
+
+// TestVerifier_RequestTimeoutHonoredWithCustomClient verifies that
+// WithRequestTimeout applies via context even when WithHTTPClient
+// supplies a client with no Timeout of its own (regression: timeout
+// was silently dropped when both options were combined).
+func TestVerifier_RequestTimeoutHonoredWithCustomClient(t *testing.T) {
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Sleep past the 50 ms timeout.
+		select {
+		case <-time.After(500 * time.Millisecond):
+		case <-context.Background().Done():
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(slow.Close)
+
+	customHTTP := &http.Client{} // no Timeout — relies on the verifier's ctx
+	v, _ := NewVerifier(
+		WithProviderURL(slow.URL),
+		WithHTTPClient(customHTTP),
+		WithRequestTimeout(50*time.Millisecond),
+	)
+	res, err := v.VerifyPactBytes(context.Background(), []byte(simplePact))
+	if err != nil {
+		t.Fatalf("verify: %v", err)
+	}
+	if res.OK() {
+		t.Fatal("expected failure due to timeout")
+	}
+	if !strings.Contains(res.Interactions[0].Error, "transport") {
+		t.Errorf("expected transport error, got %q", res.Interactions[0].Error)
 	}
 }
 

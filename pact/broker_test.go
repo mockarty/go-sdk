@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -142,6 +143,44 @@ func TestBrokerClient_Publish_Tags(t *testing.T) {
 		if !strings.HasSuffix(seenTagPaths[i], want) {
 			t.Errorf("tag path[%d] = %q, want suffix %q", i, seenTagPaths[i], want)
 		}
+	}
+}
+
+func TestBrokerClient_Publish_PartialTagFailure(t *testing.T) {
+	// Pact PUT succeeds; the 2nd tag PUT returns 500; the 3rd tag MUST
+	// still be attempted (no short-circuit). Final error must surface
+	// the partial-failure shape, not the first failing tag alone.
+	var tagsSeen int
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/tags/") {
+			mu.Lock()
+			tagsSeen++
+			n := tagsSeen
+			mu.Unlock()
+			if n == 2 {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	c, _ := NewBrokerClient(WithBrokerURL(srv.URL))
+	err := c.Publish(context.Background(), []byte(fakePact), "v1", "",
+		[]string{"prod", "stable", "ci"})
+	if err == nil {
+		t.Fatal("expected aggregate error for failing tag")
+	}
+	if !strings.Contains(err.Error(), "publish succeeded but") {
+		t.Errorf("error should mention publish-succeeded-but-tags-failed: %v", err)
+	}
+	mu.Lock()
+	got := tagsSeen
+	mu.Unlock()
+	if got != 3 {
+		t.Errorf("expected 3 tag attempts (no short-circuit); got %d", got)
 	}
 }
 
