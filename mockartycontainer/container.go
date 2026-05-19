@@ -110,8 +110,13 @@ func New(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
 		Env:          env,
 		Mounts:       mounts,
 		Cmd:          cfg.cmd,
-		WaitingFor: wait.ForHTTP("/health").
-			WithPort(MetricsPort).
+		// Wait on the WireMock-compat admin health endpoint served on
+		// the SAME 8080 listener as the mocks. The earlier draft polled
+		// /health on port 9090 (Prometheus metrics port), which the
+		// mock-serve subcommand doesn't bind — the container blocked
+		// until startup timeout and then errored. Review #109/H2.
+		WaitingFor: wait.ForHTTP("/__admin/health").
+			WithPort(MockPort).
 			WithStatusCodeMatcher(func(status int) bool { return status == http.StatusOK }).
 			WithStartupTimeout(cfg.startupTimeout),
 	}

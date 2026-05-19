@@ -32,8 +32,12 @@ const (
 	StubsMount = "/data/stubs"
 
 	// FormatEnv is the env-var the CLI reads to decide which stub
-	// dialect to expect when auto-detect is disabled.
-	FormatEnv = "MOCKARTY_STUB_FORMAT"
+	// dialect to expect when auto-detect is disabled. MUST match the
+	// CLI's applyMockServeEnv reader at cmd/cli/cmd/mock_serve_env.go —
+	// a mismatch silently leaves the container in auto-detect.
+	// Review #109/H1 caught the old "MOCKARTY_STUB_FORMAT" name was
+	// ignored; renamed to match the CLI side.
+	FormatEnv = "MOCKARTY_MOCK_FORMAT"
 
 	// MockDirEnv tells the CLI which in-container directory to scan
 	// for stub files at startup. Set by WithMappings.
