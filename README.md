@@ -260,6 +260,55 @@ func TestUserAPI(t *testing.T) {
 }
 ```
 
+## Fluent Tester DSL
+
+For end-to-end tests that exercise multiple protocols, the
+`tester` sub-package provides a fluent chain shaped after
+JUnit + RestAssured + k6 — but driving any of Mockarty's nine
+supported transports:
+
+```go
+import (
+    "github.com/mockarty/mockarty-go/tester"
+    "github.com/mockarty/mockarty-go/protocols/kafka"
+)
+
+func TestUserSignupFlow(t *testing.T) {
+    tt := tester.New(tester.WithBaseURL("http://localhost:8080"))
+    defer tt.Finish()
+
+    tt.HTTP().POST("/signup").
+        JSON(map[string]any{"email": "a@b.c"}).
+        ExpectStatus(201).
+        Extract("$.token", "token")
+
+    tt.HTTP().GET("/me").
+        Header("Authorization", "Bearer {{token}}").
+        ExpectStatus(200).
+        ExpectJSONPath("$.email", "a@b.c")
+
+    kfk, _ := kafka.NewClient([]string{"localhost:9092"})
+    tt.Kafka(kfk).Consume("user.signups").
+        Max(1).
+        ExpectMessageContains(0, "a@b.c")
+
+    if !tt.OK() {
+        t.Fatalf("%v", tt.Errors())
+    }
+}
+```
+
+Facets shipped: `HTTP()`, `Kafka(broker)`, `GRPC(client)`,
+`GraphQL(endpoint)`, `RabbitMQ(broker)`, `SSE(endpoint)`,
+`WebSocket(url)`, `SOAP(endpoint)`, `DB(conn)`. Each chain emits
+one Allure step automatically (wrap the test with
+`allure.WithTest(ctx, "...")` and the result file lands in
+`$ALLURE_RESULTS_DIR`). Group calls with `.Wrap("name", fn)`,
+retry with `.Eventually(within, interval, fn)`, fan-out with
+`.Parallel(branchA, branchB)`.
+
+See [`tester/doc.go`](./tester/doc.go) for the full vocabulary.
+
 ## Test Container
 
 For tests that need a fresh, isolated mock server per package, the
