@@ -85,19 +85,15 @@ func (s *GRPCStep) ExpectOK() *GRPCStep {
 }
 
 // ExpectError asserts the call returned an error. Useful for testing
-// server-side validation paths.
+// server-side validation paths. Does NOT mutate prior assertion
+// failures in the chain — combining ExpectError with field checks on
+// an error response is the caller's choice (and usually wrong because
+// the response map is empty when the call errored).
 func (s *GRPCStep) ExpectError() *GRPCStep {
-	if !s.ensureSent() {
-		// ensureSent records its own failure on transport issues; allow
-		// ExpectError to swallow it since the user EXPECTS a failure.
-	}
+	s.ensureSent()
 	if s.err == nil {
 		s.fail("ExpectError: call succeeded")
-		return s
 	}
-	// Clear any earlier transport-failure noise so the chain reports
-	// the expected error as a pass.
-	s.failures = nil
 	return s
 }
 
