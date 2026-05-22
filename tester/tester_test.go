@@ -262,6 +262,55 @@ func TestTesterAutoFlushOnInspect(t *testing.T) {
 	}
 }
 
+func TestHTTPMethods(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Method", r.Method)
+	}))
+	t.Cleanup(srv.Close)
+
+	tt := New(WithBaseURL(srv.URL))
+	tt.HTTP().PUT("/x").ExpectHeader("X-Method", "PUT")
+	tt.HTTP().PATCH("/x").ExpectHeader("X-Method", "PATCH")
+	tt.HTTP().DELETE("/x").ExpectHeader("X-Method", "DELETE")
+	tt.HTTP().HEAD("/x").ExpectHeader("X-Method", "HEAD")
+	tt.Finish()
+	if !tt.OK() {
+		t.Fatalf("verbs failed: %v", tt.Errors())
+	}
+}
+
+func TestHTTPSendAndDone(t *testing.T) {
+	srv := newFakeBackend(t)
+	tt := New(WithBaseURL(srv.URL))
+	// Send fires the request without an assertion; Done commits.
+	tt.HTTP().GET("/users/42").Send().Done()
+	if !tt.OK() {
+		t.Fatalf("Send/Done chain failed: %v", tt.Errors())
+	}
+	if got := len(tt.Report()); got != 1 {
+		t.Fatalf("want 1 step, got %d", got)
+	}
+}
+
+func TestHTTPExtractNumberAndBool(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":42,"active":true,"name":"alice","tags":["a","b"],"missing":null}`))
+	}))
+	t.Cleanup(srv.Close)
+	tt := New(WithBaseURL(srv.URL))
+	tt.HTTP().GET("/").
+		Extract("$.id", "id").
+		Extract("$.active", "active").
+		Extract("$.name", "name").
+		Extract("$.tags", "tags").
+		Extract("$.missing", "missing")
+	tt.Finish()
+	v := tt.Vars()
+	if v["id"] != "42" || v["active"] != "true" || v["name"] != "alice" || v["tags"] != `["a","b"]` || v["missing"] != "" {
+		t.Fatalf("Extract scalar shapes incorrect: %+v", v)
+	}
+}
+
 func TestInterpolate(t *testing.T) {
 	cases := []struct {
 		name, in, want string
