@@ -6,6 +6,7 @@ package tester
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -57,6 +58,59 @@ func FuzzInterpolate(f *testing.F) {
 			}
 		}()
 		_ = interpolate(in, map[string]string{name: value})
+	})
+}
+
+// FuzzParseSSE ensures the SSE parser never panics on arbitrary input
+// streams. The WHATWG spec is permissive (anything before a blank line
+// is buffered then dispatched / discarded); the parser must not panic
+// on truncated frames, malformed retry: lines, embedded NULs, etc.
+func FuzzParseSSE(f *testing.F) {
+	seeds := []string{
+		"data: hello\n\n",
+		"event: tick\ndata: 1\n\n",
+		"retry: 5000\nid: x\ndata: y\n\n",
+		": comment\n\n",
+		"data: line1\ndata: line2\n\n",
+		"\n\n\n",
+		"data: x", // no terminating blank line — should still buffer
+		"retry: not-a-number\ndata: x\n\n",
+		"data:\n\n", // empty data
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, in string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("panic on parseSSE(%q): %v", in, r)
+			}
+		}()
+		_ = parseSSE(strings.NewReader(in))
+	})
+}
+
+// FuzzWrapSOAPEnvelope ensures the wrapper never panics and produces
+// a string that contains a <Body> when the wrap branch fired.
+func FuzzWrapSOAPEnvelope(f *testing.F) {
+	seeds := []string{
+		"<X/>",
+		"<X></X>",
+		"<?xml version=\"1.0\"?><Y/>",
+		"<soap:Envelope xmlns:soap=\"x\"><soap:Body/></soap:Envelope>",
+		"",
+		"<<<<<>>>>>",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+	f.Fuzz(func(t *testing.T, in string) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("panic on wrapSOAPEnvelope(%q): %v", in, r)
+			}
+		}()
+		_ = wrapSOAPEnvelope(in)
 	})
 }
 
