@@ -60,11 +60,11 @@ func (h *HTTPFacet) req(method, path string) *HTTPStep {
 // committed when the next chain starts or when Tester.Finish / .Done
 // is called.
 type HTTPStep struct {
-	t        *Tester
-	method   string
-	path     string
-	headers  http.Header
-	body []byte
+	t       *Tester
+	method  string
+	path    string
+	headers http.Header
+	body    []byte
 
 	sent       bool
 	committed  bool
@@ -88,7 +88,10 @@ func (s *HTTPStep) Header(k, v string) *HTTPStep {
 }
 
 // JSON marshals v and sets it as the body with content-type
-// application/json. Use Body for raw bytes.
+// application/json. The marshalled JSON is {{var}}-interpolated against
+// the Tester's variable store — string values containing tokens like
+// "{{token}}" are substituted with the extracted value before send.
+// Pass .Body(b, "application/json") to opt OUT of interpolation.
 func (s *HTTPStep) JSON(v any) *HTTPStep {
 	if s.sent {
 		s.fail("JSON() called after send")
@@ -100,7 +103,7 @@ func (s *HTTPStep) JSON(v any) *HTTPStep {
 		s.abortChain = true
 		return s
 	}
-	s.body = b
+	s.body = []byte(interpolate(string(b), s.t.snapshotVars()))
 	if s.headers.Get("Content-Type") == "" {
 		s.headers.Set("Content-Type", "application/json")
 	}

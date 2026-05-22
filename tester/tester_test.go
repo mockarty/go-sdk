@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
+// Licensed under the Mockarty Software License Agreement.
+// See LICENSE file in the project root for full license text.
 
 package tester
 
@@ -7,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -176,29 +177,6 @@ func TestHTTPBodyInterpolationTextOnly(t *testing.T) {
 	}
 }
 
-func TestHTTPBodyInterpolationSkippedForJSONContent(t *testing.T) {
-	echo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_, _ = w.Write(body)
-	}))
-	t.Cleanup(echo.Close)
-
-	tt := New(WithBaseURL(echo.URL))
-	tt.SetVar("user", "alice")
-	raw := []byte(`{"name":"{{user}}"}`)
-	tt.HTTP().POST("/").Body(raw, "application/json").ExpectStatus(200)
-	tt.Finish()
-
-	report := tt.Report()
-	if len(report) != 1 {
-		t.Fatalf("want 1 step")
-	}
-	// Body raw mode + JSON content type should NOT interpolate.
-	if !strings.Contains(string(raw), "{{user}}") {
-		t.Fatal("setup invariant broken")
-	}
-}
-
 func TestHTTPInvalidJSONResponseFailsExpectJSONPath(t *testing.T) {
 	srv := newFakeBackend(t)
 	tt := New(WithBaseURL(srv.URL))
@@ -220,6 +198,67 @@ func TestHTTPMissingVarRendersLiteral(t *testing.T) {
 	tt.Finish()
 	if !tt.OK() {
 		t.Fatalf("unexpected: %v", tt.Errors())
+	}
+}
+
+func TestHTTPJSONBodyInterpolation(t *testing.T) {
+	echo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(echo.Close)
+
+	tt := New(WithBaseURL(echo.URL))
+	tt.SetVar("user", "alice")
+	tt.SetVar("id", "42")
+	tt.HTTP().POST("/").
+		JSON(map[string]any{"name": "{{user}}", "id": "{{id}}"}).
+		ExpectStatus(200).
+		ExpectJSONPath("$.name", "alice").
+		ExpectJSONPath("$.id", "42")
+	if !tt.OK() {
+		t.Fatalf("expected JSON interpolation OK, got %v", tt.Errors())
+	}
+}
+
+func TestHTTPRawBodyJSONContentTypeSkipsInterpolation(t *testing.T) {
+	echo := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(echo.Close)
+
+	tt := New(WithBaseURL(echo.URL))
+	tt.SetVar("user", "alice")
+	raw := []byte(`{"name":"{{user}}"}`)
+	tt.HTTP().POST("/").
+		Body(raw, "application/json").
+		ExpectStatus(200).
+		ExpectJSONPath("$.name", "{{user}}") // literal, not substituted
+
+	if !tt.OK() {
+		t.Fatalf("raw .Body should bypass interpolation: %v", tt.Errors())
+	}
+}
+
+func TestTesterAutoFlushOnInspect(t *testing.T) {
+	srv := newFakeBackend(t)
+	tt := New(WithBaseURL(srv.URL))
+
+	// Chain with failing assertion — NO Finish() call.
+	tt.HTTP().GET("/users/42").ExpectStatus(204)
+
+	// OK() must auto-flush so the assertion failure is observable.
+	if tt.OK() {
+		t.Fatal("OK() should auto-flush pending step and return false")
+	}
+	if got := len(tt.Errors()); got != 1 {
+		t.Fatalf("want 1 error, got %d: %v", got, tt.Errors())
+	}
+	if got := len(tt.Report()); got != 1 {
+		t.Fatalf("Report should contain the auto-flushed step, got %d", got)
 	}
 }
 

@@ -24,8 +24,17 @@
 // follow the same shape. When the SDK is used inside a test wrapped with
 // allure.WithTest, every step is also captured in the Allure result JSON.
 //
-// Variable interpolation: any string passed to .Header / .JSON / .Body
-// or used as part of the request path is scanned for "{{name}}" tokens
-// and substituted with values previously stored by .Extract. Missing
-// names render as the literal "{{name}}" so failures are visible.
+// Variable interpolation: any string passed to .Header, .JSON, .Body
+// (text/* + form-urlencoded), or used as part of the request path is
+// scanned for "{{name}}" tokens and substituted with values previously
+// stored by .Extract. Missing names render as the literal "{{name}}"
+// so failures are visible.
+//
+// Timing: interpolation happens at builder-call time, NOT at send time.
+// That works because chains are linear — by the time the second chain
+// reads {{token}}, the first chain has already finished (its commit
+// fired when the second .HTTP() was called, which runs the first
+// chain's actual HTTP request and then its .Extract). Don't try to
+// reference a variable extracted by the same step you're building —
+// the value isn't there yet.
 package tester

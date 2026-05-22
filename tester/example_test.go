@@ -1,4 +1,6 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
+// Licensed under the Mockarty Software License Agreement.
+// See LICENSE file in the project root for full license text.
 
 package tester_test
 

@@ -127,15 +127,20 @@ func (t *Tester) SetVar(name, value string) {
 	t.vars[name] = value
 }
 
-// OK reports whether every executed step passed.
+// OK reports whether every executed step passed. Auto-flushes any
+// in-flight chain step so an unterminated chain does not silently
+// drop assertions on the floor.
 func (t *Tester) OK() bool {
+	t.flushPending()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return len(t.errs) == 0
 }
 
-// Errors returns a copy of accumulated step failures.
+// Errors returns a copy of accumulated step failures. Auto-flushes
+// any in-flight chain step first (see OK).
 func (t *Tester) Errors() []error {
+	t.flushPending()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	out := make([]error, len(t.errs))
@@ -143,9 +148,10 @@ func (t *Tester) Errors() []error {
 	return out
 }
 
-// Report returns a snapshot of every executed step. Useful for emitting
-// the Mockarty extended Run shape or feeding a custom reporter.
+// Report returns a snapshot of every executed step. Auto-flushes any
+// in-flight chain step first (see OK).
 func (t *Tester) Report() []StepRecord {
+	t.flushPending()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	out := make([]StepRecord, len(t.steps))
