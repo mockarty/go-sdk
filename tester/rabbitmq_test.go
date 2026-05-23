@@ -116,6 +116,19 @@ func TestRabbitMQPublishErrorPropagates(t *testing.T) {
 	}
 }
 
+func TestRabbitMQExpectAtLeast(t *testing.T) {
+	b := newFakeRabbit()
+	tt := New()
+	for i := 0; i < 3; i++ {
+		tt.RabbitMQ(b).Publish("ex", "q").JSON(map[string]any{"i": i}).ExpectOK()
+	}
+	tt.RabbitMQ(b).Consume("q").Max(10).ExpectAtLeast(2)
+	tt.Finish()
+	if !tt.OK() {
+		t.Fatalf("got: %v", tt.Errors())
+	}
+}
+
 func TestRabbitMQConsumeAutoAckAndHeader(t *testing.T) {
 	b := newFakeRabbit()
 	tt := New()

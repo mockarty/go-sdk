@@ -311,6 +311,64 @@ func TestHTTPExtractNumberAndBool(t *testing.T) {
 	}
 }
 
+func TestWithHTTPClientCustomTransport(t *testing.T) {
+	srv := newFakeBackend(t)
+	// Custom client with a marker header injected by the transport.
+	customClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			req.Header.Set("X-Custom-Transport", "yes")
+			return http.DefaultTransport.RoundTrip(req)
+		}),
+	}
+	var seen string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Get("X-Custom-Transport")
+	})
+	override := httptest.NewServer(mux)
+	t.Cleanup(override.Close)
+
+	tt := New(WithBaseURL(override.URL), WithHTTPClient(customClient))
+	tt.HTTP().GET("/").Send().Done()
+	if seen != "yes" {
+		t.Fatalf("custom transport not used; seen=%q", seen)
+	}
+	_ = srv
+}
+
+func TestWithHeaderOption(t *testing.T) {
+	var auth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth = r.Header.Get("X-Default-Auth")
+	}))
+	t.Cleanup(srv.Close)
+
+	tt := New(
+		WithBaseURL(srv.URL),
+		WithHeader("X-Default-Auth", "token-abc"),
+	)
+	tt.HTTP().GET("/").Send().Done()
+	if auth != "token-abc" {
+		t.Fatalf("default header not applied; got %q", auth)
+	}
+
+	// Per-step Header() overrides the default.
+	tt2 := New(
+		WithBaseURL(srv.URL),
+		WithHeader("X-Default-Auth", "token-abc"),
+	)
+	tt2.HTTP().GET("/").Header("X-Default-Auth", "override").Send().Done()
+	if auth != "override" {
+		t.Fatalf("per-step header should override default; got %q", auth)
+	}
+}
+
+// roundTripperFunc adapts a function to http.RoundTripper for the
+// custom-transport test above.
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestInterpolate(t *testing.T) {
 	cases := []struct {
 		name, in, want string

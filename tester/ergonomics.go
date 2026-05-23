@@ -117,10 +117,15 @@ func (t *Tester) Eventually(within, interval time.Duration, fn func() error) boo
 //	  func(t *tester.Tester) { t.HTTP().GET("/b").ExpectStatus(200) },
 //	)
 //
-// Variable writes from one branch are visible to others (concurrent
-// access is guarded by the shared mutex), but ordering across branches
-// is non-deterministic. If two branches both .Extract a variable with
-// the same name the last-writer wins.
+// Variable writes from a branch do NOT propagate back to the parent
+// or sibling branches — each branch sees a snapshot of the parent's
+// var store at spawn time and writes are isolated. Branches that need
+// to share state across the fan-out must coordinate externally
+// (channels, shared maps with their own locks, etc).
+//
+// Step ordering inside each branch is preserved; the merge into the
+// parent report is deterministic (branch 0's steps, then branch 1's,
+// regardless of which branch finished first).
 func (t *Tester) Parallel(fns ...func(*Tester)) *Tester {
 	if len(fns) == 0 {
 		return t

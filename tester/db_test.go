@@ -220,6 +220,18 @@ func TestDBMisuseExpectAffectedAfterQuery(t *testing.T) {
 	}
 }
 
+func TestDBResultEscapeHatch(t *testing.T) {
+	db := newFakeDB()
+	db.execs["DELETE FROM x WHERE id = ?"] = DBExecResult{RowsAffected: 3, LastInsertID: 0}
+	tt := New()
+	step := tt.DB(db).Exec("DELETE FROM x WHERE id = ?", 42)
+	r := step.Result()
+	step.Done()
+	if r.RowsAffected != 3 {
+		t.Fatalf("Result() returned wrong shape: %+v", r)
+	}
+}
+
 func TestSqlPreview(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"SELECT 1", "SELECT 1"},

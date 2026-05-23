@@ -5,6 +5,8 @@
 package tester
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -188,6 +190,30 @@ func TestSSEEventsEscapeHatch(t *testing.T) {
 		t.Fatalf("payloads wrong: %+v", evs)
 	}
 }
+
+func TestIsDeadlineErr(t *testing.T) {
+	if !isDeadlineErr(context.DeadlineExceeded) {
+		t.Fatal("context.DeadlineExceeded should be a deadline err")
+	}
+	if !isDeadlineErr(context.Canceled) {
+		t.Fatal("context.Canceled should also count for our purposes")
+	}
+	if isDeadlineErr(nil) {
+		t.Fatal("nil err should NOT count")
+	}
+	if isDeadlineErr(errors.New("connection refused")) {
+		t.Fatal("non-timeout err should NOT count")
+	}
+	// Timeout()-bearing error.
+	if !isDeadlineErr(timeoutErr{}) {
+		t.Fatal("Timeout() interface should count")
+	}
+}
+
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string { return "i/o timeout" }
+func (timeoutErr) Timeout() bool { return true }
 
 func TestSSEParseRetryAndID(t *testing.T) {
 	body := "retry: 5000\nid: msg-1\ndata: ok\n\n"
