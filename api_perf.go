@@ -74,6 +74,41 @@ func (a *PerfAPI) Run(ctx context.Context, config *PerfConfig) (*PerfTask, error
 	return &task, nil
 }
 
+// PerfRunRequest is the inbound shape for RunWithOptions — kept distinct
+// from PerfConfig so the launch's per-call routing knobs (RunnerID,
+// CITriggerID, labels) don't pollute the persistent config model.
+type PerfRunRequest struct {
+	ConfigID string `json:"configId,omitempty"`
+	Script   string `json:"script,omitempty"`
+	// RunnerID — pin to a specific runner ID, "local" to force local,
+	// or empty for auto-assign.
+	RunnerID string `json:"runnerId,omitempty"`
+	// RequiredRunnerLabels — Phase 3 label DSL (AND'd with the expr).
+	RequiredRunnerLabels []string `json:"requiredRunnerLabels,omitempty"`
+	// RunnerLabelExpr — Phase 3 label DSL expression.
+	RunnerLabelExpr string `json:"runnerLabelExpr,omitempty"`
+	// CITriggerID — Phase 4 CI Triggers. When set, the server fires the
+	// trigger to mint a dispatch_token before queuing the task; the
+	// ephemeral runner the CI pipeline spawns claims by token.
+	CITriggerID string `json:"ciTriggerId,omitempty"`
+	IsDebug     bool   `json:"isDebug,omitempty"`
+}
+
+// RunWithOptions launches a perf test with per-call routing options.
+// Useful for CI/CD scripts that want to dispatch through a CI trigger:
+//
+//	task, err := client.Perf().RunWithOptions(ctx, PerfRunRequest{
+//	    ConfigID:    "my-config",
+//	    CITriggerID: "my-trigger",
+//	})
+func (a *PerfAPI) RunWithOptions(ctx context.Context, req PerfRunRequest) (*PerfTask, error) {
+	var task PerfTask
+	if err := a.client.do(ctx, "POST", "/api/v1/perf/run", req, &task); err != nil {
+		return nil, err
+	}
+	return &task, nil
+}
+
 // Stop stops a running performance test.
 func (a *PerfAPI) Stop(ctx context.Context, taskID string) error {
 	return a.client.do(ctx, "POST", "/api/v1/perf/stop/"+url.PathEscape(taskID), nil, nil)
