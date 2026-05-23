@@ -200,6 +200,39 @@ mock := mockarty.NewMockBuilder().
     Build()
 ```
 
+## Protocol Clients
+
+Drive the system under test directly from CI scripts. Each protocol client
+captures every call as a TCM step (start/end/duration/status/payload
+preview) so the external run shows a per-call timeline at the end:
+
+- `protocols/grpc`     — JSON-shaped gRPC client with reflection / `.proto` file source
+- `protocols/kafka`    — Produce / Consume on segmentio/kafka-go (pure Go)
+- `protocols/rabbitmq` — Publish / Consume / DeclareQueue on amqp091-go (pure Go)
+- `protocols/telemetry` — shared `Step` / `StepRecorder` / `ExternalRunsRecorder`
+
+```go
+import (
+    "github.com/mockarty/mockarty-go/externalruns"
+    mgrpc "github.com/mockarty/mockarty-go/protocols/grpc"
+    "github.com/mockarty/mockarty-go/protocols/telemetry"
+)
+
+runs, _ := externalruns.NewClient(adminURL, "sandbox", apiToken)
+run, _ := runs.CreateRun(ctx, externalruns.CreateRunRequest{Name: "smoke", Framework: "go-test"})
+defer runs.FinishRun(ctx, run.ID, externalruns.FinishRunRequest{})
+
+rec := telemetry.NewExternalRunsRecorder(runs, run.ID); defer rec.Close()
+conn, _ := mgrpc.Dial(ctx, "service:50051", mgrpc.WithRecorder(rec))
+defer conn.Close()
+var resp map[string]any
+_ = conn.InvokeJSON(ctx, "acme.UserService/GetUser", map[string]any{"id": "u-42"}, &resp)
+```
+
+Full cross-language reference (Go / Python / Java side-by-side, every
+protocol, options, classification rules, troubleshooting):
+**[SDK Protocol Clients](https://mockarty.ru/docs/sdk-protocol-clients)**.
+
 ## Testing Helpers
 
 ```go
@@ -226,6 +259,64 @@ func TestUserAPI(t *testing.T) {
     _ = mock
 }
 ```
+
+## Fluent Tester DSL
+
+For end-to-end tests that exercise multiple protocols, the
+`tester` sub-package provides a fluent chain shaped after
+JUnit + RestAssured + k6 — but driving any of Mockarty's nine
+supported transports:
+
+```go
+import (
+    "github.com/mockarty/mockarty-go/tester"
+    "github.com/mockarty/mockarty-go/protocols/kafka"
+)
+
+func TestUserSignupFlow(t *testing.T) {
+    tt := tester.New(tester.WithBaseURL("http://localhost:8080"))
+    defer tt.Finish()
+
+    tt.HTTP().POST("/signup").
+        JSON(map[string]any{"email": "a@b.c"}).
+        ExpectStatus(201).
+        Extract("$.token", "token")
+
+    tt.HTTP().GET("/me").
+        Header("Authorization", "Bearer {{token}}").
+        ExpectStatus(200).
+        ExpectJSONPath("$.email", "a@b.c")
+
+    kfk, _ := kafka.NewClient([]string{"localhost:9092"})
+    tt.Kafka(kfk).Consume("user.signups").
+        Max(1).
+        ExpectMessageContains(0, "a@b.c")
+
+    if !tt.OK() {
+        t.Fatalf("%v", tt.Errors())
+    }
+}
+```
+
+Facets shipped: `HTTP()`, `Kafka(broker)`, `GRPC(client)`,
+`GraphQL(endpoint)`, `RabbitMQ(broker)`, `SSE(endpoint)`,
+`WebSocket(url)`, `SOAP(endpoint)`, `DB(conn)`. Each chain emits
+one Allure step automatically (wrap the test with
+`allure.WithTest(ctx, "...")` and the result file lands in
+`$ALLURE_RESULTS_DIR`). Group calls with `.Wrap("name", fn)`,
+retry with `.Eventually(within, interval, fn)`, fan-out with
+`.Parallel(branchA, branchB)`.
+
+See [`tester/doc.go`](./tester/doc.go) for the full vocabulary.
+
+## Test Container
+
+For tests that need a fresh, isolated mock server per package, the
+`mockartycontainer` sub-package spawns the `mockarty/cli:latest-mock`
+Docker image via testcontainers-go. Drop-in replacement for
+`wiremock-testcontainers`. See [SDK Test Container](https://mockarty.ru/docs/sdk-testcontainer)
+and the [`examples/testcontainer_mockarty/`](./examples/testcontainer_mockarty/)
+example.
 
 ## Error Handling
 

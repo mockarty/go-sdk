@@ -33,18 +33,19 @@ type Hook func(t *testing.T)
 // for a single class (Go test function). It survives between t.Run
 // invocations of the same parent test.
 type suiteHooks struct {
-	beforeAlls    []Hook
-	afterAlls     []Hook
-	beforeEachs   []Hook
-	afterEachs    []Hook
-	children      []string
-	containerID   string
-	dir           string
-	beforeSteps   []AllureStep
-	afterSteps    []AllureStep
-	startMS       int64
-	beforeAllDone bool
-	mu            sync.Mutex
+	beforeOnce      sync.Once // guards BeforeAll execution: blocks parallel subtests until the first run completes
+	beforeAlls      []Hook
+	afterAlls       []Hook
+	beforeEachs     []Hook
+	afterEachs      []Hook
+	children        []string
+	containerID     string
+	dir             string
+	beforeSteps     []AllureStep
+	afterSteps      []AllureStep
+	startMS         int64
+	flushRegistered bool // true after the first BeforeAll/AfterAll on a given parent t registers t.Cleanup -> flushSuite
+	mu              sync.Mutex
 }
 
 var (
@@ -70,13 +71,19 @@ func suiteFor(parent string) *suiteHooks {
 }
 
 // BeforeAll registers a one-time setup that runs once before the first
-// matching subtest. The hook runs synchronously when the first
-// BeforeEach (or the test body, if BeforeEach is absent) fires.
+// matching subtest. The hook fires automatically on the first [T] call
+// inside the same test class — parallel subtests are serialised on a
+// [sync.Once] so the hook completes before any test body runs.
 //
-// Multiple BeforeAll registrations stack in declaration order.
+// Multiple BeforeAll registrations stack in declaration order; they all
+// run in that order on the same Once.
 //
 // The hook's runtime is captured as an Allure container `befores` step,
 // which Allure renders as a "Set up" entry above the test in the report.
+//
+// You do NOT need to wrap your test body in [RunWithHooks]. The wrapper
+// remains available for users who also want the JUnit-style
+// BeforeEach/AfterEach chain.
 func BeforeAll(t *testing.T, name string, fn Hook) {
 	t.Helper()
 	cls, _ := splitTestPath(t.Name())
@@ -87,6 +94,7 @@ func BeforeAll(t *testing.T, name string, fn Hook) {
 		h.dir = ResolveResultsDir("")
 	}
 	h.mu.Unlock()
+	registerSuiteFlush(t, cls)
 }
 
 // AfterAll registers teardown that runs once after the entire class. Use
@@ -101,13 +109,30 @@ func AfterAll(t *testing.T, name string, fn Hook) {
 		h.dir = ResolveResultsDir("")
 	}
 	h.mu.Unlock()
+	registerSuiteFlush(t, cls)
+}
 
-	// Register a top-level cleanup so AfterAll fires when the parent test
-	// (and its subtests) all complete. testing.T.Cleanup runs LIFO at the
-	// parent boundary — exactly what TestNG/JUnit AfterClass needs.
-	t.Cleanup(func() {
-		flushSuite(cls)
-	})
+// registerSuiteFlush wires a single parent-scoped t.Cleanup that
+// invokes flushSuite. Calling BeforeAll *and* AfterAll on the same t
+// would otherwise register the cleanup twice — flushSuite is
+// idempotent so duplication is harmless, but tracking a single
+// registration per parent keeps the cleanup chain tidy.
+func registerSuiteFlush(t *testing.T, cls string) {
+	t.Helper()
+	suiteRegistryMu.Lock()
+	h := suiteRegistry[cls]
+	suiteRegistryMu.Unlock()
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	already := h.flushRegistered
+	h.flushRegistered = true
+	h.mu.Unlock()
+	if already {
+		return
+	}
+	t.Cleanup(func() { flushSuite(cls) })
 }
 
 // BeforeEach registers per-test setup. Each subtest re-runs every
@@ -132,6 +157,39 @@ func AfterEach(t *testing.T, name string, fn Hook) {
 	h.mu.Unlock()
 }
 
+// maybeFireBeforeAll runs the registered BeforeAll hooks for the test
+// class IF they are present and have not fired yet. Called by [T] so
+// users don't need to wrap their test body in [RunWithHooks]. Safe to
+// call multiple times AND safe under parallel subtests: sync.Once.Do
+// blocks every concurrent caller until the first invocation completes,
+// guaranteeing BeforeAll finishes before any test body runs. No-op
+// when the suite has no hooks registered.
+func maybeFireBeforeAll(t *testing.T) {
+	t.Helper()
+	cls, _ := splitTestPath(t.Name())
+	suiteRegistryMu.Lock()
+	h, ok := suiteRegistry[cls]
+	suiteRegistryMu.Unlock()
+	if !ok {
+		return
+	}
+	h.beforeOnce.Do(func() {
+		h.mu.Lock()
+		hooks := append([]Hook(nil), h.beforeAlls...)
+		h.mu.Unlock()
+		if len(hooks) == 0 {
+			return
+		}
+		steps := make([]AllureStep, 0, len(hooks))
+		for _, hk := range hooks {
+			steps = append(steps, runHookCaptured(t, hk))
+		}
+		h.mu.Lock()
+		h.beforeSteps = append(h.beforeSteps, steps...)
+		h.mu.Unlock()
+	})
+}
+
 // RunWithHooks executes fn under the suite's BeforeEach/AfterEach chain,
 // running BeforeAll once on the first invocation. The function returns
 // after AfterEach completes; AfterAll fires on the parent t.Cleanup.
@@ -144,14 +202,11 @@ func RunWithHooks(t *testing.T, fn func(t *testing.T)) {
 	cls, _ := splitTestPath(t.Name())
 	h := suiteFor(cls)
 
+	// BeforeAll execution shares the same sync.Once as the auto-fire
+	// path so a test that mixes both styles still fires the hook once.
+	maybeFireBeforeAll(t)
+
 	h.mu.Lock()
-	if !h.beforeAllDone {
-		h.beforeAllDone = true
-		for _, hk := range h.beforeAlls {
-			step := runHookCaptured(t, hk)
-			h.beforeSteps = append(h.beforeSteps, step)
-		}
-	}
 	beforeEachs := append([]Hook(nil), h.beforeEachs...)
 	afterEachs := append([]Hook(nil), h.afterEachs...)
 	h.mu.Unlock()

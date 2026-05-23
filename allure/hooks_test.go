@@ -6,12 +6,14 @@ package allure
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // TestLifecycleHooks_OrderingBeforeAllBeforeEachAfterEachAfterAll verifies
@@ -87,6 +89,113 @@ func TestLifecycleHooks_OrderingBeforeAllBeforeEachAfterEachAfterAll(t *testing.
 	}
 	if !foundContainer {
 		t.Errorf("no container.json found")
+	}
+}
+
+// TestLifecycleHooks_BeforeAllAutoFiresWithoutRunWithHooks proves the UX
+// contract added 2026-05-17: calling allure.T() inside a test that has
+// registered a BeforeAll runs the hook BEFORE the test body, even when
+// the caller never invokes RunWithHooks. Prior to the fix, BeforeAll
+// silently skipped because beforeAllDone could only be set by
+// RunWithHooks — a hidden coupling caught by live SDK demos.
+func TestLifecycleHooks_BeforeAllAutoFiresWithoutRunWithHooks(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "allure-results")
+	t.Setenv(ResultsDirEnv, dir)
+
+	var setupFired atomic.Bool
+	var teardownFired atomic.Bool
+
+	t.Run("auto-fire-suite", func(parent *testing.T) {
+		BeforeAll(parent, "setup", func(_ *testing.T) { setupFired.Store(true) })
+		AfterAll(parent, "teardown", func(_ *testing.T) { teardownFired.Store(true) })
+
+		parent.Run("case-A", func(inner *testing.T) {
+			a := T(inner, WithResultsDir(dir))
+			if !setupFired.Load() {
+				inner.Fatal("BeforeAll did not fire before T() returned — auto-wire regression")
+			}
+			a.Step("body", func() {})
+		})
+		parent.Run("case-B", func(inner *testing.T) {
+			// Second subtest must NOT re-run BeforeAll — it is once per suite.
+			before := setupFired.Load()
+			_ = T(inner, WithResultsDir(dir))
+			if !before {
+				inner.Fatal("BeforeAll should already be marked done")
+			}
+		})
+	})
+
+	// AfterAll runs on parent t.Cleanup — by the time the outer test
+	// continues here, the cleanup chain has already flushed.
+	if !teardownFired.Load() {
+		t.Error("AfterAll did not fire on parent cleanup")
+	}
+
+	// Container.json must reference both subtest UUIDs + capture the
+	// single BeforeAll/AfterAll step.
+	entries, _ := os.ReadDir(dir)
+	var containers int
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), "-container.json") {
+			continue
+		}
+		containers++
+		data, _ := os.ReadFile(filepath.Join(dir, e.Name()))
+		var c Container
+		_ = json.Unmarshal(data, &c)
+		if len(c.Children) != 2 {
+			t.Errorf("container.Children=%d, want 2 (one per subtest)", len(c.Children))
+		}
+		if len(c.Befores) != 1 {
+			t.Errorf("container.Befores=%d, want 1", len(c.Befores))
+		}
+		if len(c.Afters) != 1 {
+			t.Errorf("container.Afters=%d, want 1", len(c.Afters))
+		}
+	}
+	if containers != 1 {
+		t.Errorf("container count=%d, want 1", containers)
+	}
+}
+
+// TestLifecycleHooks_BeforeAllAutoFireUnderParallelSubtests proves that
+// the auto-fire path is race-safe under `t.Parallel()` subtests. Without
+// the sync.Once guard a subtest could observe `beforeAllDone=true`
+// before the first goroutine actually finished the hook body — the
+// exact regression the fix was supposed to prevent. We deliberately
+// give the hook a 50ms sleep so every parallel subtest racing to start
+// would observe `setupComplete=false` if the guard is broken.
+func TestLifecycleHooks_BeforeAllAutoFireUnderParallelSubtests(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "allure-results")
+	t.Setenv(ResultsDirEnv, dir)
+
+	var fireCount atomic.Int32
+	var setupComplete atomic.Bool
+
+	t.Run("parallel-suite", func(parent *testing.T) {
+		BeforeAll(parent, "slow-setup", func(_ *testing.T) {
+			fireCount.Add(1)
+			time.Sleep(50 * time.Millisecond)
+			setupComplete.Store(true)
+		})
+
+		for i := 0; i < 4; i++ {
+			i := i
+			parent.Run(fmt.Sprintf("case-%d", i), func(inner *testing.T) {
+				inner.Parallel()
+				a := T(inner, WithResultsDir(dir))
+				if !setupComplete.Load() {
+					inner.Errorf("BeforeAll incomplete when T() returned — parallel race")
+				}
+				a.Step("body", func() {})
+			})
+		}
+	})
+
+	// BeforeAll must have fired exactly once even with 4 parallel callers.
+	if got := fireCount.Load(); got != 1 {
+		t.Errorf("BeforeAll fired %d times under parallel; want 1", got)
 	}
 }
 

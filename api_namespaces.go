@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"encoding/json"
 )
 
 // NamespaceAPI provides methods for namespace management.
@@ -29,13 +30,37 @@ func (a *NamespaceAPI) Create(ctx context.Context, name string) error {
 //	{"namespaces": ["sandbox", ...]}
 //
 // We decode the envelope and surface the bare slice so callers don't
-// have to know about the wire shape.
+// have to know about the wire shape. A bare JSON array shape (older
+// admin builds, mock test servers) is also accepted as a fallback so
+// the SDK keeps working against either wire form.
 func (a *NamespaceAPI) List(ctx context.Context) ([]string, error) {
-	var resp struct {
-		Namespaces []string `json:"namespaces"`
-	}
-	if err := a.client.do(ctx, "GET", "/api/v1/namespaces", nil, &resp); err != nil {
+	var raw json.RawMessage
+	if err := a.client.do(ctx, "GET", "/api/v1/namespaces", nil, &raw); err != nil {
 		return nil, err
 	}
-	return resp.Namespaces, nil
+	var envelope struct {
+		Namespaces []string `json:"namespaces"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err == nil && envelope.Namespaces != nil {
+		return envelope.Namespaces, nil
+	}
+	var arr []string
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		return arr, nil
+	}
+	return nil, &unmarshalError{shape: "namespaces list", raw: raw}
+}
+
+// unmarshalError carries the raw payload so debugging is easier when
+// the server emits an unexpected shape.
+type unmarshalError struct {
+	shape string
+	raw   []byte
+}
+
+func (e *unmarshalError) Error() string {
+	if len(e.raw) > 200 {
+		return "mockarty: cannot decode " + e.shape + " (truncated): " + string(e.raw[:200]) + "..."
+	}
+	return "mockarty: cannot decode " + e.shape + ": " + string(e.raw)
 }

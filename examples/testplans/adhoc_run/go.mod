@@ -1,6 +1,6 @@
 module example
 
-go 1.21
+go 1.25.0
 
 require github.com/mockarty/mockarty-go v0.0.0
 

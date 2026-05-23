@@ -125,6 +125,11 @@ func T(t *testing.T, opts ...Option) *AllureT {
 	// useful if the user actually called BeforeAll/AfterAll — otherwise the
 	// suite registry stays inert.
 	RegisterChild(t.Name(), s.result.UUID)
+	// Auto-fire any BeforeAll hooks registered against this suite. This
+	// removes the need for callers to wrap their test body in
+	// [RunWithHooks] just to get setup hooks to run. The check is a
+	// no-op when no hooks were registered.
+	maybeFireBeforeAll(t)
 	t.Cleanup(at.flush)
 	return at
 }
@@ -281,6 +286,88 @@ func (a *AllureT) Label(name, value string) { a.scope.addLabel(name, value) }
 
 // Description sets the test description.
 func (a *AllureT) Description(value string) { a.scope.setDescription(value) }
+
+// ────────────────────────────────────────────────────────────────────
+// Mockarty Phase 2.6 case-extension setters
+// ────────────────────────────────────────────────────────────────────
+//
+// These setters carry Mockarty-extended fields beyond the Allure
+// schema — see docs/research/SDK_MOCKARTY_EXTENSIONS_AUDIT.md. Allure
+// adapters never write these; the Mockarty CLI's `allure upload` /
+// `allure watch` bridge extracts them at upload time via a label
+// convention with the `mockarty:case:` prefix, then maps them onto
+// the server's ExternalRunRequest fields (CaseDescription /
+// CaseExpectedResult / CustomFields / ClaimCaseOwnership) landed in
+// server commit 1067beba.
+//
+// Why labels instead of dedicated fields? The Allure schema is
+// frozen — we can't add new top-level keys without breaking the
+// allure CLI / report renderer. Labels are the schema-blessed
+// extension slot; readers that don't understand the prefix ignore
+// them, readers that do (our CLI) lift them onto the wire shape.
+
+const (
+	caseLabelPrefix     = "mockarty:case:"
+	caseLabelDescription = "mockarty:case:description"
+	caseLabelExpected    = "mockarty:case:expected_result"
+	caseLabelClaim       = "mockarty:case:claim_ownership"
+	// Custom fields ride a special label name: the value is a
+	// colon-delimited type:name:value triplet identical to what the
+	// Java SDK's @TestCase(customFields = …) does.
+	caseLabelCustomField = "mockarty:case:custom_field"
+)
+
+// CaseDescription sets a Mockarty-extended markdown description that
+// gets written to test_cases.description on the case row (NOT the
+// Allure-style per-run description, which lives in `description` on
+// the result). When the case is auto-created on upload this is the
+// row's description; otherwise it's only applied when
+// ClaimCaseOwnership() is true.
+func (a *AllureT) CaseDescription(markdown string) {
+	if a == nil || a.scope == nil || markdown == "" {
+		return
+	}
+	a.scope.addLabel(caseLabelDescription, markdown)
+}
+
+// CaseExpectedResult sets the Markdown "what should happen" clause
+// that lands on test_cases.expected_result (migration 237).
+// Mockarty's PRIMARY differentiator vs Allure — the in-platform
+// review workflow keys off this column.
+func (a *AllureT) CaseExpectedResult(markdown string) {
+	if a == nil || a.scope == nil || markdown == "" {
+		return
+	}
+	a.scope.addLabel(caseLabelExpected, markdown)
+}
+
+// CustomField appends a typed user-defined metadata entry that gets
+// persisted into test_cases.custom_fields_json (migration 203). Call
+// multiple times for multiple entries. The value is encoded as
+// "type:name:value" so the CLI bridge can split it back without a
+// dedicated wire shape.
+//
+// Example::
+//
+//	a.CustomField("feature", "Auth", "Login")
+//	a.CustomField("severity", "severity", "critical")
+func (a *AllureT) CustomField(fieldType, name, value string) {
+	if a == nil || a.scope == nil || fieldType == "" || name == "" {
+		return
+	}
+	a.scope.addLabel(caseLabelCustomField, fieldType+":"+name+":"+value)
+}
+
+// ClaimCaseOwnership flags this run as "code is source-of-truth";
+// the receiver will overwrite the case row's description /
+// expected_result / custom_fields on every upload. Default
+// behaviour preserves manual UI edits between uploads.
+func (a *AllureT) ClaimCaseOwnership() {
+	if a == nil || a.scope == nil {
+		return
+	}
+	a.scope.addLabel(caseLabelClaim, "true")
+}
 
 // Title overrides the displayed test name.
 func (a *AllureT) Title(value string) { a.scope.setTitle(value) }

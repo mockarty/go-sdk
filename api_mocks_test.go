@@ -566,6 +566,9 @@ func TestNamespaceAPI_Create(t *testing.T) {
 }
 
 func TestNamespaceAPI_List(t *testing.T) {
+	// Bare-array shape: kept as a fallback path for downgraded servers
+	// and test fixtures. The canonical wire shape is the envelope
+	// covered in TestNamespaceAPI_List_EnvelopeShape below.
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/namespaces": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -582,6 +585,26 @@ func TestNamespaceAPI_List(t *testing.T) {
 	}
 	if namespaces[0] != "sandbox" {
 		t.Errorf("expected first namespace 'sandbox', got %q", namespaces[0])
+	}
+}
+
+// TestNamespaceAPI_List_EnvelopeShape covers the canonical wire shape
+// the admin server actually emits ({"namespaces":[...]}). Surfaced
+// 2026-05-17 by the live demo where the legacy bare-slice decoder
+// errored on the envelope. Both shapes must decode.
+func TestNamespaceAPI_List_EnvelopeShape(t *testing.T) {
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"GET /api/v1/namespaces": func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"namespaces":["sandbox","production"]}`))
+		},
+	})
+	namespaces, err := client.Namespaces().List(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(namespaces) != 2 || namespaces[0] != "sandbox" {
+		t.Errorf("envelope decode mismatch: %+v", namespaces)
 	}
 }
 
