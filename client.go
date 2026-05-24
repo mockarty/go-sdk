@@ -61,6 +61,7 @@ type Client struct {
 	secretsAPI           *SecretsAPI
 	promptsAPI           *PromptsAPI
 	meAPI                *MeAPI
+	externalRunsAPI      *ExternalRunsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -120,9 +121,14 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.secretsAPI = &SecretsAPI{client: c}
 	c.promptsAPI = &PromptsAPI{client: c}
 	c.meAPI = &MeAPI{client: c}
+	c.externalRunsAPI = &ExternalRunsAPI{client: c}
 
 	return c
 }
+
+// ExternalRuns returns the external-runs upload API — used to ship
+// arbitrary test results (e.g. fluent Tester DSL output) into TCM.
+func (c *Client) ExternalRuns() *ExternalRunsAPI { return c.externalRunsAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
