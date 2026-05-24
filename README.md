@@ -309,6 +309,34 @@ retry with `.Eventually(within, interval, fn)`, fan-out with
 
 See [`tester/doc.go`](./tester/doc.go) for the full vocabulary.
 
+Upload a Tester chain as a TCM external run in one call:
+
+```go
+import (
+    mockarty "github.com/mockarty/mockarty-go"
+    "github.com/mockarty/mockarty-go/tester"
+)
+
+t := tester.New(tester.WithBaseURL("http://localhost:8080"))
+t.HTTP().GET("/me").ExpectStatus(200)
+t.Finish()
+
+client := mockarty.NewClient("http://...", mockarty.WithAPIKey("..."), mockarty.WithNamespace("qa"))
+_, err := client.ExternalRuns().Submit(ctx, "",
+    t.ToExternalRun(tester.ExternalRunOptions{
+        CaseName:   "me-endpoint",
+        AutoCreate: true,
+    }),
+)
+```
+
+`Tester.ToExternalRun(opts)` maps Tester report to
+`ExternalRunRequest`: per-step `Protocol/Method/URL/StatusOrCode` go
+into `Metadata`, multi-failure errors join with `"; "`, run
+duration computed from first/last step timestamps. Same vocabulary
+as the Python (`tester.to_report_kwargs`) and Java
+(`ExternalRunBridge`) SDKs.
+
 ## Test Container
 
 For tests that need a fresh, isolated mock server per package, the
