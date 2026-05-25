@@ -27,8 +27,8 @@ type FlowRunsAPI struct {
 // pass either a marshalled iruir.Flow or any map[string]any that
 // matches the schema.
 type FlowRunRequest struct {
-	Flow    json.RawMessage `json:"flow"`
 	BaseURL string          `json:"base_url,omitempty"`
+	Flow    json.RawMessage `json:"flow"`
 }
 
 // FlowRunResponse mirrors the server's flowRunResponse. Field names +
