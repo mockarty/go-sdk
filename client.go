@@ -62,6 +62,7 @@ type Client struct {
 	promptsAPI           *PromptsAPI
 	meAPI                *MeAPI
 	externalRunsAPI      *ExternalRunsAPI
+	flowRunsAPI          *FlowRunsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -122,6 +123,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.promptsAPI = &PromptsAPI{client: c}
 	c.meAPI = &MeAPI{client: c}
 	c.externalRunsAPI = &ExternalRunsAPI{client: c}
+	c.flowRunsAPI = &FlowRunsAPI{client: c}
 
 	return c
 }
@@ -129,6 +131,10 @@ func NewClient(baseURL string, opts ...Option) *Client {
 // ExternalRuns returns the external-runs upload API — used to ship
 // arbitrary test results (e.g. fluent Tester DSL output) into TCM.
 func (c *Client) ExternalRuns() *ExternalRunsAPI { return c.externalRunsAPI }
+
+// FlowRuns returns the client for POST /api/v1/api-tester/flow-runs —
+// the server-side IR runner. See sdk/go-sdk/api_flow_runs.go for usage.
+func (c *Client) FlowRuns() *FlowRunsAPI { return c.flowRunsAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
