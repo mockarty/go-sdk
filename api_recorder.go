@@ -106,6 +106,24 @@ func (a *RecorderAPI) ExportSession(ctx context.Context, id string) ([]byte, err
 	return data, nil
 }
 
+// ExportSessionAsPostman exports a recording session as a Postman Collection
+// v2.1 JSON document. Use this to migrate captured traffic into Postman,
+// Insomnia, or any tool that imports the v2.1 format.
+//
+// When entryIDs is empty, every captured entry in the session is exported.
+// Pass a non-empty slice to export only the listed entries.
+func (a *RecorderAPI) ExportSessionAsPostman(ctx context.Context, id string, entryIDs ...string) ([]byte, error) {
+	var body any
+	if len(entryIDs) > 0 {
+		body = map[string][]string{"entryIds": entryIDs}
+	}
+	data, err := a.client.doJSON(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/export-postman", body)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
 // ---------------------------------------------------------------------------
 // Session-level Replay
 // ---------------------------------------------------------------------------

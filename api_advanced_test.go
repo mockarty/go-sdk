@@ -699,6 +699,60 @@ func TestRecorderAPI_ExportSession(t *testing.T) {
 	}
 }
 
+func TestRecorderAPI_ExportSessionAsPostman_NoEntryFilter(t *testing.T) {
+	var sawBody []byte
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
+			sawBody, _ = io.ReadAll(r.Body)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"info":{"name":"x","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"item":[]}`))
+		},
+	})
+
+	data, err := client.Recorder().ExportSessionAsPostman(context.Background(), "sess-42")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("expected non-empty Postman JSON")
+	}
+	// No entryIDs supplied → body must be empty (the admin handler
+	// treats nil + missing entryIds identically as "export all").
+	if len(sawBody) != 0 {
+		t.Errorf("expected empty request body when no entryIDs given, got %q", sawBody)
+	}
+}
+
+func TestRecorderAPI_ExportSessionAsPostman_WithEntryFilter(t *testing.T) {
+	var sawBody []byte
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
+			sawBody, _ = io.ReadAll(r.Body)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"info":{},"item":[]}`))
+		},
+	})
+
+	_, err := client.Recorder().ExportSessionAsPostman(
+		context.Background(), "sess-9",
+		"entry-1", "entry-2",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Server must have received {"entryIds":["entry-1","entry-2"]}.
+	var got struct {
+		EntryIDs []string `json:"entryIds"`
+	}
+	if err := json.Unmarshal(sawBody, &got); err != nil {
+		t.Fatalf("body not JSON: %v (raw=%q)", err, sawBody)
+	}
+	if len(got.EntryIDs) != 2 || got.EntryIDs[0] != "entry-1" || got.EntryIDs[1] != "entry-2" {
+		t.Errorf("entryIds mismatch: %v", got.EntryIDs)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Template API Tests
 // ---------------------------------------------------------------------------
