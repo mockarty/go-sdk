@@ -337,6 +337,28 @@ duration computed from first/last step timestamps. Same vocabulary
 as the Python (`tester.to_report_kwargs`) and Java
 (`ExternalRunBridge`) SDKs.
 
+## Examples
+
+The [`examples/`](./examples/) directory has 30+ runnable programs
+covering every facet of the SDK. The two most useful starting points
+for adopters:
+
+| Example | What it shows |
+|---------|---------------|
+| [`kitchen_sink/`](./examples/kitchen_sink/) | Full adopter showcase — token-chain → GraphQL → all `Expect*` assertions → `Wrap` grouping → Jira issue create → GitLab pipeline poll → TCM upload. Runs against the testbackend; ~1 s end-to-end. |
+| [`multi_protocol/`](./examples/multi_protocol/) | Tester DSL chain across HTTP + GraphQL + SSE + SOAP in one job, zero external infrastructure. Proves the DSL really works over event streams and XML envelopes. |
+
+For protocol-specific examples that need real brokers, see
+[`kafka_client/`](./examples/kafka_client/),
+[`rabbitmq_client/`](./examples/rabbitmq_client/),
+[`grpc_client/`](./examples/grpc_client/) — each ships a
+`docker-compose.yml`.
+
+For reporting integration: [`ci_cd_pipeline/`](./examples/ci_cd_pipeline/)
+shows JUnit + Allure upload from a CI step;
+[`agent_tasks/`](./examples/agent_tasks/) shows how the Tester DSL
+emits TCM external runs.
+
 ## Test Container
 
 For tests that need a fresh, isolated mock server per package, the
