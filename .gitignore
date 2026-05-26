@@ -8,3 +8,8 @@ examples/*/example
 # helpers leave artefacts behind.
 allure-results/
 **/allure-results/
+
+# Compiled multi_protocol / kitchen_sink standalone example binaries —
+# `go build` in those dirs produces a binary named after the dir.
+examples/multi_protocol/multi_protocol
+examples/kitchen_sink/kitchen_sink
