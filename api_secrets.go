@@ -31,7 +31,7 @@ type SecretStore struct {
 	Name        string    `json:"name"`
 	Namespace   string    `json:"namespace"`
 	Description string    `json:"description,omitempty"`
-	Backend     string    `json:"backend,omitempty"` // "software" | "vault"
+	Backend     string    `json:"backend,omitempty"` // "inline" | "vault" | "aws_sm" | "gcp_sm" | "azure_kv" | "custom_api"
 	EntryCount  int       `json:"entryCount"`
 }
 
@@ -61,49 +61,92 @@ type VaultIntegration struct {
 
 // ListStores returns every secret store visible to the caller in the
 // client's default namespace.
+//
+// Wire shape: `{"stores":[...], "namespace":"..."}` — we unmarshal into
+// the envelope and return the stores slice.
 func (a *SecretsAPI) ListStores(ctx context.Context) ([]SecretStore, error) {
-	var stores []SecretStore
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets?namespace="+url.QueryEscape(a.client.namespace), nil, &stores); err != nil {
+	ns := a.client.namespace
+	if ns == "" {
+		ns = "sandbox"
+	}
+	var env struct {
+		Stores []SecretStore `json:"stores"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets?namespace="+url.QueryEscape(ns), nil, &env); err != nil {
 		return nil, err
 	}
-	return stores, nil
+	return env.Stores, nil
 }
 
-// CreateStore creates a new secret store. Backend defaults to "software"
+// CreateStore creates a new secret store. Backend defaults to "inline"
 // (local AES-GCM via the KeyStore) when empty.
+//
+// Wire shape: server replies with `{"store":<SecretStore>}` — we
+// unwrap before returning so the caller never has to know.
+//
+// Namespace plumbing: the server reads the namespace from the
+// `?namespace=` query param, NOT from the request body — passing
+// store.Namespace in the body is silently ignored. We pull it out
+// of the struct and forward it on the URL.
 func (a *SecretsAPI) CreateStore(ctx context.Context, store SecretStore) (*SecretStore, error) {
-	if store.Namespace == "" {
-		store.Namespace = a.client.namespace
+	ns := store.Namespace
+	if ns == "" {
+		ns = a.client.namespace
 	}
-	var out SecretStore
-	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets", store, &out); err != nil {
+	if ns == "" {
+		ns = "sandbox"
+	}
+	var env struct {
+		Store SecretStore `json:"store"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets?namespace="+url.QueryEscape(ns), store, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &env.Store, nil
 }
 
 // GetStore fetches a single store by ID.
+//
+// Wire shape: `{"store":<SecretStore>}` — unwrapped before return.
+// Namespace is read from the query param server-side.
 func (a *SecretsAPI) GetStore(ctx context.Context, id string) (*SecretStore, error) {
 	if id == "" {
 		return nil, fmt.Errorf("mockarty: secret store id is required")
 	}
-	var out SecretStore
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(id), nil, &out); err != nil {
+	ns := a.client.namespace
+	if ns == "" {
+		ns = "sandbox"
+	}
+	var env struct {
+		Store SecretStore `json:"store"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(id)+"?namespace="+url.QueryEscape(ns), nil, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &env.Store, nil
 }
 
 // UpdateStore updates the name/description/backend of an existing store.
+//
+// Wire shape: `{"store":<SecretStore>}` — unwrapped before return.
 func (a *SecretsAPI) UpdateStore(ctx context.Context, id string, store SecretStore) (*SecretStore, error) {
 	if id == "" {
 		return nil, fmt.Errorf("mockarty: secret store id is required")
 	}
-	var out SecretStore
-	if err := a.client.do(ctx, "PUT", "/api/v1/stores/secrets/"+url.PathEscape(id), store, &out); err != nil {
+	ns := store.Namespace
+	if ns == "" {
+		ns = a.client.namespace
+	}
+	if ns == "" {
+		ns = "sandbox"
+	}
+	var env struct {
+		Store SecretStore `json:"store"`
+	}
+	if err := a.client.do(ctx, "PUT", "/api/v1/stores/secrets/"+url.PathEscape(id)+"?namespace="+url.QueryEscape(ns), store, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &env.Store, nil
 }
 
 // DeleteStore removes a secret store and all of its entries.
@@ -111,57 +154,92 @@ func (a *SecretsAPI) DeleteStore(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("mockarty: secret store id is required")
 	}
-	return a.client.do(ctx, "DELETE", "/api/v1/stores/secrets/"+url.PathEscape(id), nil, nil)
+	ns := a.client.namespace
+	if ns == "" {
+		ns = "sandbox"
+	}
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/secrets/"+url.PathEscape(id)+"?namespace="+url.QueryEscape(ns), nil, nil)
+}
+
+// nsQuery returns "?namespace=<X>" using the client's default NS, or
+// "?namespace=sandbox" as a last-resort fallback. Centralised so every
+// entry-level call adds it uniformly — the server reads NS from the
+// query string and silently rejects requests that omit it.
+func (a *SecretsAPI) nsQuery() string {
+	ns := a.client.namespace
+	if ns == "" {
+		ns = "sandbox"
+	}
+	return "?namespace=" + url.QueryEscape(ns)
 }
 
 // ListEntries returns metadata (keys, versions, timestamps) for every
 // entry in the store. Decrypted values are NOT returned.
+//
+// Wire shape: `{"entries":[...], "store_id":"...", "namespace":"..."}`.
 func (a *SecretsAPI) ListEntries(ctx context.Context, storeID string) ([]SecretEntry, error) {
 	if storeID == "" {
 		return nil, fmt.Errorf("mockarty: secret store id is required")
 	}
-	var out []SecretEntry
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries", nil, &out); err != nil {
+	var env struct {
+		Entries []SecretEntry `json:"entries"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries"+a.nsQuery(), nil, &env); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return env.Entries, nil
 }
 
 // CreateEntry writes a new key/value pair to the store.
+//
+// Wire shape: `{"entry": {id, key, version, sensitive, created_at}}`.
+// The decrypted value is NOT echoed back on create — fetch via
+// GetEntry when needed.
 func (a *SecretsAPI) CreateEntry(ctx context.Context, storeID string, entry SecretEntry) (*SecretEntry, error) {
 	if storeID == "" {
 		return nil, fmt.Errorf("mockarty: secret store id is required")
 	}
-	var out SecretEntry
-	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries", entry, &out); err != nil {
+	var env struct {
+		Entry SecretEntry `json:"entry"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries"+a.nsQuery(), entry, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &env.Entry, nil
 }
 
 // GetEntry fetches a single entry including its decrypted value. Requires
 // the `secret:read` permission on the caller's API key.
+//
+// Wire shape: flat `{id, key, value, version, sensitive, ...}` (NOT
+// wrapped in an envelope on this endpoint) — unmarshals directly.
 func (a *SecretsAPI) GetEntry(ctx context.Context, storeID, key string) (*SecretEntry, error) {
 	if storeID == "" || key == "" {
 		return nil, fmt.Errorf("mockarty: storeID and key are required")
 	}
 	var out SecretEntry
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key), nil, &out); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+a.nsQuery(), nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
 // UpdateEntry overwrites the value/description of an existing entry.
+//
+// Wire shape: `{"message":"entry updated", "id":"..."}` — no full entry
+// echoed back, so we return only Key + ID after a successful update.
 func (a *SecretsAPI) UpdateEntry(ctx context.Context, storeID, key string, entry SecretEntry) (*SecretEntry, error) {
 	if storeID == "" || key == "" {
 		return nil, fmt.Errorf("mockarty: storeID and key are required")
 	}
-	var out SecretEntry
-	if err := a.client.do(ctx, "PUT", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key), entry, &out); err != nil {
+	var env struct {
+		Message string `json:"message"`
+		ID      string `json:"id"`
+	}
+	if err := a.client.do(ctx, "PUT", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+a.nsQuery(), entry, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &SecretEntry{Key: key}, nil
 }
 
 // RotateEntry generates a new value for the entry, bumping its version.
@@ -171,11 +249,14 @@ func (a *SecretsAPI) RotateEntry(ctx context.Context, storeID, key string) (*Sec
 	if storeID == "" || key == "" {
 		return nil, fmt.Errorf("mockarty: storeID and key are required")
 	}
-	var out SecretEntry
-	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+"/rotate", nil, &out); err != nil {
+	var env struct {
+		Message string `json:"message"`
+		ID      string `json:"id"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+"/rotate"+a.nsQuery(), nil, &env); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return &SecretEntry{Key: key}, nil
 }
 
 // DeleteEntry removes a single key from the store.
@@ -183,7 +264,7 @@ func (a *SecretsAPI) DeleteEntry(ctx context.Context, storeID, key string) error
 	if storeID == "" || key == "" {
 		return fmt.Errorf("mockarty: storeID and key are required")
 	}
-	return a.client.do(ctx, "DELETE", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+a.nsQuery(), nil, nil)
 }
 
 // ConfigureVault registers or updates a Vault backend for the namespace.
