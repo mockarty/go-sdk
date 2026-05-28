@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 )
@@ -207,10 +208,20 @@ func (a *ImportAPI) HAR(ctx context.Context, data []byte) (*ImportResult, error)
 }
 
 // GrpcProto imports a Protocol Buffers (.proto) definition into a collection.
+//
+// Wire shape: server's importGRPCCollection handler reads
+// `protoContent` (NOT the generic `content` envelope shared by other
+// importers) AND expects the .proto bytes base64-encoded. Older SDK
+// builds sent raw text under `content` and every call 400'd with
+// 'either serverAddress or protoContent must be provided' or 'failed
+// to decode proto content'. The SDK now base64-encodes the bytes
+// transparently.
 func (a *ImportAPI) GrpcProto(ctx context.Context, data []byte) (*ImportResult, error) {
-	body := importContentPayload{Content: string(data)}
+	body := map[string]any{
+		"protoContent": base64.StdEncoding.EncodeToString(data),
+	}
 	var result ImportResult
-	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/grpc", &body, &result); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/grpc", body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
