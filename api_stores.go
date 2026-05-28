@@ -75,27 +75,34 @@ func (a *StoreAPI) GlobalDeleteMany(ctx context.Context, keys ...string) error {
 // ---------------------------------------------------------------------------
 
 // ChainGet retrieves the chain store for a specific chain ID.
+//
+// Namespace plumbing mirrors GlobalGet — the server reads ?namespace=
+// from the query and silently falls back to 'sandbox' without it,
+// so callers in any non-default workspace see the wrong store.
 func (a *StoreAPI) ChainGet(ctx context.Context, chainID string) (map[string]any, error) {
 	var store map[string]any
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/chain/"+url.PathEscape(chainID), nil, &store); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/chain/"+url.PathEscape(chainID)+a.nsParam(), nil, &store); err != nil {
 		return nil, err
 	}
 	return store, nil
 }
 
 // ChainSet sets a key-value pair in a chain store.
+//
+// Namespace is read from ?namespace= server-side (body field ignored).
+// SDK now threads it via the URL so callers in any workspace land in
+// the right store.
 func (a *StoreAPI) ChainSet(ctx context.Context, chainID, key string, value any) error {
 	body := map[string]any{
-		"key":       key,
-		"value":     value,
-		"namespace": a.client.namespace,
+		"key":   key,
+		"value": value,
 	}
-	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID), body, nil)
+	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID)+a.nsParam(), body, nil)
 }
 
 // ChainDelete deletes a key from a chain store.
 func (a *StoreAPI) ChainDelete(ctx context.Context, chainID string, key string) error {
-	return a.client.do(ctx, "DELETE", "/api/v1/stores/chain/"+url.PathEscape(chainID)+"/"+url.PathEscape(key), nil, nil)
+	return a.client.do(ctx, "DELETE", "/api/v1/stores/chain/"+url.PathEscape(chainID)+"/"+url.PathEscape(key)+a.nsParam(), nil, nil)
 }
 
 // ChainDeleteMany deletes multiple keys from a chain store.
