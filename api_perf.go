@@ -265,10 +265,17 @@ func (a *PerfAPI) DeleteConfig(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 // ListSchedules returns all performance test schedules.
+//
+// Server returns a bare JSON list; when the repo finds zero rows it
+// emits JSON null, which Go decodes into a nil slice. Coerce nil →
+// empty slice so callers can iterate without nil-guards.
 func (a *PerfAPI) ListSchedules(ctx context.Context) ([]PerfSchedule, error) {
 	var schedules []PerfSchedule
 	if err := a.client.do(ctx, "GET", "/api/v1/perf-schedules", nil, &schedules); err != nil {
 		return nil, err
+	}
+	if schedules == nil {
+		return []PerfSchedule{}, nil
 	}
 	return schedules, nil
 }
