@@ -29,7 +29,12 @@ type Prompt struct {
 	Body        string            `json:"body"`
 	Model       string            `json:"model,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
-	Variables   map[string]string `json:"variables,omitempty"`
+	// Server emits Variables as a LIST of variable definitions (not a
+	// flat map). The previous SDK shape decoded to map[string]string
+	// which silently failed with 'cannot unmarshal array into …'.
+	// Keep it untyped to tolerate both the array-of-objects and the
+	// historical map shape across server versions.
+	Variables   any               `json:"variables,omitempty"`
 	Version     int               `json:"version"`
 }
 
@@ -98,15 +103,20 @@ func (a *PromptsAPI) DeletePrompt(ctx context.Context, id string) error {
 }
 
 // ListVersions returns the prompt's last 20 versions (newest first).
+//
+// Wire shape: server returns `{versions: [...], count: N}`. The SDK
+// unwraps the envelope and returns the slice.
 func (a *PromptsAPI) ListVersions(ctx context.Context, id string) ([]PromptVersion, error) {
 	if id == "" {
 		return nil, fmt.Errorf("mockarty: prompt id is required")
 	}
-	var out []PromptVersion
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/prompts/"+url.PathEscape(id)+"/versions", nil, &out); err != nil {
+	var env struct {
+		Versions []PromptVersion `json:"versions"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/prompts/"+url.PathEscape(id)+"/versions", nil, &env); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return env.Versions, nil
 }
 
 // GetVersion fetches a specific historical version.

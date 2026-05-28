@@ -117,13 +117,18 @@ func (a *MockAPI) Restore(ctx context.Context, id string) error {
 }
 
 // BatchCreate creates multiple mocks in one call.
+//
+// Wire shape: server expects `{"mocks": [...]}` envelope, NOT a bare
+// array. Old SDK sent the array and got 400 'mocks field must be an
+// array' (server tried to bind into a map and failed).
 func (a *MockAPI) BatchCreate(ctx context.Context, mocks []*Mock) error {
 	for i, m := range mocks {
 		if m.Namespace == "" && a.client.namespace != "" {
 			mocks[i].Namespace = a.client.namespace
 		}
 	}
-	return a.client.do(ctx, "POST", "/api/v1/mocks/batch", mocks, nil)
+	body := map[string]any{"mocks": mocks}
+	return a.client.do(ctx, "POST", "/api/v1/mocks/batch", body, nil)
 }
 
 // BatchDelete soft-deletes multiple mocks by their IDs.
@@ -176,12 +181,17 @@ func (a *MockAPI) Versions(ctx context.Context, chainID string) ([]*Mock, error)
 }
 
 // ListVersions returns the version history for a mock.
+//
+// Wire shape: server returns `{mock_id, versions: [...], count}`.
+// The SDK unwraps the envelope and returns the slice.
 func (a *MockAPI) ListVersions(ctx context.Context, id string) ([]*Mock, error) {
-	var mocks []*Mock
-	if err := a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/versions", nil, &mocks); err != nil {
+	var env struct {
+		Versions []*Mock `json:"versions"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/versions", nil, &env); err != nil {
 		return nil, err
 	}
-	return mocks, nil
+	return env.Versions, nil
 }
 
 // GetVersion returns a specific version of a mock.
