@@ -13,8 +13,13 @@ type GeneratorAPI struct {
 }
 
 // GeneratorRequest defines the input for mock generation from a specification.
+//
+// Wire field renamed: the server reads `content` (inline spec body),
+// NOT `spec`. Older SDK sent `spec` and every generator call 400'd
+// with 'either url or content must be provided'. The Go-friendly
+// .Spec field is preserved; only the JSON tag changes.
 type GeneratorRequest struct {
-	Spec       string `json:"spec,omitempty"`
+	Spec       string `json:"content,omitempty"`
 	URL        string `json:"url,omitempty"`
 	Namespace  string `json:"namespace,omitempty"`
 	PathPrefix string `json:"pathPrefix,omitempty"`
