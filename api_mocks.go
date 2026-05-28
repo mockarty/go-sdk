@@ -109,10 +109,14 @@ func (a *MockAPI) Delete(ctx context.Context, id string) error {
 }
 
 // Restore restores a soft-deleted mock by ID (uses batch/restore endpoint).
+//
+// Wire shape: server's batch endpoints read the ID list from the
+// `mockIds` field, NOT `ids`. The older SDK shape sent `ids` and
+// every Restore call 400'd with 'at least one mock ID is required'.
 func (a *MockAPI) Restore(ctx context.Context, id string) error {
 	body := struct {
-		IDs []string `json:"ids"`
-	}{IDs: []string{id}}
+		MockIds []string `json:"mockIds"`
+	}{MockIds: []string{id}}
 	return a.client.do(ctx, "POST", "/api/v1/mocks/batch/restore", body, nil)
 }
 
@@ -132,18 +136,22 @@ func (a *MockAPI) BatchCreate(ctx context.Context, mocks []*Mock) error {
 }
 
 // BatchDelete soft-deletes multiple mocks by their IDs.
+//
+// Wire shape: server reads `mockIds` (not `ids`).
 func (a *MockAPI) BatchDelete(ctx context.Context, ids []string) error {
 	body := struct {
-		IDs []string `json:"ids"`
-	}{IDs: ids}
+		MockIds []string `json:"mockIds"`
+	}{MockIds: ids}
 	return a.client.do(ctx, "DELETE", "/api/v1/mocks/batch", body, nil)
 }
 
 // BatchRestore restores multiple soft-deleted mocks.
+//
+// Wire shape: server reads `mockIds` (not `ids`).
 func (a *MockAPI) BatchRestore(ctx context.Context, ids []string) error {
 	body := struct {
-		IDs []string `json:"ids"`
-	}{IDs: ids}
+		MockIds []string `json:"mockIds"`
+	}{MockIds: ids}
 	return a.client.do(ctx, "POST", "/api/v1/mocks/batch/restore", body, nil)
 }
 
@@ -225,28 +233,40 @@ func (a *MockAPI) DeleteLogs(ctx context.Context, id string) error {
 }
 
 // CopyToNamespace copies mocks to another namespace.
+//
+// Wire shape: server reads `mockIds` + `targetNamespace`.
 func (a *MockAPI) CopyToNamespace(ctx context.Context, ids []string, targetNamespace string) error {
 	body := struct {
-		IDs             []string `json:"ids"`
+		MockIds         []string `json:"mockIds"`
 		TargetNamespace string   `json:"targetNamespace"`
-	}{IDs: ids, TargetNamespace: targetNamespace}
+	}{MockIds: ids, TargetNamespace: targetNamespace}
 	return a.client.do(ctx, "POST", "/api/v1/mocks/copy-to-namespace", body, nil)
 }
 
 // MoveToFolder moves mocks to a folder.
+//
+// Wire shape: server's moveMocksToFolder handler reads `mockIds`
+// + `folderId`. The earlier SDK sent `ids` and every call 400'd
+// with 'no mock IDs provided'.
 func (a *MockAPI) MoveToFolder(ctx context.Context, ids []string, folderID string) error {
 	body := struct {
-		IDs      []string `json:"ids"`
+		MockIds  []string `json:"mockIds"`
 		FolderID string   `json:"folderId"`
-	}{IDs: ids, FolderID: folderID}
+	}{MockIds: ids, FolderID: folderID}
 	return a.client.do(ctx, "PATCH", "/api/v1/mocks/batch/move", body, nil)
 }
 
-// BatchUpdateTags updates tags on multiple mocks.
+// BatchUpdateTags add+remove tags on multiple mocks in one call.
+//
+// Wire shape: server expects `{mockIds, tagsToAdd, tagsToRemove}`.
+// The single `tags` parameter is treated as "tags to add"; removing
+// tags requires constructing the body manually via BatchTagsRequest
+// (exported for advanced callers — see comment).
 func (a *MockAPI) BatchUpdateTags(ctx context.Context, ids []string, tags []string) error {
 	body := struct {
-		IDs  []string `json:"ids"`
-		Tags []string `json:"tags"`
-	}{IDs: ids, Tags: tags}
+		MockIds      []string `json:"mockIds"`
+		TagsToAdd    []string `json:"tagsToAdd"`
+		TagsToRemove []string `json:"tagsToRemove"`
+	}{MockIds: ids, TagsToAdd: tags}
 	return a.client.do(ctx, "PATCH", "/api/v1/mocks/batch/tags", body, nil)
 }
