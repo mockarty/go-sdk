@@ -30,9 +30,19 @@ type FuzzingConfig struct {
 }
 
 // FuzzingRun represents a started fuzzing run.
+//
+// Wire shape on POST /api/v1/fuzzing/run: {"taskId":"...", "resultId":"...",
+// "runnerId":"..."} — the SDK projects:
+//   - TaskID    → runner_tasks.id (use this with Tasks API / cancel)
+//   - ID        → fuzz_results.id (use this with GetResult / Stop /
+//                 ListFindings — that's the user-visible "run" id)
+//   - RunnerID  → assigned runner UUID (empty when auto-picked)
+//   - Status    → optional; populated when a future server emits it
 type FuzzingRun struct {
-	ID     string `json:"id,omitempty"`
-	Status string `json:"status,omitempty"`
+	TaskID   string `json:"taskId,omitempty"`
+	ID       string `json:"resultId,omitempty"`
+	RunnerID string `json:"runnerId,omitempty"`
+	Status   string `json:"status,omitempty"`
 }
 
 // FuzzingResult holds the results of a completed or in-progress fuzzing run.
@@ -55,12 +65,35 @@ type FuzzingResult struct {
 }
 
 // Start starts a new fuzzing run with the given configuration.
+//
+// Wire shape: POST /api/v1/fuzzing/run expects
+//
+//	{ "configId": "...", "config": {...}, "runnerId": "...", ... }
+//
+// — NOT a bare FuzzConfig. The server reads `req.Config` and `req.ConfigID`
+// out of an outer envelope. The SDK builds that envelope here so the
+// caller passes a plain FuzzingConfig as before.
 func (a *FuzzingAPI) Start(ctx context.Context, config *FuzzingConfig) (*FuzzingRun, error) {
 	if config.Namespace == "" && a.client.namespace != "" {
 		config.Namespace = a.client.namespace
 	}
+	body := map[string]any{"config": config}
 	var run FuzzingRun
-	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/run", config, &run); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/run", body, &run); err != nil {
+		return nil, err
+	}
+	return &run, nil
+}
+
+// StartFromConfig launches a run referencing a previously-saved
+// FuzzConfig by ID. Equivalent to the UI's "Run this config" button.
+// The SDK passes only the configId; runner selection + Phase 4 CI
+// trigger plumbing are left out of the minimal surface — call the
+// REST API directly when you need them.
+func (a *FuzzingAPI) StartFromConfig(ctx context.Context, configID string) (*FuzzingRun, error) {
+	body := map[string]any{"configId": configID}
+	var run FuzzingRun
+	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/run", body, &run); err != nil {
 		return nil, err
 	}
 	return &run, nil
@@ -115,13 +148,26 @@ func (a *FuzzingAPI) GetConfig(ctx context.Context, id string) (*FuzzingConfig, 
 	return &config, nil
 }
 
-// ListConfigs returns all fuzzing configurations.
+// ListConfigs returns the saved fuzz configurations visible to the
+// caller. Wire shape: server replies with
+// {"configs":[...], "total":N, "limit":N, "offset":N}; we unwrap.
+//
+// Namespace plumbing: the server reads `?namespace=` from the URL
+// query — body/path are NOT consulted for this endpoint. The SDK
+// threads the client-level namespace so callers don't have to wire
+// the query themselves.
 func (a *FuzzingAPI) ListConfigs(ctx context.Context) ([]FuzzingConfig, error) {
-	var configs []FuzzingConfig
-	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/configs", nil, &configs); err != nil {
+	q := ""
+	if a.client.namespace != "" {
+		q = "?namespace=" + url.QueryEscape(a.client.namespace)
+	}
+	var env struct {
+		Configs []FuzzingConfig `json:"configs"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/configs"+q, nil, &env); err != nil {
 		return nil, err
 	}
-	return configs, nil
+	return env.Configs, nil
 }
 
 // UpdateConfig updates a fuzzing configuration by ID.
