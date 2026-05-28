@@ -37,20 +37,39 @@ type PerfTask struct {
 }
 
 // PerfResult holds the results of a completed performance test.
+//
+// Wire shape mirrors the server's `runner.PerfTestResult`. Two ID
+// fields: `ID` is the result row's own UUID, `TaskID` is the runner
+// task that produced it — use TaskID to correlate with the value
+// returned by Run() / RunWithOptions().
 type PerfResult struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Status      string         `json:"status"`
-	Duration    int64          `json:"duration"` // milliseconds
-	VUs         int            `json:"vus"`
-	Iterations  int            `json:"iterations"`
-	Metrics     map[string]any `json:"metrics,omitempty"`
-	Thresholds  map[string]any `json:"thresholds,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
-	Errors      []PerfError    `json:"errors,omitempty"`
-	StartedAt   string         `json:"startedAt"`
-	CompletedAt string         `json:"completedAt,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	ID               string         `json:"id"`
+	TaskID           string         `json:"taskId,omitempty"`
+	ConfigID         string         `json:"configId,omitempty"`
+	Namespace        string         `json:"namespace,omitempty"`
+	Name             string         `json:"name,omitempty"`
+	Status           string         `json:"status"`
+	DurationMs       int64          `json:"durationMs"`
+	TotalRequests    int64          `json:"totalRequests"`
+	FailedRequests   int64          `json:"failedRequests"`
+	TotalVUs         int            `json:"totalVUs"`
+	StartedAt        string         `json:"startedAt"`
+	CompletedAt      string         `json:"completedAt,omitempty"`
+	ThresholdsPassed *bool          `json:"thresholdsPassed,omitempty"`
+	ThresholdsData   map[string]any `json:"thresholdsData,omitempty"`
+	MetricsData      map[string]any `json:"metricsData,omitempty"`
+	Tags             []string       `json:"tags,omitempty"`
+	Errors           []PerfError    `json:"errors,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	StoppedReason    string         `json:"stoppedReason,omitempty"`
+	// Deprecated aliases for back-compat with the previous shape. Kept
+	// so older callers don't break, but new code should use the snake-
+	// case-matching DurationMs / TotalVUs / TotalRequests above.
+	Duration   int64          `json:"-"`
+	VUs        int            `json:"-"`
+	Iterations int            `json:"-"`
+	Metrics    map[string]any `json:"-"`
+	Thresholds map[string]any `json:"-"`
 }
 
 // PerfError represents an error encountered during a performance test.
@@ -66,12 +85,35 @@ type PerfComparison struct {
 }
 
 // Run starts a new performance test.
+//
+// Wire shape: the server replies with `{"taskId": "<uuid>"}` — NOT a
+// full PerfTask struct — so we decode the envelope and project the id
+// onto our richer PerfTask shape. Status is populated by the caller
+// via a follow-up GET (currently raw HTTP; see Results() for the
+// SDK-native poll path).
 func (a *PerfAPI) Run(ctx context.Context, config *PerfConfig) (*PerfTask, error) {
-	var task PerfTask
-	if err := a.client.do(ctx, "POST", "/api/v1/perf/run", config, &task); err != nil {
+	var env struct {
+		TaskID string `json:"taskId"`
+		// Forward-compatible: if the server starts returning the full
+		// PerfTask envelope (id/name/status/startedAt), prefer those.
+		ID        string `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Status    string `json:"status,omitempty"`
+		StartedAt string `json:"startedAt,omitempty"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/perf/run", config, &env); err != nil {
 		return nil, err
 	}
-	return &task, nil
+	id := env.TaskID
+	if id == "" {
+		id = env.ID
+	}
+	return &PerfTask{
+		ID:        id,
+		Name:      env.Name,
+		Status:    env.Status,
+		StartedAt: env.StartedAt,
+	}, nil
 }
 
 // PerfRunRequest is the inbound shape for RunWithOptions — kept distinct
@@ -102,11 +144,27 @@ type PerfRunRequest struct {
 //	    CITriggerID: "my-trigger",
 //	})
 func (a *PerfAPI) RunWithOptions(ctx context.Context, req PerfRunRequest) (*PerfTask, error) {
-	var task PerfTask
-	if err := a.client.do(ctx, "POST", "/api/v1/perf/run", req, &task); err != nil {
+	// Same wire envelope as Run() — server returns {"taskId": "..."}.
+	var env struct {
+		TaskID    string `json:"taskId"`
+		ID        string `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Status    string `json:"status,omitempty"`
+		StartedAt string `json:"startedAt,omitempty"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/perf/run", req, &env); err != nil {
 		return nil, err
 	}
-	return &task, nil
+	id := env.TaskID
+	if id == "" {
+		id = env.ID
+	}
+	return &PerfTask{
+		ID:        id,
+		Name:      env.Name,
+		Status:    env.Status,
+		StartedAt: env.StartedAt,
+	}, nil
 }
 
 // Stop stops a running performance test.
