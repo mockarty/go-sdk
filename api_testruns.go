@@ -6,6 +6,7 @@ package mockarty
 import (
 	"context"
 	"net/url"
+	"time"
 )
 
 // TestRunAPI provides methods for managing test runs.
@@ -25,19 +26,26 @@ type TestRunAPI struct {
 //	"contract"    — contract verification (ReferenceID -> contract_registry.id)
 //
 // Fields are alignment-sorted (8-byte first) to minimise struct padding.
+//
+// StartedAt / FinishedAt were `int64` ms timestamps in older SDK
+// builds, but the server emits RFC3339 strings via time.Time. The
+// older SDK shape failed to decode any TestRun list — every call
+// returned 'cannot unmarshal string into Go struct field
+// TestRun.startedAt of type int64'. Now using time.Time so the
+// envelope round-trips cleanly.
 type TestRun struct {
-	Duration     int64  `json:"duration,omitempty"` // ms
-	StartedAt    int64  `json:"startedAt,omitempty"`
-	FinishedAt   int64  `json:"finishedAt,omitempty"`
-	ID           string `json:"id,omitempty"`
-	CollectionID string `json:"collectionId,omitempty"`
-	Mode         string `json:"mode,omitempty"`
-	ReferenceID  string `json:"referenceId,omitempty"`
-	Status       string `json:"status,omitempty"` // running, completed, failed, cancelled
-	Environment  string `json:"environment,omitempty"`
-	TotalTests   int    `json:"totalTests,omitempty"`
-	PassedTests  int    `json:"passedTests,omitempty"`
-	FailedTests  int    `json:"failedTests,omitempty"`
+	StartedAt    time.Time `json:"startedAt,omitempty"`
+	FinishedAt   time.Time `json:"finishedAt,omitempty"`
+	Duration     int64     `json:"duration,omitempty"` // ms
+	ID           string    `json:"id,omitempty"`
+	CollectionID string    `json:"collectionId,omitempty"`
+	Mode         string    `json:"mode,omitempty"`
+	ReferenceID  string    `json:"referenceId,omitempty"`
+	Status       string    `json:"status,omitempty"` // running, completed, failed, cancelled
+	Environment  string    `json:"environment,omitempty"`
+	TotalTests   int       `json:"totalTests,omitempty"`
+	PassedTests  int       `json:"passedTests,omitempty"`
+	FailedTests  int       `json:"failedTests,omitempty"`
 }
 
 // ListTestRunsOptions filters a ListTestRuns call. All fields are optional.
@@ -78,18 +86,21 @@ func (a *TestRunAPI) ListWithOptions(ctx context.Context, opts ListTestRunsOptio
 		path += "?" + encoded
 	}
 
-	// Server responses may be either a bare list (legacy) or an envelope
-	// `{ runs: [...] }`. Decode into an envelope first; if the `runs` field is
-	// missing, fall back to treating the payload as a bare list.
+	// Server emits `{runs: [...], total: N, ...}` envelope. Decode into
+	// the envelope unconditionally and return the runs slice (which may
+	// be nil/empty when no rows match the filter). The earlier bare-list
+	// fallback corrupted SDK behaviour: when envelope.Runs was nil it
+	// re-issued a request and tried to decode the object response into
+	// []TestRun → 'cannot unmarshal object' errors for filter modes
+	// that had no rows.
 	var envelope activeTestRunsEnvelope
-	if err := a.client.do(ctx, "GET", path, nil, &envelope); err == nil && envelope.Runs != nil {
-		return envelope.Runs, nil
-	}
-	var runs []TestRun
-	if err := a.client.do(ctx, "GET", path, nil, &runs); err != nil {
+	if err := a.client.do(ctx, "GET", path, nil, &envelope); err != nil {
 		return nil, err
 	}
-	return runs, nil
+	if envelope.Runs == nil {
+		return []TestRun{}, nil
+	}
+	return envelope.Runs, nil
 }
 
 // intToString avoids pulling in strconv just for a single digit-encoder.

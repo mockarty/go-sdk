@@ -24,12 +24,22 @@ type NamespaceWebhook struct {
 }
 
 // ListUsers returns all users in a namespace.
+//
+// Wire shape: server emits `{users: [...], total: N}` — NOT a bare list.
+// The older SDK build decoded into `[]NamespaceUser` directly and every
+// call failed with 'cannot unmarshal object into Go value of type
+// []mockarty.NamespaceUser'. We now unwrap the envelope.
 func (a *NamespaceSettingsAPI) ListUsers(ctx context.Context, ns string) ([]NamespaceUser, error) {
-	var users []NamespaceUser
-	if err := a.client.do(ctx, "GET", "/api/v1/namespaces/"+url.PathEscape(ns)+"/users", nil, &users); err != nil {
+	var env struct {
+		Users []NamespaceUser `json:"users"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/namespaces/"+url.PathEscape(ns)+"/users", nil, &env); err != nil {
 		return nil, err
 	}
-	return users, nil
+	if env.Users == nil {
+		return []NamespaceUser{}, nil
+	}
+	return env.Users, nil
 }
 
 // AddUser adds a user to a namespace.
@@ -65,21 +75,33 @@ func (a *NamespaceSettingsAPI) UpdateCleanupPolicy(ctx context.Context, ns strin
 }
 
 // ListWebhooks returns all webhooks configured for a namespace.
+//
+// Wire shape: server emits `{webhooks: [...]}` — unwrap.
 func (a *NamespaceSettingsAPI) ListWebhooks(ctx context.Context, ns string) ([]NamespaceWebhook, error) {
-	var webhooks []NamespaceWebhook
-	if err := a.client.do(ctx, "GET", "/api/v1/namespaces/"+url.PathEscape(ns)+"/webhooks", nil, &webhooks); err != nil {
+	var env struct {
+		Webhooks []NamespaceWebhook `json:"webhooks"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/namespaces/"+url.PathEscape(ns)+"/webhooks", nil, &env); err != nil {
 		return nil, err
 	}
-	return webhooks, nil
+	if env.Webhooks == nil {
+		return []NamespaceWebhook{}, nil
+	}
+	return env.Webhooks, nil
 }
 
 // CreateWebhook creates a new webhook for a namespace.
+//
+// Wire shape: server replies with `{message: "...", webhook: {...}}` —
+// unwrap the inner webhook.
 func (a *NamespaceSettingsAPI) CreateWebhook(ctx context.Context, ns string, webhook *NamespaceWebhook) (*NamespaceWebhook, error) {
-	var result NamespaceWebhook
-	if err := a.client.do(ctx, "POST", "/api/v1/namespaces/"+url.PathEscape(ns)+"/webhooks", webhook, &result); err != nil {
+	var env struct {
+		Webhook NamespaceWebhook `json:"webhook"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/namespaces/"+url.PathEscape(ns)+"/webhooks", webhook, &env); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return &env.Webhook, nil
 }
 
 // DeleteWebhook deletes a webhook from a namespace.
