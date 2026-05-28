@@ -49,10 +49,20 @@ type PromptVersion struct {
 }
 
 // ListPrompts returns every prompt in the client's default namespace.
+//
+// Wire shape: server emits `{templates:[...], count, namespace}` —
+// older SDK builds decoded into bare []Prompt and 'cannot unmarshal
+// object' on every call. Unwrap the envelope here.
 func (a *PromptsAPI) ListPrompts(ctx context.Context) ([]Prompt, error) {
-	var out []Prompt
-	if err := a.client.do(ctx, "GET", "/api/v1/stores/prompts?namespace="+url.QueryEscape(a.client.namespace), nil, &out); err != nil {
+	var env struct {
+		Templates []Prompt `json:"templates"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/stores/prompts?namespace="+url.QueryEscape(a.client.namespace), nil, &env); err != nil {
 		return nil, err
+	}
+	out := env.Templates
+	if out == nil {
+		out = []Prompt{}
 	}
 	return out, nil
 }

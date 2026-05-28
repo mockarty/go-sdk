@@ -123,13 +123,56 @@ func (a *ExternalRunsAPI) Submit(ctx context.Context, namespace string, run Exte
 
 // ExternalRunsBatchResponse is what the /batch endpoint returns: per-row
 // success / per-row error. Rows arrive in the same order as the request.
+//
+// Wire shape: server emits each row as `{result: <Run>, error?: "...",
+// index: N}`. Older SDK builds expected the run fields at the top of
+// each row and silently zeroed every RunID/CaseID/Status. Custom
+// UnmarshalJSON below flattens the server's nested `result` block onto
+// the SDK row so callers see the run identifiers directly while still
+// being able to read `Error` for per-row failures.
+type ExternalRunsBatchRow struct {
+	RunID  string `json:"runId,omitempty"`
+	CaseID string `json:"caseId,omitempty"`
+	Status string `json:"status,omitempty"`
+	Error  string `json:"error,omitempty"`
+	Index  int    `json:"index,omitempty"`
+}
+
+// UnmarshalJSON flattens the server's `{result:{runId,caseId,status},
+// error, index}` row into a flat ExternalRunsBatchRow. Both the
+// nested `result` shape and the historical flat shape are accepted.
+func (r *ExternalRunsBatchRow) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Result *struct {
+			RunID  string `json:"runId"`
+			CaseID string `json:"caseId"`
+			Status string `json:"status"`
+		} `json:"result"`
+		Error  string `json:"error"`
+		Index  int    `json:"index"`
+		RunID  string `json:"runId"`
+		CaseID string `json:"caseId"`
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	r.Error = wire.Error
+	r.Index = wire.Index
+	if wire.Result != nil {
+		r.RunID = wire.Result.RunID
+		r.CaseID = wire.Result.CaseID
+		r.Status = wire.Result.Status
+		return nil
+	}
+	r.RunID = wire.RunID
+	r.CaseID = wire.CaseID
+	r.Status = wire.Status
+	return nil
+}
+
 type ExternalRunsBatchResponse struct {
-	Results []struct {
-		RunID  string `json:"runId,omitempty"`
-		CaseID string `json:"caseId,omitempty"`
-		Status string `json:"status,omitempty"`
-		Error  string `json:"error,omitempty"`
-	} `json:"results"`
+	Results []ExternalRunsBatchRow `json:"results"`
 }
 
 // SubmitBatch uploads up to 100 runs in one POST (the server caps per
