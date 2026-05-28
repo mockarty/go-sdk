@@ -14,13 +14,18 @@ type RecorderAPI struct {
 }
 
 // RecorderSession represents a recording session configuration and status.
+//
+// CreatedAt is a string because the server emits ISO-8601 timestamps
+// on this endpoint (not Unix-epoch ints). Older SDK builds used int64
+// and broke on decode — keep the field as string so callers parse with
+// time.Parse(time.RFC3339, …) when they need a real time value.
 type RecorderSession struct {
 	ID         string `json:"id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	TargetURL  string `json:"targetUrl,omitempty"`
 	Status     string `json:"status,omitempty"` // idle, recording, stopped
 	Namespace  string `json:"namespace,omitempty"`
-	CreatedAt  int64  `json:"createdAt,omitempty"`
+	CreatedAt  string `json:"createdAt,omitempty"`
 	EntryCount int    `json:"entryCount,omitempty"`
 }
 
@@ -35,33 +40,46 @@ type RecorderEntry struct {
 }
 
 // StartRecording creates and starts a new recording session.
+//
+// Wire shape: server responds with `{"session": <RecorderSession>}`
+// — the SDK unwraps before returning so callers see the inner struct.
 func (a *RecorderAPI) StartRecording(ctx context.Context, session *RecorderSession) (*RecorderSession, error) {
 	if session.Namespace == "" && a.client.namespace != "" {
 		session.Namespace = a.client.namespace
 	}
-	var result RecorderSession
-	if err := a.client.do(ctx, "POST", "/api/v1/recorder/start", session, &result); err != nil {
+	var env struct {
+		Session RecorderSession `json:"session"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/start", session, &env); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return &env.Session, nil
 }
 
 // GetSession retrieves a recording session by ID.
+//
+// Wire shape: `{"session": <RecorderSession>}`.
 func (a *RecorderAPI) GetSession(ctx context.Context, id string) (*RecorderSession, error) {
-	var session RecorderSession
-	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(id), nil, &session); err != nil {
+	var env struct {
+		Session RecorderSession `json:"session"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(id), nil, &env); err != nil {
 		return nil, err
 	}
-	return &session, nil
+	return &env.Session, nil
 }
 
 // ListSessions returns all recording sessions.
+//
+// Wire shape: `{"sessions": [...]}`. The SDK unwraps.
 func (a *RecorderAPI) ListSessions(ctx context.Context) ([]RecorderSession, error) {
-	var sessions []RecorderSession
-	if err := a.client.do(ctx, "GET", "/api/v1/recorder/sessions", nil, &sessions); err != nil {
+	var env struct {
+		Sessions []RecorderSession `json:"sessions"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/sessions", nil, &env); err != nil {
 		return nil, err
 	}
-	return sessions, nil
+	return env.Sessions, nil
 }
 
 // StopRecording stops recording on a session.
@@ -80,12 +98,18 @@ func (a *RecorderAPI) DeleteSession(ctx context.Context, id string) error {
 }
 
 // GetEntries retrieves all recorded entries for a session.
+//
+// Wire shape: `{"entries":[...], "total":N, "limit":N, "offset":N}`.
+// The SDK unwraps and returns the slice; pagination params can be
+// applied by the server but we don't surface them here yet.
 func (a *RecorderAPI) GetEntries(ctx context.Context, sessionID string) ([]RecorderEntry, error) {
-	var entries []RecorderEntry
-	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/entries", nil, &entries); err != nil {
+	var env struct {
+		Entries []RecorderEntry `json:"entries"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/"+url.PathEscape(sessionID)+"/entries", nil, &env); err != nil {
 		return nil, err
 	}
-	return entries, nil
+	return env.Entries, nil
 }
 
 // CreateMocksFromSession creates mocks from all recorded entries in a session.

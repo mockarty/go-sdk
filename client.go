@@ -270,16 +270,31 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any) ([]b
 
 // doRaw executes the request with retries and returns the response body reader.
 // The caller must close the returned reader.
+//
+// Body marshalling rules:
+//   - body == nil           → no body
+//   - body is []byte        → sent as-is (binary upload path — used by
+//                             Templates().Upload, Recorder export
+//                             import, etc.)
+//   - body is io.Reader     → sent as-is
+//   - anything else         → JSON-marshalled (the common case)
 func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.ReadCloser, error) {
 	url := c.baseURL + path
 
 	var bodyReader io.Reader
 	if body != nil {
-		data, err := json.Marshal(body)
-		if err != nil {
-			return nil, fmt.Errorf("mockarty: marshal request: %w", err)
+		switch b := body.(type) {
+		case []byte:
+			bodyReader = bytes.NewReader(b)
+		case io.Reader:
+			bodyReader = b
+		default:
+			data, err := json.Marshal(body)
+			if err != nil {
+				return nil, fmt.Errorf("mockarty: marshal request: %w", err)
+			}
+			bodyReader = bytes.NewReader(data)
 		}
-		bodyReader = bytes.NewReader(data)
 	}
 
 	attempts := 1 + c.maxRetries
