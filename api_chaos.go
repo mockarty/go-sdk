@@ -21,10 +21,16 @@ type ChaosAPI struct {
 
 // ListProfiles returns all chaos cluster connection profiles.
 // GET /api/v1/chaos/profiles
+//
+// Coerces nil → empty slice when no profiles exist so callers can
+// iterate without nil-guards.
 func (a *ChaosAPI) ListProfiles(ctx context.Context) ([]ChaosProfile, error) {
 	var resp chaosProfileListResponse
 	if err := a.client.do(ctx, "GET", "/api/v1/chaos/profiles", nil, &resp); err != nil {
 		return nil, err
+	}
+	if resp.Profiles == nil {
+		return []ChaosProfile{}, nil
 	}
 	return resp.Profiles, nil
 }

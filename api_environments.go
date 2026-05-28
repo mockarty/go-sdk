@@ -23,10 +23,16 @@ type Environment struct {
 }
 
 // List returns all environments.
+//
+// Coerces nil → empty slice when no environments exist so callers
+// can iterate without nil-guards.
 func (a *EnvironmentAPI) List(ctx context.Context) ([]Environment, error) {
 	var envs []Environment
 	if err := a.client.do(ctx, "GET", "/api/v1/api-tester/environments", nil, &envs); err != nil {
 		return nil, err
+	}
+	if envs == nil {
+		return []Environment{}, nil
 	}
 	return envs, nil
 }
