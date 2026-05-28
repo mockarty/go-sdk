@@ -242,18 +242,26 @@ func (a *SecretsAPI) UpdateEntry(ctx context.Context, storeID, key string, entry
 	return &SecretEntry{Key: key}, nil
 }
 
-// RotateEntry generates a new value for the entry, bumping its version.
-// The old value is not retained — pair with store-level backups if a
-// fallback is needed.
-func (a *SecretsAPI) RotateEntry(ctx context.Context, storeID, key string) (*SecretEntry, error) {
+// RotateEntry replaces the entry's value with `newValue`, bumping its
+// version and stamping RotatedAt. The old value is not retained —
+// pair with store-level backups if a fallback is needed.
+//
+// Wire shape: server requires `{value: "..."}` in the request body;
+// callers must supply the new secret. An empty newValue returns an
+// explicit local error (the server would 400 with the same message).
+func (a *SecretsAPI) RotateEntry(ctx context.Context, storeID, key, newValue string) (*SecretEntry, error) {
 	if storeID == "" || key == "" {
 		return nil, fmt.Errorf("mockarty: storeID and key are required")
 	}
+	if newValue == "" {
+		return nil, fmt.Errorf("mockarty: rotate: newValue is required")
+	}
+	body := map[string]string{"value": newValue}
 	var env struct {
 		Message string `json:"message"`
 		ID      string `json:"id"`
 	}
-	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+"/rotate"+a.nsQuery(), nil, &env); err != nil {
+	if err := a.client.do(ctx, "POST", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+"/rotate"+a.nsQuery(), body, &env); err != nil {
 		return nil, err
 	}
 	return &SecretEntry{Key: key}, nil
