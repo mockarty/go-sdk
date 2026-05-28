@@ -15,16 +15,23 @@ type ContractAPI struct {
 }
 
 // ContractConfig represents a saved contract testing configuration.
+//
+// The spec content field is wire-named `specContent` (not `spec`) —
+// the SDK exposes it as the Go-friendly Spec while keeping the wire
+// tag aligned with the server. SpecURL is the alternative source.
 type ContractConfig struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
-	Spec      string `json:"spec,omitempty"`
+	Spec      string `json:"specContent,omitempty"`
 	SpecURL   string `json:"specUrl,omitempty"`
 	TargetURL string `json:"targetUrl,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 	Schedule  string `json:"schedule,omitempty"`
-	CreatedAt int64  `json:"createdAt,omitempty"`
-	UpdatedAt int64  `json:"updatedAt,omitempty"`
+	// Timestamps are ISO-8601 strings on the wire — parse with
+	// time.Parse(time.RFC3339, …) when needed. Older SDK builds
+	// used int64; that broke decode against the current server.
+	CreatedAt string `json:"createdAt,omitempty"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
 // ContractValidationRequest is the payload for validate-mocks and verify-provider.
@@ -70,13 +77,42 @@ type DriftDetectionRequest struct {
 }
 
 // ContractValidationResult holds the result of a contract validation.
+//
+// Wire shape varies across endpoints:
+//   - validate-payload returns `{valid: bool, violations: [...], ...}`
+//   - validate-mocks / verify-provider return `{status, configId, ...}`
+// The SDK projects both into a unified shape: Status is "pass" / "fail"
+// derived from `valid` when present; Violations is the LIST of issues
+// (NOT a count — the legacy `violations: int` shape was wrong);
+// ViolationCount is the explicit count when the server provides it.
 type ContractValidationResult struct {
-	ID          string              `json:"id,omitempty"`
-	ConfigID    string              `json:"configId,omitempty"`
-	Status      string              `json:"status,omitempty"` // pass, fail
-	Violations  int                 `json:"violations,omitempty"`
-	Details     []ContractViolation `json:"details,omitempty"`
-	ValidatedAt int64               `json:"validatedAt,omitempty"`
+	ID             string              `json:"id,omitempty"`
+	ConfigID       string              `json:"configId,omitempty"`
+	Status         string              `json:"status,omitempty"`
+	Valid          *bool               `json:"valid,omitempty"`
+	Violations     []ContractViolation `json:"violations,omitempty"`
+	ViolationCount int                 `json:"violationCount,omitempty"`
+	Details        []ContractViolation `json:"details,omitempty"`
+	ValidatedAt    int64               `json:"validatedAt,omitempty"`
+}
+
+// EffectiveStatus returns "pass" / "fail" by reading Status when set,
+// falling back to the `valid` boolean. Useful in tests that care
+// about the boolean outcome but not which endpoint produced it.
+func (r *ContractValidationResult) EffectiveStatus() string {
+	if r == nil {
+		return ""
+	}
+	if r.Status != "" {
+		return r.Status
+	}
+	if r.Valid != nil {
+		if *r.Valid {
+			return "pass"
+		}
+		return "fail"
+	}
+	return ""
 }
 
 // ContractViolation represents a single violation found during contract validation.
@@ -139,9 +175,18 @@ func (a *ContractAPI) ValidatePayload(ctx context.Context, req *ValidatePayloadR
 // ---------------------------------------------------------------------------
 
 // ListConfigs returns all contract testing configurations.
+//
+// Namespace plumbing: the server reads ?namespace= from the query.
+// Without it the call lists all configs (or the default 'sandbox'
+// namespace's), so callers in any non-default workspace see the
+// wrong list. SDK now threads the client namespace through.
 func (a *ContractAPI) ListConfigs(ctx context.Context) ([]ContractConfig, error) {
+	q := ""
+	if a.client.namespace != "" {
+		q = "?namespace=" + url.QueryEscape(a.client.namespace)
+	}
 	var configs []ContractConfig
-	if err := a.client.do(ctx, "GET", "/api/v1/contract/configs", nil, &configs); err != nil {
+	if err := a.client.do(ctx, "GET", "/api/v1/contract/configs"+q, nil, &configs); err != nil {
 		return nil, err
 	}
 	return configs, nil

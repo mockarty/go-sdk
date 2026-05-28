@@ -24,7 +24,10 @@ type MockFolder struct {
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
-// List returns all mock folders.
+// List returns all mock folders for the client's namespace.
+//
+// Wire shape: server replies with `{"folders":[...], "mockCounts":{...}}`.
+// The SDK unwraps the envelope and returns the folders slice.
 func (a *FolderAPI) List(ctx context.Context) ([]MockFolder, error) {
 	params := url.Values{}
 	if a.client.namespace != "" {
@@ -36,11 +39,13 @@ func (a *FolderAPI) List(ctx context.Context) ([]MockFolder, error) {
 		path += "?" + params.Encode()
 	}
 
-	var folders []MockFolder
-	if err := a.client.do(ctx, "GET", path, nil, &folders); err != nil {
+	var env struct {
+		Folders []MockFolder `json:"folders"`
+	}
+	if err := a.client.do(ctx, "GET", path, nil, &env); err != nil {
 		return nil, err
 	}
-	return folders, nil
+	return env.Folders, nil
 }
 
 // Create creates a new folder.
