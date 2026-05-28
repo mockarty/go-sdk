@@ -114,12 +114,21 @@ func (a *FuzzingAPI) GetResult(ctx context.Context, id string) (*FuzzingResult, 
 }
 
 // ListResults returns all fuzzing results.
+//
+// Wire shape: server emits `{results, total, limit, offset}` envelope.
+// Older SDK builds decoded into `[]FuzzingResult` and failed every
+// call with 'cannot unmarshal object'.
 func (a *FuzzingAPI) ListResults(ctx context.Context) ([]FuzzingResult, error) {
-	var results []FuzzingResult
-	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/results", nil, &results); err != nil {
+	var env struct {
+		Results []FuzzingResult `json:"results"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/results", nil, &env); err != nil {
 		return nil, err
 	}
-	return results, nil
+	if env.Results == nil {
+		return []FuzzingResult{}, nil
+	}
+	return env.Results, nil
 }
 
 // DeleteResult deletes a fuzzing result by ID.
@@ -259,12 +268,22 @@ func (a *FuzzingAPI) QuickFuzz(ctx context.Context, req any) (*FuzzingRun, error
 // ---------------------------------------------------------------------------
 
 // ListFindings returns all fuzzing findings.
+//
+// Wire shape: server emits `{findings, total, limit, offset,
+// quarantinedCount?}` envelope. Older SDK builds decoded into bare
+// `[]FuzzingFinding` and failed every call with 'cannot unmarshal
+// object'.
 func (a *FuzzingAPI) ListFindings(ctx context.Context) ([]FuzzingFinding, error) {
-	var findings []FuzzingFinding
-	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/findings", nil, &findings); err != nil {
+	var env struct {
+		Findings []FuzzingFinding `json:"findings"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/fuzzing/findings", nil, &env); err != nil {
 		return nil, err
 	}
-	return findings, nil
+	if env.Findings == nil {
+		return []FuzzingFinding{}, nil
+	}
+	return env.Findings, nil
 }
 
 // GetFinding retrieves a fuzzing finding by ID.
@@ -461,6 +480,9 @@ func (a *FuzzingAPI) ListFuzzQuarantine(ctx context.Context, limit, offset int) 
 	}
 	if err := a.client.do(ctx, "GET", path, nil, &resp); err != nil {
 		return nil, 0, err
+	}
+	if resp.Entries == nil {
+		resp.Entries = []QuarantineEntry{}
 	}
 	return resp.Entries, resp.Total, nil
 }
