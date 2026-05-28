@@ -62,11 +62,21 @@ func (a *UndefinedAPI) ClearAll(ctx context.Context) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/undefined-requests/all", nil, nil)
 }
 
-// CreateMock creates a mock from an undefined request.
+// CreateMock auto-generates a mock from a recorded undefined request.
+//
+// Wire shape: this targets the `/convert` endpoint, which derives the
+// mock from the stored undefined-request row (protocol auto-detected
+// server-side) and returns a `{mock, mockId, protocol, isNew}`
+// envelope. The older SDK build pointed at `/create-mock`, which
+// instead expects a caller-supplied `{mockData}` body and 400'd with
+// 'invalid request payload' on the no-body call. The unwrapped `mock`
+// is returned so callers get the persisted Mock directly.
 func (a *UndefinedAPI) CreateMock(ctx context.Context, id string) (*Mock, error) {
-	var mock Mock
-	if err := a.client.do(ctx, "POST", "/api/v1/undefined-requests/"+url.PathEscape(id)+"/create-mock", nil, &mock); err != nil {
+	var env struct {
+		Mock Mock `json:"mock"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/undefined-requests/"+url.PathEscape(id)+"/convert", nil, &env); err != nil {
 		return nil, err
 	}
-	return &mock, nil
+	return &env.Mock, nil
 }
