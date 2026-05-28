@@ -25,13 +25,23 @@ type UndefinedRequest struct {
 	Headers   map[string]any `json:"headers,omitempty"`
 }
 
-// List returns all unmatched requests.
+// List returns all unmatched requests for the client's namespace.
+//
+// Wire shape: `{"requests": [...], "total": N, "offset": N, "limit": N}`.
+// The SDK unwraps the envelope and threads ?namespace= (server reads
+// it from query only).
 func (a *UndefinedAPI) List(ctx context.Context) ([]UndefinedRequest, error) {
-	var requests []UndefinedRequest
-	if err := a.client.do(ctx, "GET", "/api/v1/undefined-requests", nil, &requests); err != nil {
+	q := ""
+	if a.client.namespace != "" {
+		q = "?namespace=" + url.QueryEscape(a.client.namespace)
+	}
+	var env struct {
+		Requests []UndefinedRequest `json:"requests"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/undefined-requests"+q, nil, &env); err != nil {
 		return nil, err
 	}
-	return requests, nil
+	return env.Requests, nil
 }
 
 // Ignore marks an undefined request as ignored.
