@@ -292,21 +292,35 @@ type RecorderConfig struct {
 // ---------------------------------------------------------------------------
 
 // ListConfigs returns all recorder configurations.
+//
+// Wire shape: server emits `{configs: [...]}` envelope. Older SDK
+// builds decoded into bare `[]RecorderConfig` and silently returned
+// nil for every call.
 func (a *RecorderAPI) ListConfigs(ctx context.Context) ([]RecorderConfig, error) {
-	var configs []RecorderConfig
-	if err := a.client.do(ctx, "GET", "/api/v1/recorder/configs", nil, &configs); err != nil {
+	var env struct {
+		Configs []RecorderConfig `json:"configs"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/recorder/configs", nil, &env); err != nil {
 		return nil, err
 	}
-	return configs, nil
+	if env.Configs == nil {
+		return []RecorderConfig{}, nil
+	}
+	return env.Configs, nil
 }
 
 // SaveConfig creates or updates a recorder configuration.
+//
+// Wire shape: server replies with `{config: <RecorderConfig>}` —
+// unwrap before returning.
 func (a *RecorderAPI) SaveConfig(ctx context.Context, config *RecorderConfig) (*RecorderConfig, error) {
-	var result RecorderConfig
-	if err := a.client.do(ctx, "POST", "/api/v1/recorder/configs", config, &result); err != nil {
+	var env struct {
+		Config RecorderConfig `json:"config"`
+	}
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/configs", config, &env); err != nil {
 		return nil, err
 	}
-	return &result, nil
+	return &env.Config, nil
 }
 
 // DeleteConfig deletes a recorder configuration by ID.
