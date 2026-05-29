@@ -56,12 +56,16 @@ func main() {
 	}
 	fmt.Printf("[3] Retrieved v%d — value length %d\n", entry.Version, len(entry.Value))
 
-	// 4. Rotate — bumps version, returns new value
-	rotated, err := client.Secrets().RotateEntry(ctx, store.ID, "stripe_api_key")
-	if err != nil {
+	// 4. Rotate to a new value — bumps version. The rotate response is a
+	//    minimal ack; re-fetch the entry to observe the new version + value.
+	if _, err := client.Secrets().RotateEntry(ctx, store.ID, "stripe_api_key", "sk_live_rotated_value"); err != nil {
 		log.Fatalf("rotate: %v", err)
 	}
-	fmt.Printf("[4] Rotated to v%d\n", rotated.Version)
+	afterRotate, err := client.Secrets().GetEntry(ctx, store.ID, "stripe_api_key")
+	if err != nil {
+		log.Fatalf("get after rotate: %v", err)
+	}
+	fmt.Printf("[4] Rotated to v%d (value length %d)\n", afterRotate.Version, len(afterRotate.Value))
 
 	// 5. List entries (keys/metadata only — no values)
 	entries, err := client.Secrets().ListEntries(ctx, store.ID)
