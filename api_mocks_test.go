@@ -329,8 +329,9 @@ func TestMockAPI_Delete(t *testing.T) {
 }
 
 func TestMockAPI_Restore(t *testing.T) {
+	// Batch endpoints read the ID list from `mockIds` (not `ids`).
 	var gotBody struct {
-		IDs []string `json:"ids"`
+		MockIDs []string `json:"mockIds"`
 	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/mocks/batch/restore": func(w http.ResponseWriter, r *http.Request) {
@@ -344,8 +345,8 @@ func TestMockAPI_Restore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotBody.IDs) != 1 || gotBody.IDs[0] != "restored-mock" {
-		t.Errorf("expected IDs [restored-mock], got %v", gotBody.IDs)
+	if len(gotBody.MockIDs) != 1 || gotBody.MockIDs[0] != "restored-mock" {
+		t.Errorf("expected mockIds [restored-mock], got %v", gotBody.MockIDs)
 	}
 }
 
@@ -381,11 +382,15 @@ func TestMockAPI_Update(t *testing.T) {
 }
 
 func TestMockAPI_BatchCreate(t *testing.T) {
-	var gotMocks []*Mock
+	// BatchCreate wraps the slice in a `{mocks: [...]}` envelope (the
+	// server binds into a map, not a bare array).
+	var gotBody struct {
+		Mocks []*Mock `json:"mocks"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/mocks/batch": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &gotMocks)
+			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -400,14 +405,14 @@ func TestMockAPI_BatchCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotMocks) != 3 {
-		t.Errorf("expected 3 mocks in batch, got %d", len(gotMocks))
+	if len(gotBody.Mocks) != 3 {
+		t.Errorf("expected 3 mocks in batch envelope, got %d", len(gotBody.Mocks))
 	}
 }
 
 func TestMockAPI_BatchDelete(t *testing.T) {
 	var gotBody struct {
-		IDs []string `json:"ids"`
+		MockIDs []string `json:"mockIds"`
 	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"DELETE /api/v1/mocks/batch": func(w http.ResponseWriter, r *http.Request) {
@@ -421,14 +426,14 @@ func TestMockAPI_BatchDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotBody.IDs) != 2 {
-		t.Errorf("expected 2 IDs, got %d", len(gotBody.IDs))
+	if len(gotBody.MockIDs) != 2 {
+		t.Errorf("expected 2 mockIds, got %d", len(gotBody.MockIDs))
 	}
 }
 
 func TestMockAPI_BatchRestore(t *testing.T) {
 	var gotBody struct {
-		IDs []string `json:"ids"`
+		MockIDs []string `json:"mockIds"`
 	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/mocks/batch/restore": func(w http.ResponseWriter, r *http.Request) {
@@ -442,8 +447,8 @@ func TestMockAPI_BatchRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(gotBody.IDs) != 3 {
-		t.Errorf("expected 3 IDs, got %d", len(gotBody.IDs))
+	if len(gotBody.MockIDs) != 3 {
+		t.Errorf("expected 3 mockIds, got %d", len(gotBody.MockIDs))
 	}
 }
 
@@ -743,11 +748,16 @@ func TestStoreAPI_GlobalSet_IncludesNamespace(t *testing.T) {
 	}
 }
 
-// TestStoreAPI_ChainSet_IncludesNamespace verifies namespace in chain POST body.
+// TestStoreAPI_ChainSet_IncludesNamespace verifies namespace is threaded
+// via the ?namespace= query string (the chain-store endpoints read it
+// from the query, not the body — the older fixture asserted the body,
+// which no longer matches the implementation).
 func TestStoreAPI_ChainSet_IncludesNamespace(t *testing.T) {
+	var gotNamespace string
 	var gotBody map[string]any
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/stores/chain/": func(w http.ResponseWriter, r *http.Request) {
+			gotNamespace = r.URL.Query().Get("namespace")
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
@@ -758,8 +768,12 @@ func TestStoreAPI_ChainSet_IncludesNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotBody["namespace"] != "sandbox" {
-		t.Errorf("expected namespace=sandbox in body, got %v", gotBody["namespace"])
+	if gotNamespace != "sandbox" {
+		t.Errorf("expected namespace=sandbox in query, got %q", gotNamespace)
+	}
+	// Body still carries the key/value pair.
+	if gotBody["key"] != "step" || gotBody["value"] != "done" {
+		t.Errorf("unexpected chain-set body: %v", gotBody)
 	}
 }
 

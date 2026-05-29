@@ -273,13 +273,18 @@ func TestGeneratorAPI_ServerError(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestFuzzingAPI_Start(t *testing.T) {
-	var gotBody FuzzingConfig
+	// Request body is wrapped in a {config:{...}} envelope; the response
+	// carries {taskId, resultId, status} — FuzzingRun.ID maps from
+	// `resultId` (NOT `id`).
+	var gotBody struct {
+		Config FuzzingConfig `json:"config"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"fuzz-run-1","status":"running"}`))
+			_, _ = w.Write([]byte(`{"taskId":"task-1","resultId":"fuzz-run-1","status":"running"}`))
 		},
 	})
 
@@ -292,32 +297,34 @@ func TestFuzzingAPI_Start(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if run.ID != "fuzz-run-1" {
-		t.Errorf("expected ID fuzz-run-1, got %q", run.ID)
+		t.Errorf("expected ID fuzz-run-1 (from resultId), got %q", run.ID)
 	}
 	if run.Status != "running" {
 		t.Errorf("expected status running, got %q", run.Status)
 	}
-	if gotBody.Name != "security-fuzz" {
-		t.Errorf("expected name security-fuzz, got %q", gotBody.Name)
+	if gotBody.Config.Name != "security-fuzz" {
+		t.Errorf("expected config.name security-fuzz, got %q", gotBody.Config.Name)
 	}
 }
 
 func TestFuzzingAPI_Start_DefaultNamespace(t *testing.T) {
-	var gotBody FuzzingConfig
+	var gotBody struct {
+		Config FuzzingConfig `json:"config"`
+	}
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/fuzzing/run": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"fuzz-1","status":"running"}`))
+			_, _ = w.Write([]byte(`{"taskId":"task-1","resultId":"fuzz-1","status":"running"}`))
 		},
 	})
 
 	_, _ = client.Fuzzing().Start(context.Background(), &FuzzingConfig{
 		TargetBaseURL: "https://api.example.com",
 	})
-	if gotBody.Namespace != "sandbox" {
-		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
+	if gotBody.Config.Namespace != "sandbox" {
+		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Config.Namespace)
 	}
 }
 
@@ -363,7 +370,9 @@ func TestFuzzingAPI_ListResults(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/fuzzing/results": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"r1","status":"completed"},{"id":"r2","status":"running"}]`))
+			// Server emits {results,total,limit,offset} envelope.
+			_, _ = w.Write([]byte(`{"results":[{"id":"r1","status":"completed"},` +
+				`{"id":"r2","status":"running"}],"total":2}`))
 		},
 	})
 
@@ -446,7 +455,13 @@ func TestContractAPI_ValidateMocks(t *testing.T) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"result-1","status":"fail","violations":2}`))
+			// `violations` is a LIST of issue objects + an explicit
+			// `violationCount`. (Legacy stale fixture used `violations:2`
+			// — an int — which no longer matches the struct.)
+			_, _ = w.Write([]byte(`{"id":"result-1","status":"fail","violationCount":2,` +
+				`"violations":[` +
+				`{"path":"/users","message":"missing field","severity":"error"},` +
+				`{"path":"/orders","message":"type mismatch","severity":"error"}]}`))
 		},
 	})
 
@@ -460,8 +475,11 @@ func TestContractAPI_ValidateMocks(t *testing.T) {
 	if result.Status != "fail" {
 		t.Errorf("expected status fail, got %q", result.Status)
 	}
-	if result.Violations != 2 {
-		t.Errorf("expected 2 violations, got %d", result.Violations)
+	if len(result.Violations) != 2 {
+		t.Errorf("expected 2 violations, got %d", len(result.Violations))
+	}
+	if result.ViolationCount != 2 {
+		t.Errorf("expected violationCount 2, got %d", result.ViolationCount)
 	}
 	if gotBody.Namespace != "sandbox" {
 		t.Errorf("expected default namespace 'sandbox', got %q", gotBody.Namespace)
@@ -527,7 +545,12 @@ func TestContractAPI_ListResults(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/contract/results": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"r1","status":"pass"},{"id":"r2","status":"fail","violations":1}]`))
+			// `violations` is a list of issue objects + `violationCount`
+			// scalar (the old fixture used `violations:1` — an int — which
+			// no longer matches the struct).
+			_, _ = w.Write([]byte(`[{"id":"r1","status":"pass"},` +
+				`{"id":"r2","status":"fail","violationCount":1,` +
+				`"violations":[{"path":"/x","message":"bad","severity":"error"}]}]`))
 		},
 	})
 
@@ -551,7 +574,8 @@ func TestRecorderAPI_StartRecording(t *testing.T) {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &gotBody)
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"recording"}`))
+			// Server wraps the session in a {session:{...}} envelope.
+			_, _ = w.Write([]byte(`{"session":{"id":"session-1","name":"My Recording","status":"recording"}}`))
 		},
 	})
 
@@ -574,7 +598,7 @@ func TestRecorderAPI_GetSession(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"session-1","name":"My Recording","status":"recording","entryCount":42}`))
+			_, _ = w.Write([]byte(`{"session":{"id":"session-1","name":"My Recording","status":"recording","entryCount":42}}`))
 		},
 	})
 
@@ -591,7 +615,7 @@ func TestRecorderAPI_ListSessions(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/recorder/sessions": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"s1","status":"idle"},{"id":"s2","status":"recording"}]`))
+			_, _ = w.Write([]byte(`{"sessions":[{"id":"s1","status":"idle"},{"id":"s2","status":"recording"}]}`))
 		},
 	})
 
@@ -644,7 +668,8 @@ func TestRecorderAPI_GetEntries(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/recorder/": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"e1","method":"GET","path":"/api/users","statusCode":200},{"id":"e2","method":"POST","path":"/api/users","statusCode":201}]`))
+			_, _ = w.Write([]byte(`{"entries":[{"id":"e1","method":"GET","path":"/api/users","statusCode":200},` +
+				`{"id":"e2","method":"POST","path":"/api/users","statusCode":201}],"total":2}`))
 		},
 	})
 
@@ -761,7 +786,9 @@ func TestTemplateAPI_List(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/templates": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"name":"response.json","size":1024},{"name":"error.xml","size":512}]`))
+			// Server emits {templates:[<filename>,...]} — a bare string
+			// list of filenames, not {name,size} objects.
+			_, _ = w.Write([]byte(`{"templates":["response.json","error.xml"],"total":2}`))
 		},
 	})
 
@@ -795,11 +822,14 @@ func TestTemplateAPI_Get(t *testing.T) {
 }
 
 func TestTemplateAPI_Upload(t *testing.T) {
-	var gotBody map[string]any
+	// Upload streams the template bytes RAW (not wrapped in a
+	// {content:...} JSON envelope) so a subsequent Get round-trips the
+	// exact bytes.
+	var gotRawBody string
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/templates/": func(w http.ResponseWriter, r *http.Request) {
 			body, _ := io.ReadAll(r.Body)
-			_ = json.Unmarshal(body, &gotBody)
+			gotRawBody = string(body)
 			w.WriteHeader(http.StatusOK)
 		},
 	})
@@ -808,8 +838,8 @@ func TestTemplateAPI_Upload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotBody["content"] != `{"hello":"world"}` {
-		t.Errorf("unexpected content in body: %v", gotBody["content"])
+	if gotRawBody != `{"hello":"world"}` {
+		t.Errorf("expected raw body bytes, got %q", gotRawBody)
 	}
 }
 
@@ -839,7 +869,12 @@ func TestImportAPI_Postman(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"POST /api/v1/api-tester/import/postman": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"collectionId":"col-1","name":"Postman Collection","imported":15}`))
+			// Real server shape: {collections:[{id,...}], requests, summary}.
+			// CollectionID is derived from collections[0].id and Imported
+			// from summary.importedRequests (the flat collectionId/imported
+			// fields in the old fixture never existed on the wire).
+			_, _ = w.Write([]byte(`{"collections":[{"id":"col-1","name":"Postman Collection","protocol":"http"}],` +
+				`"requests":[],"summary":{"importedRequests":15,"importedCollections":1}}`))
 		},
 	})
 
@@ -996,7 +1031,11 @@ func TestTestRunAPI_List(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/api-tester/test-runs": func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"run-1","status":"completed","totalTests":10,"passedTests":8,"failedTests":2}]`))
+			// Server emits a {runs,total,limit,offset} envelope — not a
+			// bare array (the old fixture predates the unified test-runs
+			// view + envelope unwrap).
+			_, _ = w.Write([]byte(`{"runs":[{"id":"run-1","status":"completed","totalTests":10,` +
+				`"passedTests":8,"failedTests":2}],"total":1,"limit":50,"offset":0}`))
 		},
 	})
 
