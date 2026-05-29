@@ -81,6 +81,7 @@ type DriftDetectionRequest struct {
 // Wire shape varies across endpoints:
 //   - validate-payload returns `{valid: bool, violations: [...], ...}`
 //   - validate-mocks / verify-provider return `{status, configId, ...}`
+//
 // The SDK projects both into a unified shape: Status is "pass" / "fail"
 // derived from `valid` when present; Violations is the LIST of issues
 // (NOT a count — the legacy `violations: int` shape was wrong);

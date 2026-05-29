@@ -274,8 +274,8 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any) ([]b
 // Body marshalling rules:
 //   - body == nil           → no body
 //   - body is []byte        → sent as-is (binary upload path — used by
-//                             Templates().Upload, Recorder export
-//                             import, etc.)
+//     Templates().Upload, Recorder export
+//     import, etc.)
 //   - body is io.Reader     → sent as-is
 //   - anything else         → JSON-marshalled (the common case)
 func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.ReadCloser, error) {

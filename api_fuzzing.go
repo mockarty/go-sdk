@@ -35,7 +35,7 @@ type FuzzingConfig struct {
 // "runnerId":"..."} — the SDK projects:
 //   - TaskID    → runner_tasks.id (use this with Tasks API / cancel)
 //   - ID        → fuzz_results.id (use this with GetResult / Stop /
-//                 ListFindings — that's the user-visible "run" id)
+//     ListFindings — that's the user-visible "run" id)
 //   - RunnerID  → assigned runner UUID (empty when auto-picked)
 //   - Status    → optional; populated when a future server emits it
 type FuzzingRun struct {

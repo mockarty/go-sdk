@@ -33,15 +33,15 @@ type ImportAPI struct {
 //     one (multi-folder Postman exports surface here).
 //   - Imported counts the total imported requests.
 type ImportResult struct {
-	CollectionID string                   `json:"-"`
-	Collections  []ImportedCollection     `json:"collections,omitempty"`
-	Requests     []ImportedRequest        `json:"requests,omitempty"`
-	SeededMocks  *ImportSeededMocks       `json:"seededMocks,omitempty"`
-	Summary      map[string]any           `json:"summary,omitempty"`
-	Failures     []map[string]any         `json:"failures,omitempty"`
-	Name         string                   `json:"name,omitempty"`
-	Imported     int                      `json:"imported,omitempty"`
-	Message      string                   `json:"message,omitempty"`
+	CollectionID string               `json:"-"`
+	Collections  []ImportedCollection `json:"collections,omitempty"`
+	Requests     []ImportedRequest    `json:"requests,omitempty"`
+	SeededMocks  *ImportSeededMocks   `json:"seededMocks,omitempty"`
+	Summary      map[string]any       `json:"summary,omitempty"`
+	Failures     []map[string]any     `json:"failures,omitempty"`
+	Name         string               `json:"name,omitempty"`
+	Imported     int                  `json:"imported,omitempty"`
+	Message      string               `json:"message,omitempty"`
 }
 
 // ImportedCollection — one row of the `collections` response array.

@@ -20,22 +20,22 @@ type PromptsAPI struct {
 
 // Prompt is a single managed prompt template.
 type Prompt struct {
-	CreatedAt   time.Time         `json:"createdAt"`
-	UpdatedAt   time.Time         `json:"updatedAt"`
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Namespace   string            `json:"namespace"`
-	Description string            `json:"description,omitempty"`
-	Body        string            `json:"body"`
-	Model       string            `json:"model,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Namespace   string    `json:"namespace"`
+	Description string    `json:"description,omitempty"`
+	Body        string    `json:"body"`
+	Model       string    `json:"model,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
 	// Server emits Variables as a LIST of variable definitions (not a
 	// flat map). The previous SDK shape decoded to map[string]string
 	// which silently failed with 'cannot unmarshal array into …'.
 	// Keep it untyped to tolerate both the array-of-objects and the
 	// historical map shape across server versions.
-	Variables   any               `json:"variables,omitempty"`
-	Version     int               `json:"version"`
+	Variables any `json:"variables,omitempty"`
+	Version   int `json:"version"`
 }
 
 // PromptVersion is one entry from a prompt's FIFO-20 history.
