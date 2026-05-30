@@ -20,9 +20,25 @@
 //	    for _, e := range t.Errors() { fmt.Println(e) }
 //	}
 //
-// HTTP is the first protocol facet shipped; Kafka / gRPC / RabbitMQ
-// follow the same shape. When the SDK is used inside a test wrapped with
-// allure.WithTest, every step is also captured in the Allure result JSON.
+// HTTP is the first protocol facet shipped; GraphQL, SOAP, WebSocket,
+// SSE, gRPC, Kafka, RabbitMQ, DB, S3, SMTP and Socket.IO follow the same
+// shape. When the SDK is used inside a test wrapped with allure.WithTest,
+// every step is also captured in the Allure result JSON.
+//
+// S3 / SMTP / Socket.IO facets (CI-friendly minimal clients live in
+// protocols/{s3,smtp,socketio}):
+//
+//	s3cli := s3.NewClient("http://localhost:8080/s3")
+//	t.S3(s3cli).Put("reports", "q1.csv").Body("a,b,c").ExpectOK()
+//	t.S3(s3cli).Get("reports", "q1.csv").ExpectBodyContains("a,b,c")
+//
+//	mail := smtp.NewClient("localhost:1025",
+//	    smtp.WithPlainAuth("user", "pass", "localhost"))
+//	t.SMTP(mail).Send("a@x", "b@y").Subject("Hi").Body("...").ExpectAccepted()
+//
+//	t.SocketIO("http://localhost:8080").Connect().
+//	    Emit("greet", "World").Collect(2*time.Second).
+//	    ExpectEvent("greeting").ExpectEventJSONPath("greeting", "$.msg", "hello World")
 //
 // Variable interpolation: any string passed to .Header, .JSON, .Body
 // (text/* + form-urlencoded), or used as part of the request path is
