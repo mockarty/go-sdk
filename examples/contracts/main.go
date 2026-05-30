@@ -146,6 +146,28 @@ func main() {
 	}
 
 	// -----------------------------------------------------------------------
+	// 4b. Import a pact FILE produced by a pact framework (one-call bridge)
+	// -----------------------------------------------------------------------
+	//
+	// In CI you typically run your consumer tests, which write a pact file
+	// to ./pacts/<consumer>-<provider>.json (mockarty-go's pact.WritePactFile,
+	// pact-python, pact-js, pact-jvm — any of them). ImportPactFile reads
+	// that file and publishes it to Mockarty as a contract in one call, so
+	// you never have to paste JSON into the UI.
+	fmt.Println("\n--- Import Pact File ---")
+
+	imported, err := client.Contracts().ImportPactFile(ctx, "./pacts/web-frontend-user-service.json",
+		&mockarty.ImportPactOptions{Version: "1.2.0"}) // version usually the git SHA in CI
+	if err != nil {
+		// Expected here unless you ran a consumer test first that wrote the file.
+		fmt.Printf("Import pact file returned: %v\n", err)
+	} else {
+		fmt.Printf("Imported pact: id=%s, consumer=%s, provider=%s\n",
+			imported.ID, imported.Consumer.Name, imported.Provider.Name)
+		defer func() { _ = client.Contracts().DeletePact(ctx, imported.ID) }()
+	}
+
+	// -----------------------------------------------------------------------
 	// 5. List all pacts
 	// -----------------------------------------------------------------------
 	fmt.Println("\n--- List Pacts ---")
