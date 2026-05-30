@@ -149,8 +149,10 @@ func WithParameterEx(name, value string, mode ParameterMode, excluded bool) Opti
 // in package-level state (see Issue/IssueLink builders).
 func WithIssuePattern(pattern string) Option {
 	return func(c *config) {
-		// Stored on the config so RuntimeIssue can read it later if needed.
-		c.labels = append(c.labels, AllureLabel{Name: "_internal.issuePattern", Value: pattern})
+		// Stored on the config under the reserved `_internal.` prefix so it is
+		// stripped before the result is written (never leaks into the Allure
+		// report as a junk label). See internalLabelPrefix in scope.go.
+		c.labels = append(c.labels, AllureLabel{Name: internalLabelPrefix + "issuePattern", Value: pattern})
 	}
 }
 

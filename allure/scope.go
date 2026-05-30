@@ -7,16 +7,24 @@ package allure
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// internalLabelPrefix marks SDK-private labels carried on the config label
+// slice (e.g. WithIssuePattern). Labels with this prefix are stripped before
+// the result is written so they never appear in the Allure report.
+const internalLabelPrefix = "_internal."
 
 // scope is the in-memory accumulator for a single test. It collects steps,
 // attachments, labels and links and produces a serialisable [Result] on
@@ -71,16 +79,17 @@ func newScope(cfg config, writer ResultWriter) *scope {
 		Steps:       []AllureStep{},
 		Attachments: []AllureAttachment{},
 	}
-	// Stable historyId — derived from fullName + parameter values that are
-	// NOT marked excluded. uuid.NewSHA1 with a stable namespace gives us 32
-	// hex chars. Re-runs of the same parameter combination cluster together
+	// Stable historyId — byte-identical to allure-python's get_history_id:
+	// md5(fullName + non-excluded parameter VALUES sorted by name), no
+	// separators. Re-runs of the same parameter combination cluster together
 	// in Allure's history view; differing parameters fork into distinct
 	// history series.
 	s.result.HistoryID = computeHistoryID(fullName, cfg.parameters)
-	// AS_ID (Allure stable ID) is a short hash of testClass+testMethod used
-	// for history navigation. We compute it lazily from the bootstrap labels
-	// when applyConfigLabels runs.
-	s.result.TestCaseID = s.result.HistoryID
+	// testCaseId is the parameter-INDEPENDENT identity = md5(fullName),
+	// matching allure-pytest (test_result.testCaseId = md5(full_name)). Unlike
+	// historyId it stays constant across parameterised iterations, so TCM
+	// discovery can match the case by fullName when no explicit id is set.
+	s.result.TestCaseID = computeTestCaseID(fullName)
 
 	s.applyConfigLabels()
 	if cfg.description != "" {
@@ -92,23 +101,46 @@ func newScope(cfg config, writer ResultWriter) *scope {
 	return s
 }
 
-// computeHistoryID is a deterministic hash of fullName + non-excluded
-// parameter values. Allure's history-id contract: two runs with the same
-// history-id are considered "the same test". Parameterised tests rely on
-// distinct parameter combinations producing distinct history-ids.
+// computeHistoryID is byte-identical to allure-python's get_history_id:
+// md5(fullName + non-excluded parameter VALUES sorted by parameter name),
+// concatenated with NO separator. Allure's history-id contract: two runs
+// with the same history-id are considered "the same test", so the algorithm
+// MUST match across SDKs and against allure-pytest for history/trend/retry
+// linking to work in a mixed-language report.
+//
+// Reference: allure-framework/allure-python allure-python-commons/src/
+// allure_commons/utils.py (md5 + get_history_id).
 func computeHistoryID(fullName string, params []AllureParameter) string {
-	h := sha1.New()
-	h.Write([]byte(fullName))
-	for _, p := range params {
+	values := make([]string, 0, len(params))
+	idx := make([]int, 0, len(params))
+	for i, p := range params {
 		if p.Excluded {
 			continue
 		}
-		h.Write([]byte{0})
-		h.Write([]byte(p.Name))
-		h.Write([]byte{0})
-		h.Write([]byte(p.Value))
+		idx = append(idx, i)
+	}
+	// Sort the surviving parameters by name (stable for equal names), then
+	// take their values — names are NOT folded into the hash (Allure parity).
+	sort.SliceStable(idx, func(a, b int) bool {
+		return params[idx[a]].Name < params[idx[b]].Name
+	})
+	for _, i := range idx {
+		values = append(values, params[i].Value)
+	}
+	h := md5.New()
+	h.Write([]byte(fullName))
+	for _, v := range values {
+		h.Write([]byte(v))
 	}
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+// computeTestCaseID is the parameter-independent identity = md5(fullName),
+// matching allure-pytest's testCaseId. Stays constant across parameterised
+// iterations of the same test.
+func computeTestCaseID(fullName string) string {
+	sum := md5.Sum([]byte(fullName))
+	return hex.EncodeToString(sum[:])
 }
 
 // goroutineID parses the current goroutine ID out of runtime.Stack output.
@@ -189,7 +221,16 @@ func (s *scope) applyConfigLabels() {
 	if asID := s.computeAllureStableID(); asID != "" {
 		push(LabelAllureID, asID)
 	}
-	s.result.Labels = append(s.result.Labels, s.cfg.labels...)
+	// Append user labels, but NEVER emit internal bookkeeping labels (the
+	// `_internal.` prefix is reserved for SDK-private config carried on the
+	// label slice, e.g. WithIssuePattern). Leaking them pollutes the Allure
+	// report with junk metadata rows.
+	for _, l := range s.cfg.labels {
+		if strings.HasPrefix(l.Name, internalLabelPrefix) {
+			continue
+		}
+		s.result.Labels = append(s.result.Labels, l)
+	}
 	s.result.Links = append(s.result.Links, s.cfg.links...)
 	s.result.Parameters = append(s.result.Parameters, s.cfg.parameters...)
 }

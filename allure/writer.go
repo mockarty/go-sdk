@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -146,6 +147,42 @@ func (w *FileWriter) WriteCategories(cats []Category) error {
 		return err
 	}
 	return writeJSONFile(filepath.Join(w.dir, "categories.json"), cats)
+}
+
+// WriteEnvironment writes `environment.properties` — the key/value snapshot
+// Allure renders in the report's "Environment" widget. The format is a Java
+// `.properties` file: one `key=value` line per entry, keys sorted for stable
+// byte output. Newlines and carriage returns inside a value are neutralised
+// to spaces (a raw newline would split the value into a bogus second entry).
+//
+// Allure also accepts `environment.xml`; the `.properties` form is the one
+// the Python/Java SDKs emit, so we match it for cross-language parity.
+//
+// Reference: https://allurereport.org/docs/how-it-works-environment-file/
+func (w *FileWriter) WriteEnvironment(env map[string]string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := os.MkdirAll(w.dir, 0o755); err != nil {
+		return err
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	repl := strings.NewReplacer("\n", " ", "\r", " ")
+	for _, k := range keys {
+		b.WriteString(k)
+		b.WriteByte('=')
+		b.WriteString(repl.Replace(env[k]))
+		b.WriteByte('\n')
+	}
+	p := filepath.Join(w.dir, "environment.properties")
+	if err := os.WriteFile(p, []byte(b.String()), 0o644); err != nil {
+		return fmt.Errorf("allure: write %s: %w", p, err)
+	}
+	return nil
 }
 
 // WriteContainer writes a `<uuid>-container.json` file (rare — only when a
