@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Mockarty. All rights reserved.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+
 // Package dto's tests live next to the generated code (CLAUDE.md "Testing
 // Rules": tests co-located with the package). They verify JSON marshalling
 // round-trips and that the generator's encoding decisions (omitempty,

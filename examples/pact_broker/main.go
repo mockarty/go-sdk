@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Mockarty. All rights reserved.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+
 // Example: publish a consumer pact + check can-i-deploy.
 //
 // Run against a real Pact Broker by setting PACT_BROKER_BASE_URL +

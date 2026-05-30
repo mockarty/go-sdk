@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: entity_search — look up Mockarty resources by case-insensitive
 // name match across all major entity types. Powers UI pickers and CI/CD

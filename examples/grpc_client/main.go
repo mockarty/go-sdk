@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: grpc_client — call a gRPC service (real or Mockarty-mocked)
 // from a CI test script with auto-step capture into a Mockarty TCM

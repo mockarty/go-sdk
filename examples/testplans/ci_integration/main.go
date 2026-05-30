@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: testplans/ci_integration — full CI scenario:
 //  1. Attach a webhook to a Plan

@@ -386,4 +386,13 @@ if errors.As(err, &apiErr) {
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This SDK is proprietary software, **not** open source. It is licensed under the
+**Mockarty SDK License Agreement** — see [LICENSE](LICENSE) for the full terms.
+
+- **Free** for evaluation, learning, and non-commercial / community use.
+- **Commercial use requires a valid, paid Mockarty subscription.** Using this
+  SDK in production or for commercial advantage without a subscription is not
+  permitted.
+
+For commercial subscriptions and licensing inquiries, see
+[mockarty.ru](https://mockarty.ru) or contact orlovich.artem@gmail.com.

@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Package kafka is the Mockarty Go SDK's Kafka test client. It is built
 // for CI/CD test scripts that exercise a Kafka producer/consumer (real

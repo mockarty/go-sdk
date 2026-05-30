@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Mockarty. All rights reserved.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+
 // Package externalruns is a thin REST client for Mockarty's TCM external-runs
 // endpoint. External-runs let a CI pipeline (or any out-of-Mockarty test
 // runner) register a synthetic test run with the Mockarty admin server,

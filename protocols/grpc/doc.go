@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Package grpc is the Mockarty Go SDK's gRPC test client. It is built for
 // the use case the rest of mockarty-go is built for: writing CI/CD test

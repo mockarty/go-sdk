@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: testplans/manual_run — CI/CD flow against a manual Test Plan:
 //  1. Trigger the plan with executionModeOverride="manual" and recordDetailed=true.

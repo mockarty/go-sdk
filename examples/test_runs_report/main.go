@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: test_runs_report — fetch the unified test-run report in every
 // supported format for any mode (functional / load / fuzz / chaos / contract

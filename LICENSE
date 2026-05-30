@@ -1,21 +1,167 @@
-MIT License
+Mockarty SDK License Agreement
+Version 1.0, 2026
 
-Copyright (c) 2026 Mockarty
+Copyright (c) 2026 Artem Orlovich. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+NOTICE: This software development kit ("SDK") is proprietary software owned
+by Artem Orlovich, the creator of Mockarty. It is made available free of
+charge for evaluation, community, and non-commercial use. Commercial use
+requires a valid, paid Mockarty subscription. This SDK is NOT released
+under an open-source license (it is not MIT, Apache, BSD, or any other
+OSI-approved license), and no open-source rights are granted.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+==========================================================================
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+1. DEFINITIONS
+
+"Licensor" means Artem Orlovich, the copyright holder and creator of
+Mockarty.
+
+"SDK" means this software development kit, including all source code,
+object code, libraries, examples, documentation, and any other materials
+distributed in this repository or its published packages.
+
+"Mockarty Platform" means the Mockarty server software and hosted service
+that the SDK is designed to interact with.
+
+"Subscription" means a valid, paid Mockarty license or subscription that
+grants the right to use the Mockarty Platform under its terms, as evidenced
+by a cryptographically signed License Key issued by the Licensor.
+
+"Commercial Use" means any use of the SDK in a production environment, or
+any use that is intended for or directed toward commercial advantage or
+monetary compensation, including use within or on behalf of a for-profit
+organization, or use to build, test, operate, or deliver a product or
+service offered for commercial benefit.
+
+"Non-Commercial Use" means use solely for personal learning, evaluation,
+academic research, or community contribution to this SDK, in each case not
+for Commercial Use.
+
+"You" (or "Your") means the individual or legal entity exercising the
+permissions granted by this Agreement.
+
+2. GRANT OF LICENSE
+
+(a) Non-Commercial Use. Subject to Your compliance with this Agreement,
+    the Licensor grants You a limited, non-exclusive, non-transferable,
+    non-sublicensable, revocable license to download, install, use, and
+    modify the SDK solely for Non-Commercial Use.
+
+(b) Commercial Use. Commercial Use of the SDK is permitted ONLY while You
+    hold a valid Subscription, and ONLY in connection with the licensed
+    use of the Mockarty Platform. Commercial Use without a valid
+    Subscription is strictly prohibited and constitutes a breach of this
+    Agreement and copyright infringement.
+
+(c) Contributions. You may submit modifications and contributions to this
+    SDK. Any such contribution is provided to the Licensor under Section
+    4(d) and may be incorporated into the SDK at the Licensor's discretion.
+
+3. RESTRICTIONS
+
+You shall NOT:
+
+(a) Use the SDK for Commercial Use without a valid Subscription.
+
+(b) Distribute, sublicense, lease, rent, loan, sell, or otherwise transfer
+    the SDK, or a modified version of it, to any third party as a
+    standalone product, except as a contribution back to this SDK.
+
+(c) Remove, alter, or obscure any copyright notices, license notices, or
+    proprietary markings in the SDK.
+
+(d) Use the SDK to build, operate, or assist any product or service that
+    competes with the Mockarty Platform.
+
+(e) Use the SDK or any technique within it to circumvent, disable, or
+    tamper with any license verification, authentication, usage tracking,
+    or security mechanism of the Mockarty Platform.
+
+(f) Publish performance benchmarks or comparison results of the SDK or the
+    Mockarty Platform without the Licensor's prior written consent.
+
+(g) Use the SDK for any unlawful purpose or in violation of any applicable
+    laws or regulations.
+
+4. INTELLECTUAL PROPERTY
+
+(a) The SDK, including all copies, modifications, and derivative works, is
+    and shall remain the exclusive property of the Licensor. This Agreement
+    does not convey any ownership rights in the SDK.
+
+(b) All trade secrets, know-how, algorithms, data structures, protocols,
+    formats, and interfaces embodied in the SDK are proprietary information
+    of the Licensor.
+
+(c) The Mockarty name, logo, and all related trademarks, service marks, and
+    trade names are the exclusive property of the Licensor. You may not use
+    them without prior written consent.
+
+(d) Any feedback, suggestions, contributions, or improvements You provide
+    regarding the SDK shall become the property of the Licensor, who may use
+    them without any obligation to You.
+
+5. TERM AND TERMINATION
+
+(a) This Agreement is effective until terminated.
+
+(b) Your license automatically terminates if You breach any term of this
+    Agreement, including engaging in Commercial Use without a valid
+    Subscription.
+
+(c) Upon termination, You must immediately cease all use of the SDK and
+    destroy all copies in Your possession.
+
+(d) Sections 3, 4, 6, 7, and 9 survive termination.
+
+6. DISCLAIMER OF WARRANTIES
+
+THE SDK IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY
+KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND
+NON-INFRINGEMENT. THE LICENSOR DOES NOT WARRANT THAT THE SDK WILL BE
+UNINTERRUPTED, ERROR-FREE, OR SECURE.
+
+7. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
+SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS,
+REVENUE, DATA, OR BUSINESS OPPORTUNITY, HOWEVER CAUSED, EVEN IF ADVISED OF
+THE POSSIBILITY OF SUCH DAMAGES.
+
+8. EXPORT COMPLIANCE
+
+You shall comply with all applicable export and import control laws and
+regulations.
+
+9. GENERAL PROVISIONS
+
+(a) Governing Law. This Agreement shall be governed by and construed in
+    accordance with the laws of the Russian Federation, without regard to
+    its conflict of laws provisions.
+
+(b) Entire Agreement. This Agreement constitutes the entire agreement
+    between You and the Licensor regarding the SDK and supersedes all prior
+    agreements and understandings.
+
+(c) Severability. If any provision of this Agreement is found to be
+    unenforceable, the remaining provisions shall continue in full force
+    and effect.
+
+(d) Assignment. You may not assign or transfer this Agreement without the
+    Licensor's prior written consent. The Licensor may assign this
+    Agreement without restriction.
+
+10. CONTACT
+
+For licensing inquiries, permissions, and commercial subscriptions:
+Artem Orlovich
+Email: orlovich.artem@gmail.com
+Web:   https://mockarty.ru
+
+==========================================================================
+
+BY DOWNLOADING, INSTALLING, OR USING THIS SDK, YOU ACKNOWLEDGE THAT YOU HAVE
+READ THIS AGREEMENT, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS AND
+CONDITIONS. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT USE THIS SDK.

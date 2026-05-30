@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: load_test — describe a load test with the LoadTest builder DSL and
 // emit a perf-config that `mockarty-cli perf run --from-config` runs locally.

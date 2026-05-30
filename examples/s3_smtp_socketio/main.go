@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Example: s3_smtp_socketio — author one autotest that exercises S3,
 // SMTP and Socket.IO endpoints through the Mockarty SDK Tester, the same

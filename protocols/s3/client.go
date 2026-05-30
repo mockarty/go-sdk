@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the MIT License. See LICENSE file for details.
+// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
 
 // Package s3 is the Mockarty Go SDK's minimal S3 test client. It speaks
 // path-style S3 over plain HTTP so CI/CD test scripts can exercise an
