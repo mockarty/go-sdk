@@ -63,6 +63,7 @@ type Client struct {
 	meAPI                *MeAPI
 	externalRunsAPI      *ExternalRunsAPI
 	flowRunsAPI          *FlowRunsAPI
+	discoveryAPI         *DiscoveryAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -124,6 +125,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.meAPI = &MeAPI{client: c}
 	c.externalRunsAPI = &ExternalRunsAPI{client: c}
 	c.flowRunsAPI = &FlowRunsAPI{client: c}
+	c.discoveryAPI = &DiscoveryAPI{client: c}
 
 	return c
 }
@@ -135,6 +137,11 @@ func (c *Client) ExternalRuns() *ExternalRunsAPI { return c.externalRunsAPI }
 // FlowRuns returns the client for POST /api/v1/api-tester/flow-runs —
 // the server-side IR runner. See sdk/go-sdk/api_flow_runs.go for usage.
 func (c *Client) FlowRuns() *FlowRunsAPI { return c.flowRunsAPI }
+
+// Discovery returns the TCM test-discovery API — used to sync a test
+// framework's collected case list (pytest --collect-only, `go test -list`,
+// etc.) into the Mockarty catalogue. See sdk/go-sdk/api_discovery.go.
+func (c *Client) Discovery() *DiscoveryAPI { return c.discoveryAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
