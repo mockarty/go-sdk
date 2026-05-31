@@ -80,12 +80,14 @@ type allureResult struct {
 		Message string `json:"message,omitempty"`
 		Trace   string `json:"trace,omitempty"`
 	} `json:"statusDetails,omitempty"`
-	UUID        string `json:"uuid"`
-	HistoryID   string `json:"historyId"`
-	FullName    string `json:"fullName,omitempty"`
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Status      string `json:"status"`
+	UUID            string `json:"uuid"`
+	HistoryID       string `json:"historyId"`
+	TestCaseID      string `json:"testCaseId,omitempty"`
+	FullName        string `json:"fullName,omitempty"`
+	Name            string `json:"name"`
+	Description     string `json:"description,omitempty"`
+	DescriptionHTML string `json:"descriptionHtml,omitempty"`
+	Status          string `json:"status"`
 	Labels      []struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
@@ -147,8 +149,10 @@ func (r allureResult) toExternalRun() AllureRun {
 	}
 	req := CreateRunRequest{
 		Name:        firstNonEmptyAllure(r.FullName, r.Name),
+		FullName:    r.FullName,
 		Framework:   framework,
-		ExternalID:  r.HistoryID,
+		ExternalID:  r.TestCaseID,
+		TestCaseID:  r.TestCaseID,
 		StartedAt:   epochMillisToTime(r.Start),
 		Tags:        tags,
 		Environment: env,

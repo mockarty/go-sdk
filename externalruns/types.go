@@ -48,13 +48,15 @@ func (s Status) Valid() bool {
 //	Environment      — free-form key/value labels (CI job, git sha, etc.).
 //	Tags             — TCM-level labels for filtering.
 type CreateRunRequest struct {
-	StartedAt   time.Time         `json:"started_at,omitempty"`
-	Environment map[string]string `json:"environment,omitempty"`
-	Name        string            `json:"name"`
-	Framework   string            `json:"framework"`
-	SuiteID     string            `json:"suite_id,omitempty"`
-	ExternalID  string            `json:"external_id,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
+	StartedAt     time.Time         `json:"started_at,omitempty"`
+	Environment   map[string]string `json:"environment,omitempty"`
+	Name          string            `json:"name"`
+	FullName      string            `json:"full_name,omitempty"`
+	Framework     string            `json:"framework"`
+	SuiteID       string            `json:"suite_id,omitempty"`
+	ExternalID    string            `json:"external_id,omitempty"`
+	TestCaseID    string            `json:"test_case_id,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
 }
 
 // Run is the canonical run envelope returned by every endpoint.
