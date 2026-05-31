@@ -236,16 +236,21 @@ func (a *ContractAPI) GetResult(ctx context.Context, id string) (*ContractValida
 // Pact types
 // ---------------------------------------------------------------------------
 
+// PactParty names a consumer or provider in a pact contract.
+type PactParty struct {
+	Name string `json:"name"`
+}
+
 // Pact represents a consumer-driven contract (pact).
 type Pact struct {
-	ID        string `json:"id,omitempty"`
-	Consumer  string `json:"consumer"`
-	Provider  string `json:"provider"`
-	Version   string `json:"version,omitempty"`
-	Spec      string `json:"spec,omitempty"`
-	SpecURL   string `json:"specUrl,omitempty"`
-	Namespace string `json:"namespace,omitempty"`
-	CreatedAt int64  `json:"createdAt,omitempty"`
+	ID        string    `json:"id,omitempty"`
+	Consumer  PactParty `json:"consumer"`
+	Provider  PactParty `json:"provider"`
+	Version   string    `json:"version,omitempty"`
+	Spec      string    `json:"spec,omitempty"`
+	SpecURL   string    `json:"specUrl,omitempty"`
+	Namespace string    `json:"namespace,omitempty"`
+	CreatedAt int64     `json:"createdAt,omitempty"`
 }
 
 // PactVerificationResult holds the result of a pact verification.

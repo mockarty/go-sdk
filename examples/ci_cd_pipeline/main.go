@@ -162,7 +162,7 @@ func main() {
 		fmt.Printf("  WARN: Pact publish failed: %v\n", err)
 	} else {
 		fmt.Printf("  Published pact: %s (consumer=%s, provider=%s)\n",
-			pact.ID, pact.Consumer, pact.Provider)
+			pact.ID, pact.Consumer.Name, pact.Provider)
 
 		// 3b. Verify the pact
 		verification, err := client.Contracts().VerifyPact(ctx, &mockarty.PactVerifyRequest{

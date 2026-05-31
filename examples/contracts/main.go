@@ -103,8 +103,8 @@ func main() {
 	// A Pact describes the expectations of a consumer (e.g. frontend)
 	// about a provider (e.g. user-service API).
 	pact, err := client.Contracts().PublishPact(ctx, &mockarty.Pact{
-		Consumer: "web-frontend",
-		Provider: "user-service",
+		Consumer: mockarty.PactParty{Name: "web-frontend"},
+		Provider: mockarty.PactParty{Name: "user-service"},
 		Version:  "1.2.0",
 		Spec: `{
 			"consumer": {"name": "web-frontend"},
@@ -137,7 +137,7 @@ func main() {
 		fmt.Printf("Publish pact returned: %v\n", err)
 	} else {
 		fmt.Printf("Published pact: id=%s, consumer=%s, provider=%s, version=%s\n",
-			pact.ID, pact.Consumer, pact.Provider, pact.Version)
+			pact.ID, pact.Consumer.Name, pact.Provider.Name, pact.Version)
 
 		defer func() {
 			_ = client.Contracts().DeletePact(ctx, pact.ID)
@@ -179,7 +179,7 @@ func main() {
 		fmt.Printf("Found %d pacts:\n", len(pacts))
 		for _, p := range pacts {
 			fmt.Printf("  - %s -> %s (version=%s, id=%s)\n",
-				p.Consumer, p.Provider, p.Version, p.ID)
+				p.Consumer.Name, p.Provider.Name, p.Version, p.ID)
 		}
 	}
 
