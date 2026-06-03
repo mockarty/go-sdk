@@ -175,7 +175,10 @@ func (a *TCMAPI) UploadAttachment(ctx context.Context, namespace, parentKind, pa
 	path := fmt.Sprintf("/api/v1/namespaces/%s/tcm/attachments/upload?parentKind=%s&parentId=%s",
 		url.PathEscape(namespace), url.QueryEscape(parentKind), url.QueryEscape(parentID))
 
-	reader, err := a.client.doRaw(ctx, http.MethodPost, path, mp.Bytes())
+	// multipart body needs the matching Content-Type + boundary; the default
+	// doRaw forces application/json, which makes the server's c.FormFile fail.
+	contentType := "multipart/form-data; boundary=" + boundary
+	reader, err := a.client.doRawCT(ctx, http.MethodPost, path, mp.Bytes(), contentType)
 	if err != nil {
 		return nil, err
 	}

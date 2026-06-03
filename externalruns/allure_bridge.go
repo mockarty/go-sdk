@@ -5,6 +5,8 @@
 package externalruns
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -147,12 +149,21 @@ func (r allureResult) toExternalRun() AllureRun {
 			}
 		}
 	}
+	// external_id is the stable cross-run identity used for dedup. Prefer the
+	// explicit Allure testCaseId; when the result file omits it (a raw result
+	// not written by an Allure adapter), fall back to md5(fullName) — the same
+	// derivation the Mockarty Allure writers use in all three SDKs, so a run
+	// converted here lands on the same TCM case as one submitted by the writer.
+	testCaseID := r.TestCaseID
+	if testCaseID == "" && r.FullName != "" {
+		testCaseID = allureTestCaseID(r.FullName)
+	}
 	req := CreateRunRequest{
 		Name:        firstNonEmptyAllure(r.FullName, r.Name),
 		FullName:    r.FullName,
 		Framework:   framework,
-		ExternalID:  r.TestCaseID,
-		TestCaseID:  r.TestCaseID,
+		ExternalID:  testCaseID,
+		TestCaseID:  testCaseID,
 		StartedAt:   epochMillisToTime(r.Start),
 		Tags:        tags,
 		Environment: env,
@@ -167,6 +178,14 @@ func (r allureResult) toExternalRun() AllureRun {
 		final.Summary = r.StatusDetails.Message
 	}
 	return AllureRun{Request: req, FinishRequest: final, Steps: steps}
+}
+
+// allureTestCaseID derives the Allure testCaseId from a fullName as md5(fullName)
+// (lowercase hex) — the convention shared by the Mockarty Allure writers in the
+// Go/Python/Java SDKs.
+func allureTestCaseID(fullName string) string {
+	sum := md5.Sum([]byte(fullName))
+	return hex.EncodeToString(sum[:])
 }
 
 func countSteps(s []allureStep) int {

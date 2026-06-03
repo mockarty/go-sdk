@@ -130,7 +130,10 @@ func (c *Client) BaseURL() string { return c.baseURL.String() }
 // caller-supplied namespace or run ID containing literal "/" from being
 // silently split.
 func (c *Client) runSegments(suffix ...string) []string {
-	segs := []string{"api", "v1", "namespaces", c.namespace, "tcm", "external-runs"}
+	// The incremental lifecycle lives under /external-runs/lifecycle so it does
+	// not collide with the single-shot POST /external-runs (and its /batch
+	// sibling), which record a complete run in one call.
+	segs := []string{"api", "v1", "namespaces", c.namespace, "tcm", "external-runs", "lifecycle"}
 	for _, s := range suffix {
 		if s == "" {
 			continue

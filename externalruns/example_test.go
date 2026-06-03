@@ -24,7 +24,7 @@ func ExampleClient_endToEnd() {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
-		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/external-runs"):
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/external-runs/lifecycle"):
 			_ = json.NewEncoder(w).Encode(externalruns.Run{
 				ID:        "run-42",
 				Namespace: "team-alpha",

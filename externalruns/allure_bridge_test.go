@@ -76,8 +76,14 @@ func TestFromAllureDir_Conversion(t *testing.T) {
 	if r.Request.Framework != "mockarty-go-sdk" {
 		t.Errorf("framework = %q", r.Request.Framework)
 	}
-	if r.Request.ExternalID != "abc123" {
-		t.Errorf("external_id = %q", r.Request.ExternalID)
+	// The seed has no explicit testCaseId, so external_id falls back to
+	// md5(fullName) — the stable identity shared with the Allure writers.
+	wantExtID := allureTestCaseID("pkg.TestLogin")
+	if r.Request.ExternalID != wantExtID {
+		t.Errorf("external_id = %q, want md5(fullName) %q", r.Request.ExternalID, wantExtID)
+	}
+	if r.Request.TestCaseID != wantExtID {
+		t.Errorf("test_case_id = %q, want %q", r.Request.TestCaseID, wantExtID)
 	}
 	if len(r.Request.Tags) != 2 || r.Request.Tags[0] != "smoke" {
 		t.Errorf("tags = %v", r.Request.Tags)
@@ -113,6 +119,34 @@ func TestFromAllureDir_Conversion(t *testing.T) {
 	if r.Steps[0].DurationMS != 1000 {
 		t.Errorf("step[0] duration = %d, want 1000", r.Steps[0].DurationMS)
 	}
+}
+
+// TestToExternalRun_ExternalIDSources covers both external_id sources: an
+// explicit testCaseId is used verbatim; when absent it falls back to
+// md5(fullName).
+func TestToExternalRun_ExternalIDSources(t *testing.T) {
+	t.Run("explicit testCaseId wins", func(t *testing.T) {
+		ar := allureResult{FullName: "pkg.Test", TestCaseID: "explicit-id"}
+		got := ar.toExternalRun()
+		if got.Request.ExternalID != "explicit-id" || got.Request.TestCaseID != "explicit-id" {
+			t.Errorf("external_id/test_case_id = %q/%q, want explicit-id", got.Request.ExternalID, got.Request.TestCaseID)
+		}
+	})
+	t.Run("fallback to md5(fullName)", func(t *testing.T) {
+		ar := allureResult{FullName: "pkg.Test"}
+		got := ar.toExternalRun()
+		want := allureTestCaseID("pkg.Test")
+		if got.Request.ExternalID != want {
+			t.Errorf("external_id = %q, want %q", got.Request.ExternalID, want)
+		}
+	})
+	t.Run("no fullName -> empty (no spurious md5 of empty string)", func(t *testing.T) {
+		ar := allureResult{Name: "anon"}
+		got := ar.toExternalRun()
+		if got.Request.ExternalID != "" {
+			t.Errorf("external_id = %q, want empty", got.Request.ExternalID)
+		}
+	})
 }
 
 // TestFromAllureDir_EmptyDir verifies a directory with no result files

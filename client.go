@@ -286,21 +286,37 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any) ([]b
 //   - body is io.Reader     → sent as-is
 //   - anything else         → JSON-marshalled (the common case)
 func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.ReadCloser, error) {
+	return c.doRawCT(ctx, method, path, body, "application/json")
+}
+
+// doRawCT is doRaw with an explicit request Content-Type. Multipart uploads
+// (TCM attachments) need "multipart/form-data; boundary=..." rather than JSON.
+//
+// The body is buffered into a []byte ONCE up front so every retry replays the
+// exact same bytes: a []byte / io.Reader / multipart body must NOT be
+// re-JSON-marshalled on retry (the previous code double-encoded []byte uploads
+// and would have JSON-marshalled an already-consumed io.Reader).
+func (c *Client) doRawCT(ctx context.Context, method, path string, body any, contentType string) (io.ReadCloser, error) {
 	url := c.baseURL + path
 
-	var bodyReader io.Reader
-	if body != nil {
+	hasBody := body != nil
+	var rawBody []byte
+	if hasBody {
 		switch b := body.(type) {
 		case []byte:
-			bodyReader = bytes.NewReader(b)
+			rawBody = b
 		case io.Reader:
-			bodyReader = b
+			data, err := io.ReadAll(b)
+			if err != nil {
+				return nil, fmt.Errorf("mockarty: read request body: %w", err)
+			}
+			rawBody = data
 		default:
 			data, err := json.Marshal(body)
 			if err != nil {
 				return nil, fmt.Errorf("mockarty: marshal request: %w", err)
 			}
-			bodyReader = bytes.NewReader(data)
+			rawBody = data
 		}
 	}
 
@@ -323,15 +339,12 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 			case <-time.After(delay):
 			}
 			delay *= 2 // exponential back-off
+		}
 
-			// Re-create body reader for retry
-			if body != nil {
-				data, err := json.Marshal(body)
-				if err != nil {
-					return nil, fmt.Errorf("mockarty: marshal request: %w", err)
-				}
-				bodyReader = bytes.NewReader(data)
-			}
+		// Fresh reader over the buffered bytes for every attempt (replayable).
+		var bodyReader io.Reader
+		if hasBody {
+			bodyReader = bytes.NewReader(rawBody)
 		}
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
@@ -339,8 +352,8 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 			return nil, fmt.Errorf("mockarty: create request: %w", err)
 		}
 
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
+		if hasBody {
+			req.Header.Set("Content-Type", contentType)
 		}
 		req.Header.Set("Accept", "application/json")
 
