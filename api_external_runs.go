@@ -56,25 +56,29 @@ type CustomField struct {
 // the server's internal/testcase/external_run.go shape verbatim — DO
 // NOT rename JSON keys without bumping SchemaVersion.
 type ExternalRunRequest struct {
-	StartedAt          *time.Time           `json:"startedAt,omitempty"`
-	FinishedAt         *time.Time           `json:"finishedAt,omitempty"`
-	Labels             map[string]string    `json:"labels,omitempty"`
-	Metadata           map[string]any       `json:"metadata,omitempty"`
-	Stdout             string               `json:"stdout,omitempty"`
-	ExternalID         string               `json:"externalId,omitempty"`
-	CaseID             string               `json:"caseId,omitempty"`
-	CaseName           string               `json:"caseName,omitempty"`
-	PlanID             string               `json:"planId,omitempty"`
-	PlanRunID          string               `json:"planRunId,omitempty"`
-	Framework          string               `json:"framework,omitempty"`
-	FrameworkVersion   string               `json:"frameworkVersion,omitempty"`
-	Stderr             string               `json:"stderr,omitempty"`
-	TestDisplayName    string               `json:"testDisplayName,omitempty"`
-	Status             string               `json:"status"`
-	Error              string               `json:"error,omitempty"`
-	CaseDescription    string               `json:"caseDescription,omitempty"`
-	CaseExpectedResult string               `json:"caseExpectedResult,omitempty"`
-	FullName           string               `json:"fullName,omitempty"`
+	StartedAt          *time.Time        `json:"startedAt,omitempty"`
+	FinishedAt         *time.Time        `json:"finishedAt,omitempty"`
+	Labels             map[string]string `json:"labels,omitempty"`
+	Metadata           map[string]any    `json:"metadata,omitempty"`
+	Stdout             string            `json:"stdout,omitempty"`
+	ExternalID         string            `json:"externalId,omitempty"`
+	CaseID             string            `json:"caseId,omitempty"`
+	CaseName           string            `json:"caseName,omitempty"`
+	PlanID             string            `json:"planId,omitempty"`
+	PlanRunID          string            `json:"planRunId,omitempty"`
+	Framework          string            `json:"framework,omitempty"`
+	FrameworkVersion   string            `json:"frameworkVersion,omitempty"`
+	Stderr             string            `json:"stderr,omitempty"`
+	TestDisplayName    string            `json:"testDisplayName,omitempty"`
+	Status             string            `json:"status"`
+	Error              string            `json:"error,omitempty"`
+	CaseDescription    string            `json:"caseDescription,omitempty"`
+	CaseExpectedResult string            `json:"caseExpectedResult,omitempty"`
+	FullName           string            `json:"fullName,omitempty"`
+	// TestCaseID is the author-pinned identity (Allure testCaseId / @allure.id).
+	// AUTHORITATIVE resolution key — tried before fullName/name — so a method or
+	// parameter rename (which changes fullName) still lands on the same case.
+	TestCaseID         string               `json:"testCaseId,omitempty"`
 	Steps              []ExternalStep       `json:"steps,omitempty"`
 	Attachments        []ExternalAttachment `json:"attachments,omitempty"`
 	CustomFields       []CustomField        `json:"customFields,omitempty"`

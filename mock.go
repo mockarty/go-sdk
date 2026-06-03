@@ -394,6 +394,7 @@ type Mock struct {
 
 	// Timestamps (set by server)
 	CreatedAt int64 `json:"createdAt,omitempty"`
+	UpdatedAt int64 `json:"updatedAt,omitempty"`
 	LastUse   int64 `json:"lastUse,omitempty"`
 	ExpireAt  int64 `json:"expireAt,omitempty"`
 	ClosedAt  int64 `json:"closedAt,omitempty"`
