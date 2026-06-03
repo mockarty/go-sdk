@@ -330,11 +330,24 @@ func (a *PerfAPI) DeleteResult(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/perf-results/"+url.PathEscape(id), nil, nil)
 }
 
-// RunCollection starts a performance test from a collection.
-func (a *PerfAPI) RunCollection(ctx context.Context, req any) (*PerfTask, error) {
-	var task PerfTask
-	if err := a.client.do(ctx, "POST", "/api/v1/perf/run-collection", req, &task); err != nil {
+// PerfRunGroup is the result of running a whole collection as a perf suite.
+// A collection fans out into one perf task per request, so the server returns
+// a run-group id plus the per-request task ids — NOT a single PerfTask.
+type PerfRunGroup struct {
+	RunGroupID string   `json:"runGroupId"`
+	TaskIDs    []string `json:"taskIds"`
+}
+
+// RunCollection starts a performance suite from a collection — every request
+// in the collection becomes its own perf task. Returns the run-group id (to
+// correlate results via GET /perf-results/group/:runGroupId) and the spawned
+// task ids.
+//
+// POST /api/v1/perf/run-collection
+func (a *PerfAPI) RunCollection(ctx context.Context, req any) (*PerfRunGroup, error) {
+	var group PerfRunGroup
+	if err := a.client.do(ctx, "POST", "/api/v1/perf/run-collection", req, &group); err != nil {
 		return nil, err
 	}
-	return &task, nil
+	return &group, nil
 }

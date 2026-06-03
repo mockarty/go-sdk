@@ -192,8 +192,10 @@ func main() {
 	fmt.Println("\n--- Performance Test from Collection ---")
 
 	if len(collections) > 0 {
-		// Run the collection as a performance test with multiple virtual users
-		perfTask, err := client.Perf().RunCollection(ctx, map[string]any{
+		// Run the collection as a performance suite with multiple virtual users.
+		// A collection fans out into one perf task per request, so the result is
+		// a run-group id plus the spawned task ids (not a single task).
+		group, err := client.Perf().RunCollection(ctx, map[string]any{
 			"collectionId": collections[0].ID,
 			"vus":          5,
 			"duration":     "10s",
@@ -202,8 +204,8 @@ func main() {
 			fmt.Printf("Perf run from collection returned: %v\n", err)
 			fmt.Println("(Performance testing may require specific license tier)")
 		} else {
-			fmt.Printf("Performance test started: id=%s, status=%s\n",
-				perfTask.ID, perfTask.Status)
+			fmt.Printf("Performance suite started: runGroupId=%s, tasks=%d\n",
+				group.RunGroupID, len(group.TaskIDs))
 		}
 	}
 
