@@ -353,6 +353,79 @@ func Equality(example any) Matcher {
 	}
 }
 
+// NotNull matches any value that is not the JSON null literal. The
+// sibling of [Null].
+func NotNull(example any) Matcher {
+	return Matcher{
+		Example: example,
+		Type:    "notNull",
+		Rule:    MatcherRule{Match: "notNull"},
+	}
+}
+
+// Date matches an ISO date string (`2026-06-12`). The default pattern is
+// `^\d{4}-\d{2}-\d{2}$`; pass a non-empty regex to [DateFormat] to
+// override it.
+func Date(example string) Matcher { return DateFormat(example, "") }
+
+// DateFormat is [Date] with a caller-supplied regex overriding the
+// default ISO pattern. An empty regex keeps the default.
+func DateFormat(example, regex string) Matcher {
+	return Matcher{Example: example, Type: "date", Rule: MatcherRule{Match: "date", Regex: regex}}
+}
+
+// Time matches a `HH:MM:SS[.fraction]` string. Pass a regex to
+// [TimeFormat] to override the default.
+func Time(example string) Matcher { return TimeFormat(example, "") }
+
+// TimeFormat is [Time] with a caller-supplied regex override.
+func TimeFormat(example, regex string) Matcher {
+	return Matcher{Example: example, Type: "time", Rule: MatcherRule{Match: "time", Regex: regex}}
+}
+
+// DateTime matches an RFC 3339 / ISO 8601 timestamp
+// (`2026-06-12T10:00:00Z`). Pass a regex to [DateTimeFormat] to override.
+func DateTime(example string) Matcher { return DateTimeFormat(example, "") }
+
+// DateTimeFormat is [DateTime] with a caller-supplied regex override.
+func DateTimeFormat(example, regex string) Matcher {
+	return Matcher{Example: example, Type: "timestamp", Rule: MatcherRule{Match: "timestamp", Regex: regex}}
+}
+
+// Timestamp is an alias of [DateTime] kept for pact-jvm/pact-js parity.
+func Timestamp(example string) Matcher { return DateTime(example) }
+
+// UUID matches a canonical UUID string. Pass a regex to [UUIDFormat] to
+// override the default shape (e.g. to require a specific version).
+func UUID(example string) Matcher { return UUIDFormat(example, "") }
+
+// UUIDFormat is [UUID] with a caller-supplied regex override.
+func UUIDFormat(example, regex string) Matcher {
+	return Matcher{Example: example, Type: "uuid", Rule: MatcherRule{Match: "uuid", Regex: regex}}
+}
+
+// Semver matches a SemVer 2.0 version string (`1.2.3`, `1.2.3-rc.1`).
+func Semver(example string) Matcher {
+	return Matcher{Example: example, Type: "semver", Rule: MatcherRule{Match: "semver"}}
+}
+
+// IPv4 matches a dotted-quad IPv4 address string.
+func IPv4(example string) Matcher {
+	return Matcher{Example: example, Type: "ipv4", Rule: MatcherRule{Match: "ipv4"}}
+}
+
+// ContentType matches a string whose value starts with the given media
+// type, tolerating trailing parameters (`application/json; charset=...`).
+func ContentType(example, contentType string) Matcher {
+	return Matcher{Example: example, Type: "contentType", Rule: MatcherRule{Match: "contentType", Value: contentType}}
+}
+
+// AtLeastOne matches an array that contains at least one element. example
+// is wrapped as the single-element array preview the verifier replays.
+func AtLeastOne(example any) Matcher {
+	return Matcher{Example: []any{example}, Type: "atLeastOne", Rule: MatcherRule{Match: "atLeastOne"}}
+}
+
 // indexSegment renders an array index as a JSON-path segment.
 //
 // Numbers above 9 still serialise correctly because matching paths
