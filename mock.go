@@ -386,7 +386,19 @@ type ContentResponse struct {
 	SSEEventChain       *SSEEventChain      `json:"sseEventChain,omitempty"`
 	GraphQLErrors       []GraphQLError      `json:"graphqlErrors,omitempty"`
 	SOAPFault           *SOAPFault          `json:"soapFault,omitempty"`
+	Script              *ResponseScript     `json:"script,omitempty"`
 	MCPIsError          bool                `json:"mcpIsError,omitempty"`
+}
+
+// ResponseScript builds the response dynamically with JavaScript when the mock
+// is hit. The script receives `request` and fills `response`. See the Scripted
+// Responses guide. Code is required; Language defaults to "javascript";
+// TimeoutMs overrides the per-mock budget; AllowNet opts into outbound calls.
+type ResponseScript struct {
+	Code      string `json:"code"`
+	Language  string `json:"language,omitempty"`
+	TimeoutMs int32  `json:"timeoutMs,omitempty"`
+	AllowNet  bool   `json:"allowNet,omitempty"`
 }
 
 // OneOf allows a mock to return one of multiple responses.
@@ -480,6 +492,11 @@ type Mock struct {
 	UseCounter int32 `json:"useCounter,omitempty"`
 	Priority   int64 `json:"priority,omitempty"`
 
+	// Transient marks a lightweight mock that skips per-hit bookkeeping
+	// (request logging, live updates, usage counter) to shed load under high
+	// traffic / load testing. Matching and the response are unchanged.
+	Transient bool `json:"transient,omitempty"`
+
 	// Metadata
 	Tags     []string `json:"tags,omitempty"`
 	FolderID string   `json:"folderId,omitempty"`
@@ -502,9 +519,15 @@ type Mock struct {
 
 // SaveMockResponse is the response from creating/updating a mock.
 //
-// Wire shape (admin node, POST /api/v1/mocks):
+// Wire shape (admin node, POST /api/v1/mocks). As of 2026-06-21 (G2 envelope
+// unification) the server emits the mock's fields at the TOP LEVEL (matching
+// GET /mocks/:id) and keeps the "mock" wrapper as a deprecated mirror for one
+// release cycle:
 //
-//	{"id":"...","mock":{...},"isNew":<bool>,"success":true,"message":"..."}
+//	{"id":"...","name":"...",...,"mock":{...},"isNew":<bool>,"success":true,"message":"..."}
+//
+// UnmarshalJSON reads the "mock" wrapper when present and otherwise
+// reconstructs Mock from the top-level fields, so it decodes both shapes.
 //
 // The server's `isNew` field is semantically "was overwrite" — it's
 // true when an existing mock with the same id was replaced. The legacy
@@ -543,6 +566,14 @@ func (s *SaveMockResponse) UnmarshalJSON(data []byte) error {
 		s.IsNew = *aux.LegacyOverwritten
 	}
 	s.Overwritten = s.IsNew
+	// G2 flat-shape fallback (2026-06-21): when the server omits the
+	// deprecated "mock" wrapper (flat-only response), the mock's fields sit at
+	// the top level alongside the envelope keys. Decode them directly into
+	// Mock — the envelope keys (message/isNew/success/mockId/…) aren't Mock
+	// fields, so they're ignored. Skipped when the wrapper was present.
+	if s.Mock.ID == "" {
+		_ = json.Unmarshal(data, &s.Mock)
+	}
 	return nil
 }
 
