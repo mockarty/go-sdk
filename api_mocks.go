@@ -30,14 +30,43 @@ type LogsOptions struct {
 	Offset int
 }
 
+// CreateOption tunes a Create call. Use CreateNew or Overwrite to resolve a
+// duplicate-entity (HTTP 409) conflict when a similar mock already exists
+// (same endpoint, possibly different conditions).
+type CreateOption func(*createOptions)
+
+type createOptions struct {
+	intent string
+}
+
+// CreateNew forces creating a brand-new mock even when a similar one exists,
+// instead of getting a 409 duplicate_entity conflict. Use it to seed several
+// condition-differentiated mocks on the same route/method.
+func CreateNew() CreateOption { return func(o *createOptions) { o.intent = "create_new" } }
+
+// Overwrite replaces the existing duplicate in place (reusing its id) instead
+// of getting a 409. The server still guards against a concurrent modification.
+func Overwrite() CreateOption { return func(o *createOptions) { o.intent = "overwrite" } }
+
 // Create creates a new mock or overwrites an existing one with the same ID.
-func (a *MockAPI) Create(ctx context.Context, mock *Mock) (*SaveMockResponse, error) {
+// When a similar mock already exists the server returns 409 duplicate_entity;
+// pass CreateNew() or Overwrite() to resolve the conflict.
+func (a *MockAPI) Create(ctx context.Context, mock *Mock, opts ...CreateOption) (*SaveMockResponse, error) {
 	if mock.Namespace == "" && a.client.namespace != "" {
 		mock.Namespace = a.client.namespace
 	}
 
+	var co createOptions
+	for _, o := range opts {
+		o(&co)
+	}
+	path := "/api/v1/mocks"
+	if co.intent != "" {
+		path += "?intent=" + url.QueryEscape(co.intent)
+	}
+
 	var resp SaveMockResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/mocks", mock, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", path, mock, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
