@@ -58,12 +58,13 @@ const (
 // ChaosExperiment is the top-level entity describing a chaos engineering experiment.
 // Fields and JSON tags match the server model in internal/chaos/models.go exactly.
 type ChaosExperiment struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Description string           `json:"description,omitempty"`
-	Namespace   string           `json:"namespace"`
-	Status      ExperimentStatus `json:"status"`
-	PresetName  string           `json:"presetName,omitempty"`
+	ID             string           `json:"id"`
+	Name           string           `json:"name"`
+	Description    string           `json:"description,omitempty"`
+	Namespace      string           `json:"namespace"`
+	Status         ExperimentStatus `json:"status"`
+	PresetName     string           `json:"presetName,omitempty"`
+	InfraProfileID string           `json:"infraProfileId,omitempty"`
 
 	Faults      []FaultConfig  `json:"faults"`
 	Target      TargetConfig   `json:"target"`
@@ -82,6 +83,15 @@ type ChaosExperiment struct {
 	UpdatedAt time.Time  `json:"updatedAt"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	EndedAt   *time.Time `json:"endedAt,omitempty"`
+
+	// Approval trail (set when safety.requireApproval gated the run).
+	ApprovedAt   *time.Time `json:"approvedAt,omitempty"`
+	ApprovedBy   string     `json:"approvedBy,omitempty"`
+	ApprovalNote string     `json:"approvalNote,omitempty"`
+
+	// Warnings carries non-fatal notices about what the server did NOT do with
+	// the submitted experiment (e.g. an unrecognised field). Never persisted.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +269,10 @@ type ChaosProfile struct {
 	Context        string `json:"context,omitempty"`        // kubectl context name
 	InCluster      bool   `json:"inCluster,omitempty"`      // Use in-cluster config
 	DefaultNS      string `json:"defaultNamespace,omitempty"`
+	ClusterType    string `json:"cluster_type,omitempty"` // kubernetes | docker-compose | generic
+	Status         string `json:"status,omitempty"`       // e.g. "connected"
+	Connected      bool   `json:"connected,omitempty"`    // derived from Status == "connected"
+	Description    string `json:"description,omitempty"`
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

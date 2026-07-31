@@ -560,3 +560,50 @@ func (a *ChaosAPI) GenerateOperatorManifest(ctx context.Context, adminURL string
 	}
 	return string(data), nil
 }
+
+// Approve releases a chaos experiment that was created with safety.requireApproval.
+// POST /api/v1/chaos/experiments/{id}/approve
+func (a *ChaosAPI) Approve(ctx context.Context, id string, note string) error {
+	body := struct {
+		Note string `json:"note,omitempty"`
+	}{Note: note}
+	return a.client.do(ctx, "POST", "/api/v1/chaos/experiments/"+url.PathEscape(id)+"/approve", body, nil)
+}
+
+// Unapprove withdraws a previously granted approval (only while still pending).
+// POST /api/v1/chaos/experiments/{id}/unapprove
+func (a *ChaosAPI) Unapprove(ctx context.Context, id string) error {
+	return a.client.do(ctx, "POST", "/api/v1/chaos/experiments/"+url.PathEscape(id)+"/unapprove", nil, nil)
+}
+
+// ChaosSchedule is one recurring-schedule record.
+type ChaosSchedule struct {
+	ID           string `json:"id"`
+	ExperimentID string `json:"experimentId"`
+	CronExpr     string `json:"cronExpr"`
+	Paused       bool   `json:"paused"`
+}
+
+// ListSchedules returns recurring schedules visible to the caller.
+// GET /api/v1/chaos/schedules
+func (a *ChaosAPI) ListSchedules(ctx context.Context) ([]ChaosSchedule, error) {
+	var resp struct {
+		Schedules []ChaosSchedule `json:"schedules"`
+	}
+	if err := a.client.do(ctx, "GET", "/api/v1/chaos/schedules", nil, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Schedules, nil
+}
+
+// PauseSchedule pauses a recurring schedule.
+// POST /api/v1/chaos/schedules/{id}/pause
+func (a *ChaosAPI) PauseSchedule(ctx context.Context, id string) error {
+	return a.client.do(ctx, "POST", "/api/v1/chaos/schedules/"+url.PathEscape(id)+"/pause", nil, nil)
+}
+
+// DeleteSchedule removes a recurring schedule.
+// DELETE /api/v1/chaos/schedules/{id}
+func (a *ChaosAPI) DeleteSchedule(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/chaos/schedules/"+url.PathEscape(id), nil, nil)
+}
