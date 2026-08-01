@@ -11,7 +11,7 @@
 // payload length + payload bytes) and delegates the payload itself to
 // the [protobuf] plugin. Embedding a real gRPC server inside the SDK is
 // explicitly out of scope (see feedback_sdk_thin_layer.md) — that is
-// Phase 2 territory if a customer actually needs HTTP/2 framing.
+// a follow-up if a customer actually needs HTTP/2 framing.
 //
 // The plugin's `expected` shape mirrors protobuf, with an extra field
 // for service/method context that round-trips into pact.json:

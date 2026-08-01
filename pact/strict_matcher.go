@@ -216,6 +216,16 @@ func init() {
 		"arrayContains": checkArrayContains,
 		"jsonpath":      checkJSONPath,
 		"xmlpath":       checkXMLPath,
+		"notNull":       checkNotNull,
+		"date":          checkDate,
+		"time":          checkTime,
+		"timestamp":     checkTimestamp,
+		"datetime":      checkTimestamp,
+		"uuid":          checkUUID,
+		"semver":        checkSemver,
+		"ipv4":          checkIPv4,
+		"contentType":   checkContentType,
+		"atLeastOne":    checkAtLeastOne,
 	}
 }
 
@@ -655,4 +665,92 @@ func evalSimpleJSONPath(root any, expr string) (any, bool) {
 		}
 	}
 	return cur, true
+}
+
+// Default format patterns — kept byte-for-byte identical to the
+// server-side matcher engine (internal/contract/pact_matcher.go) so the
+// consumer mock server and the provider verifier agree on what a "date"
+// or "uuid" is.
+var (
+	strictDateRE     = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+	strictTimeRE     = regexp.MustCompile(`^\d{2}:\d{2}:\d{2}(\.\d+)?$`)
+	strictDateTimeRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$`)
+	strictUUIDRE     = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+	strictSemverRE   = regexp.MustCompile(`^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
+	strictIPv4RE     = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+)
+
+// checkPattern is the shared implementation for the regex-backed format
+// matchers. A non-empty rule regex from the consumer overrides def.
+func checkPattern(m Matcher, actual any, path, label string, def *regexp.Regexp, result *MatchResult) {
+	s, ok := actual.(string)
+	if !ok {
+		result.Add(path, "expected "+label+" string", label, actual)
+		return
+	}
+	re := def
+	if pat := strings.TrimSpace(m.Rule.Regex); pat != "" {
+		compiled, err := compileRegex(pat)
+		if err != nil {
+			result.Add(path, "invalid "+label+" regex in declared matcher: "+err.Error(), pat, actual)
+			return
+		}
+		re = compiled
+	}
+	if !re.MatchString(s) {
+		result.Add(path, label+" did not match", re.String(), actual)
+	}
+}
+
+func checkNotNull(_ Matcher, actual any, path string, result *MatchResult) {
+	if actual == nil {
+		result.Add(path, "expected non-null value", "non-null", nil)
+	}
+}
+
+func checkDate(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "date", strictDateRE, result)
+}
+
+func checkTime(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "time", strictTimeRE, result)
+}
+
+func checkTimestamp(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "timestamp", strictDateTimeRE, result)
+}
+
+func checkUUID(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "uuid", strictUUIDRE, result)
+}
+
+func checkSemver(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "semver", strictSemverRE, result)
+}
+
+func checkIPv4(m Matcher, actual any, path string, result *MatchResult) {
+	checkPattern(m, actual, path, "ipv4", strictIPv4RE, result)
+}
+
+func checkContentType(m Matcher, actual any, path string, result *MatchResult) {
+	s, ok := actual.(string)
+	if !ok {
+		result.Add(path, "expected content-type string", m.Rule.Value, actual)
+		return
+	}
+	want, _ := m.Rule.Value.(string)
+	if want != "" && !strings.HasPrefix(strings.TrimSpace(s), want) {
+		result.Add(path, "content type does not start with "+want, want, actual)
+	}
+}
+
+func checkAtLeastOne(_ Matcher, actual any, path string, result *MatchResult) {
+	as, ok := actual.([]any)
+	if !ok {
+		result.Add(path, "expected array for atLeastOne", "array", actual)
+		return
+	}
+	if len(as) == 0 {
+		result.Add(path, "array must contain at least one element", "non-empty array", actual)
+	}
 }

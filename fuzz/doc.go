@@ -7,7 +7,7 @@
 // the Mockarty admin server's POST /api/v1/fuzzing/run endpoint and by the
 // mockarty-cli `fuzz run` subcommand.
 //
-// The package is the Go side of Mockarty's Wave 3 SDK strategy (see
+// The package is the Go side of Mockarty's SDK protocol-client strategy (see
 // docs/research/SDK_FRAMEWORK_PLAN.md §5.7a). It is intentionally THIN:
 //
 //   - It DOES NOT embed a fuzz engine, mutator, or detector. Mockarty's
@@ -67,7 +67,7 @@
 // surfaces the fields most commonly tuned from code and falls back to
 // server-side defaults for the rest.
 //
-// # Phase 2 (forthcoming)
+// # Forthcoming
 //
 //   - Custom JavaScript mutators registered via WithCustomMutator.
 //   - Distributed fuzz fan-out across runner pools (target → multiple

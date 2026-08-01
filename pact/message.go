@@ -43,8 +43,12 @@ import (
 // MessageProducer per interaction description, the verifier asks the
 // producer for the actual bytes, matches against the recorded shape.
 
-// MessageInteractionType is the V4 discriminator.
+// MessageInteractionType is the V4 discriminator for async messages.
 const MessageInteractionType = "Asynchronous/Messages"
+
+// SyncMessageInteractionType is the V4 discriminator for synchronous
+// (request/response) messages.
+const SyncMessageInteractionType = "Synchronous/Messages"
 
 // MessagePact is one consumer ↔ message-provider contract.
 type MessagePact struct {
@@ -55,11 +59,26 @@ type MessagePact struct {
 }
 
 // Message is a single expected message.
+//
+// For an ASYNCHRONOUS message Contents is the message body. For a
+// SYNCHRONOUS (request/response) message — when Responses is non-empty —
+// Contents is the REQUEST the consumer sends and each Responses entry is an
+// expected reply.
 type Message struct {
 	Contents    any
 	Metadata    map[string]string
 	States      []ProviderState
+	Responses   []MessageReply
 	Description string
+	ContentType string
+}
+
+// MessageReply is one expected reply in a synchronous (request/response)
+// message interaction. Matchers inside Contents are extracted to
+// matchingRules just like the request body.
+type MessageReply struct {
+	Contents    any
+	Metadata    map[string]string
 	ContentType string
 }
 
@@ -140,6 +159,33 @@ func (b *MessageBuilder) WithContent(body any) *MessageBuilder {
 // WithContentType overrides the default `application/json`.
 func (b *MessageBuilder) WithContentType(ct string) *MessageBuilder {
 	b.msg().ContentType = ct
+	return b
+}
+
+// ExpectsResponse declares an expected reply, turning this interaction into a
+// SYNCHRONOUS (request/response) message: WithContent is then the request the
+// consumer sends and each ExpectsResponse adds one acceptable reply. Matchers
+// inside body are extracted to matchingRules like any other body. Call it more
+// than once to allow several acceptable replies.
+func (b *MessageBuilder) ExpectsResponse(body any) *MessageBuilder {
+	b.msg().Responses = append(b.msg().Responses, MessageReply{Contents: body, ContentType: "application/json"})
+	return b
+}
+
+// WithResponseMetadata attaches metadata to the most recently declared
+// response (no-op if ExpectsResponse hasn't been called yet).
+func (b *MessageBuilder) WithResponseMetadata(meta map[string]string) *MessageBuilder {
+	m := b.msg()
+	if len(m.Responses) == 0 {
+		return b
+	}
+	r := &m.Responses[len(m.Responses)-1]
+	if r.Metadata == nil {
+		r.Metadata = map[string]string{}
+	}
+	for k, v := range meta {
+		r.Metadata[k] = v
+	}
 	return b
 }
 
@@ -281,9 +327,15 @@ func (v *Verifier) verifyMessages(ctx context.Context, msgs []Message) (*Verific
 func serialiseMessagesV4(msgs []Message) []map[string]any {
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
+		sync := len(m.Responses) > 0
 		ix := map[string]any{
 			"type":        MessageInteractionType,
 			"description": m.Description,
+		}
+		if sync {
+			// Synchronous/Messages: contents is the request, response[] holds
+			// the expected replies. The server's normaliser reads it this way.
+			ix["type"] = SyncMessageInteractionType
 		}
 		if len(m.States) > 0 {
 			states := make([]map[string]any, 0, len(m.States))
@@ -307,6 +359,30 @@ func serialiseMessagesV4(msgs []Message) []map[string]any {
 		ix["contents"] = contents
 		if len(m.Metadata) > 0 {
 			ix["metadata"] = m.Metadata
+		}
+		if sync {
+			responses := make([]map[string]any, 0, len(m.Responses))
+			for _, r := range m.Responses {
+				ct := r.ContentType
+				if ct == "" {
+					ct = "application/json"
+				}
+				rRules := map[string]MatchCategory{}
+				rEntry := map[string]any{
+					"contents": map[string]any{
+						"contentType": ct,
+						"content":     walkAndExtract(r.Contents, "$.body", rRules, SpecV4),
+					},
+				}
+				if len(rRules) > 0 {
+					rEntry["matchingRules"] = formatMatchingRules(rRules, SpecV4)
+				}
+				if len(r.Metadata) > 0 {
+					rEntry["metadata"] = r.Metadata
+				}
+				responses = append(responses, rEntry)
+			}
+			ix["response"] = responses
 		}
 		out = append(out, ix)
 	}

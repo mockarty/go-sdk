@@ -7,7 +7,7 @@
 // for WireMockContainer / MockServer / MockoonContainer in user
 // integration tests.
 //
-// The package is the Go side of Mockarty's Wave 4 SDK strategy (see
+// The package is the Go side of Mockarty's SDK protocol-client strategy (see
 // docs/research/SDK_FRAMEWORK_PLAN.md rev 3 §6.4). Like the other Wave
 // 3/4 packages it is intentionally THIN:
 //

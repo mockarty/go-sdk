@@ -93,7 +93,7 @@ The emitted JSON is a strict superset of the server-side
   `sdk` — SDK-side annotations; server treats unknown fields as opaque
   metadata (forward-compatible).
 
-## Phase 2 follow-ups
+## Follow-ups
 
 * **Distributed fuzz across runner pool** — sharding the seed corpus
   across multiple runners with cross-shard finding dedup.

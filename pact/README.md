@@ -139,7 +139,7 @@ that is the provider team's responsibility. Two production paths:
   full HTTP/2 transport should bridge to Mockarty admin's gRPC mock
   surface and use this package for the contract.
 
-## Plugin runtime (Wave 4)
+## Plugin runtime
 
 `WithPlugin` records V4 plugin metadata AND wires the named plugin
 into the in-process mock server. Two plugins ship in the SDK:

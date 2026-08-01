@@ -4,6 +4,7 @@
 package mockarty
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -47,6 +48,23 @@ type LoadStage struct {
 	Duration  string `json:"duration"`
 	Target    int    `json:"target,omitempty"`
 	TargetRPS int    `json:"targetRps,omitempty"`
+}
+
+// MarshalJSON emits a VU stage's `target` even when it is 0 (a ramp-down-to-zero
+// drain stage) — a bare `{"duration":"10s"}` is not a valid k6 stage. Only an
+// arrival-rate stage (TargetRPS>0) swaps `target` for `targetRps`. Mirrors the
+// Python (`{"duration","target"}`) and Java (`stagesAsMaps`) serialization.
+func (s LoadStage) MarshalJSON() ([]byte, error) {
+	if s.TargetRPS > 0 {
+		return json.Marshal(struct {
+			Duration  string `json:"duration"`
+			TargetRPS int    `json:"targetRps"`
+		}{s.Duration, s.TargetRPS})
+	}
+	return json.Marshal(struct {
+		Duration string `json:"duration"`
+		Target   int    `json:"target"`
+	}{s.Duration, s.Target})
 }
 
 // Stage is a convenience constructor for a VU-target ramp stage.
@@ -213,7 +231,14 @@ func (b *LoadTest) ToK6Script() string {
 	sb.WriteString("export const options = ")
 	sb.WriteString(b.optionsJS())
 	sb.WriteString(";\n\n")
+	// Bake the Target() base URL as a runnable default so the exported script
+	// works out of the box (matching the perf engine's own builder pattern),
+	// while staying overridable at run time via `-e BASE_URL=...` / __ENV.
+	if b.baseURL != "" {
+		sb.WriteString("const BASE_URL = __ENV.BASE_URL || " + jsStr(b.baseURL) + ";\n\n")
+	}
 	sb.WriteString("export default function () {\n")
+	sb.WriteString("  let r;\n")
 	for _, req := range b.resolvedRequests() {
 		sb.WriteString(b.requestJS(req))
 	}
@@ -249,8 +274,13 @@ func (b *LoadTest) optionsJS() string {
 		opts["vus"] = 1
 		opts["duration"] = "30s"
 	}
-	data, _ := json.Marshal(opts)
-	return string(data)
+	// Encode without HTML escaping so threshold expressions like
+	// "p(95)<500" stay readable (json.Marshal would emit "<").
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(opts)
+	return strings.TrimRight(buf.String(), "\n")
 }
 
 func (b *LoadTest) requestJS(req loadRequest) string {
@@ -260,7 +290,7 @@ func (b *LoadTest) requestJS(req loadRequest) string {
 		if path != "" && !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
-		url = "`${__ENV.BASE_URL}" + path + "`"
+		url = "`${BASE_URL}" + path + "`"
 	} else {
 		url = jsStr(req.path)
 	}
@@ -301,15 +331,15 @@ func (b *LoadTest) requestJS(req loadRequest) string {
 	var sb strings.Builder
 	if req.body == nil {
 		if params != "" {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, null, %s);\n", method, url, params))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, null, %s);\n", method, url, params))
 		} else {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s);\n", method, url))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s);\n", method, url))
 		}
 	} else {
 		if params != "" {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, %s, %s);\n", method, url, bodyLit, params))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, %s, %s);\n", method, url, bodyLit, params))
 		} else {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, %s);\n", method, url, bodyLit))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, %s);\n", method, url, bodyLit))
 		}
 	}
 	sb.WriteString("  check(r, { 'status < 400': (res) => res.status < 400 });\n")

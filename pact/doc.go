@@ -6,7 +6,7 @@
 // contract files (.json) for the Mockarty platform and any other Pact-
 // compatible broker / provider.
 //
-// The package is the Go side of Mockarty's Wave 2 SDK strategy (see
+// The package is the Go side of Mockarty's SDK protocol-client strategy (see
 // docs/research/SDK_FRAMEWORK_PLAN.md §3 Pact compat). It is intentionally
 // FFI-free: there is no libpact_ffi, no CGO, no Rust runtime. The DSL is
 // implemented in pure Go on top of stdlib JSON and net/http/httptest so
