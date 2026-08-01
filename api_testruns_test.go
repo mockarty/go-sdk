@@ -5,120 +5,60 @@ package mockarty
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync/atomic"
 	"testing"
 )
 
-func TestTestRuns_CreateMergedRun(t *testing.T) {
+// The persistent merge surface (POST/GET/DELETE /test-runs/merges*) was
+// removed server-side in migration 100. The stateless replacement is
+// POST /test-runs/reports/aggregate — recomputed per call, no parent row.
+
+func TestTestRuns_AggregateRunsReport(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/test-runs/merges" {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/test-runs/reports/aggregate" {
 			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.URL.Query().Get("format"); got != "markdown" {
+			t.Fatalf("expected format=markdown, got %q", got)
 		}
 		body, _ := io.ReadAll(r.Body)
-		if !strings.Contains(string(body), `"name":"nightly-merge"`) {
+		if !strings.Contains(string(body), `"run_ids":["r1","r2"]`) {
+			t.Fatalf("expected run_ids in body, got %s", body)
+		}
+		if !strings.Contains(string(body), `"name":"nightly"`) {
 			t.Fatalf("expected name in body, got %s", body)
 		}
-		if !strings.Contains(string(body), `"sourceRunIds":["src-1","src-2"]`) {
-			t.Fatalf("expected sourceRunIds in body, got %s", body)
-		}
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{
-            "run": {"ID":"merge-id","Name":"nightly-merge","Mode":"merged","Status":"completed","Namespace":"default"},
-            "sources": [
-                {"ID":"src-1","Mode":"fuzz","Status":"completed"},
-                {"ID":"src-2","Mode":"chaos","Status":"failed"}
-            ]
-        }`))
+		_, _ = w.Write([]byte("# Aggregate test run: nightly\n"))
 	}))
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	view, err := c.TestRuns().CreateMergedRun(context.Background(), "nightly-merge", []string{"src-1", "src-2"})
+	out, err := c.TestRuns().AggregateRunsReport(context.Background(),
+		AggregateRunsReportRequest{Name: "nightly", RunIDs: []string{"r1", "r2"}},
+		AggregateReportFormatMarkdown)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.Run == nil || view.Run.ID != "merge-id" || view.Run.Mode != "merged" {
-		t.Fatalf("unexpected parent: %+v", view.Run)
-	}
-	if len(view.Sources) != 2 {
-		t.Fatalf("expected 2 sources, got %d", len(view.Sources))
-	}
-	if view.Sources[0].ID != "src-1" || view.Sources[1].ID != "src-2" {
-		t.Fatalf("unexpected sources: %+v", view.Sources)
+	if !strings.Contains(string(out), "Aggregate test run: nightly") {
+		t.Fatalf("unexpected report body: %s", out)
 	}
 }
 
-func TestTestRuns_GetMergedRun(t *testing.T) {
+func TestTestRuns_AggregateRunsReport_DefaultsToUnified(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.Path != "/api/v1/test-runs/merges/merge-42" {
-			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		if got := r.URL.Query().Get("format"); got != "unified" {
+			t.Fatalf("empty format must default to unified, got %q", got)
 		}
-		_, _ = w.Write([]byte(`{
-            "run": {"ID":"merge-42","Mode":"merged","Status":"completed"},
-            "sources": [{"ID":"s1","Status":"passed"}]
-        }`))
+		_, _ = w.Write([]byte(`{"totals":{"sources":0,"passed":0,"failed":0}}`))
 	}))
 	defer srv.Close()
 
 	c := NewClient(srv.URL)
-	view, err := c.TestRuns().GetMergedRun(context.Background(), "merge-42")
-	if err != nil {
+	if _, err := c.TestRuns().AggregateRunsReport(context.Background(),
+		AggregateRunsReportRequest{RunIDs: []string{"r1"}}, ""); err != nil {
 		t.Fatal(err)
-	}
-	if view.Run.ID != "merge-42" {
-		t.Fatalf("unexpected parent id %q", view.Run.ID)
-	}
-	if len(view.Sources) != 1 || view.Sources[0].ID != "s1" {
-		t.Fatalf("unexpected sources: %+v", view.Sources)
-	}
-}
-
-func TestTestRuns_AddMergeSource(t *testing.T) {
-	var hit atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/v1/test-runs/merges/m1/sources" {
-			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-		var body map[string]string
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		if body["sourceRunId"] != "src-new" {
-			t.Fatalf("expected sourceRunId=src-new, got %+v", body)
-		}
-		hit.Add(1)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-
-	c := NewClient(srv.URL)
-	if err := c.TestRuns().AddMergeSource(context.Background(), "m1", "src-new"); err != nil {
-		t.Fatal(err)
-	}
-	if hit.Load() != 1 {
-		t.Error("handler not called")
-	}
-}
-
-func TestTestRuns_RemoveMergeSource(t *testing.T) {
-	var hit atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete || r.URL.Path != "/api/v1/test-runs/merges/m1/sources/src-old" {
-			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
-		}
-		hit.Add(1)
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer srv.Close()
-
-	c := NewClient(srv.URL)
-	if err := c.TestRuns().RemoveMergeSource(context.Background(), "m1", "src-old"); err != nil {
-		t.Fatal(err)
-	}
-	if hit.Load() != 1 {
-		t.Error("handler not called")
 	}
 }
