@@ -16,7 +16,9 @@
 // # Canonical contract
 //
 // The Mockarty admin server exposes the following endpoints under the
-// per-namespace prefix /api/v1/namespaces/:ns/tcm/external-runs:
+// per-namespace prefix /api/v1/namespaces/:ns/tcm/external-runs/lifecycle
+// (the /lifecycle sub-path keeps the streaming lifecycle distinct from the
+// single-shot POST /tcm/external-runs that records a complete run in one call):
 //
 //	POST   /                        — create a run, returns Run
 //	GET    /:run_id                 — fetch a single run
@@ -24,6 +26,10 @@
 //	POST   /:run_id/attachments     — multipart artefact upload
 //	POST   /:run_id/finish          — close the run with a final status
 //	GET    /                        — list runs (filterable)
+//
+// On finish the accumulated payload is submitted through the same ingest as the
+// single-shot endpoint, so a finished lifecycle run lands as a TCM test-case run
+// exactly like a single-shot upload.
 //
 // Every request carries an X-Mockarty-Schema-Version header so the server
 // can refuse old clients after a backwards-incompatible envelope change.

@@ -95,7 +95,7 @@ func TestIntegration_AllureHappyPath(t *testing.T) {
 			allure.WithFeature("SDK Integration"),
 			allure.WithStory("Allure happy path"),
 			allure.WithSeverity(allure.SeverityCritical),
-			allure.WithOwner("sdk-integration@mockarty.com"),
+			allure.WithOwner("sdk-integration@mockarty.ru"),
 		)
 		a.Issue("INT-1", "https://issues.example.com/INT-1")
 		a.TmsLink("TC-99", "https://tms.example.com/cases/99")

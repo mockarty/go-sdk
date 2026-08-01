@@ -130,7 +130,10 @@ func (c *Client) BaseURL() string { return c.baseURL.String() }
 // caller-supplied namespace or run ID containing literal "/" from being
 // silently split.
 func (c *Client) runSegments(suffix ...string) []string {
-	segs := []string{"api", "v1", "namespaces", c.namespace, "tcm", "external-runs"}
+	// The incremental lifecycle lives under /external-runs/lifecycle so it does
+	// not collide with the single-shot POST /external-runs (and its /batch
+	// sibling), which record a complete run in one call.
+	segs := []string{"api", "v1", "namespaces", c.namespace, "tcm", "external-runs", "lifecycle"}
 	for _, s := range suffix {
 		if s == "" {
 			continue
@@ -311,7 +314,7 @@ func (c *Client) AddSteps(ctx context.Context, runID string, steps []Step) error
 // mime may be empty — the server then derives it from the file name. To
 // stream a large file without buffering, supply a *bytes.Buffer or any
 // other io.Reader via an internal helper (kept private until a use case
-// arrives — see Phase 2 follow-ups).
+// arrives — see the follow-up notes).
 func (c *Client) AttachReport(ctx context.Context, runID, name string, content []byte, mime string) error {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {

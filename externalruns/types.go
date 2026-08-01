@@ -47,16 +47,26 @@ func (s Status) Valid() bool {
 //	                   the server's now() if zero.
 //	Environment      — free-form key/value labels (CI job, git sha, etc.).
 //	Tags             — TCM-level labels for filtering.
+//	FullName         — deterministic per-test identity (e.g.
+//	                   "pkg.Class::TestMethod"). On finish the server matches
+//	                   the run to an existing TCM case by this key (or
+//	                   auto-creates one) — set it to keep re-runs appending
+//	                   to the SAME case instead of spawning duplicates.
+//	TestCaseID       — the author-pinned EXTERNAL case id (Allure
+//	                   `@allure.id` style), matched against the case's
+//	                   stored external test-case id. NOT the Mockarty case
+//	                   UUID — a UUID here silently misses and resolution
+//	                   falls back to FullName/Name.
 type CreateRunRequest struct {
-	StartedAt     time.Time         `json:"started_at,omitempty"`
-	Environment   map[string]string `json:"environment,omitempty"`
-	Name          string            `json:"name"`
-	FullName      string            `json:"full_name,omitempty"`
-	Framework     string            `json:"framework"`
-	SuiteID       string            `json:"suite_id,omitempty"`
-	ExternalID    string            `json:"external_id,omitempty"`
-	TestCaseID    string            `json:"test_case_id,omitempty"`
-	Tags          []string          `json:"tags,omitempty"`
+	StartedAt   time.Time         `json:"started_at,omitempty"`
+	Environment map[string]string `json:"environment,omitempty"`
+	Name        string            `json:"name"`
+	FullName    string            `json:"full_name,omitempty"`
+	Framework   string            `json:"framework"`
+	SuiteID     string            `json:"suite_id,omitempty"`
+	ExternalID  string            `json:"external_id,omitempty"`
+	TestCaseID  string            `json:"test_case_id,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
 }
 
 // Run is the canonical run envelope returned by every endpoint.
@@ -70,12 +80,19 @@ type Run struct {
 	Framework   string            `json:"framework"`
 	SuiteID     string            `json:"suite_id,omitempty"`
 	ExternalID  string            `json:"external_id,omitempty"`
+	FullName    string            `json:"full_name,omitempty"`
 	Status      Status            `json:"status"`
-	Tags        []string          `json:"tags,omitempty"`
-	Steps       []Step            `json:"steps,omitempty"`
-	Attachments []Attachment      `json:"attachments,omitempty"`
-	StepCount   int               `json:"step_count"`
-	SchemaVer   int               `json:"schema_version"`
+	// ResolvedCaseID / ResolvedRunID are the TCM case + case-run the server
+	// matched (or auto-created) this run to on finish — keyed off FullName /
+	// TestCaseID. Empty until the run is finished. Use them to link a CI
+	// result straight back to its case (open it, attach a defect).
+	ResolvedCaseID string       `json:"resolved_case_id,omitempty"`
+	ResolvedRunID  string       `json:"resolved_run_id,omitempty"`
+	Tags           []string     `json:"tags,omitempty"`
+	Steps          []Step       `json:"steps,omitempty"`
+	Attachments    []Attachment `json:"attachments,omitempty"`
+	StepCount      int          `json:"step_count"`
+	SchemaVer      int          `json:"schema_version"`
 }
 
 // Step is one logical step inside a run.

@@ -133,7 +133,7 @@ func TestCreateRun_happyPath(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("method = %s, want POST", r.Method)
 		}
-		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs" {
+		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/lifecycle" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
@@ -221,7 +221,7 @@ func TestAddSteps_happyPath(t *testing.T) {
 	var got stepsBody
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requireHeaders(t, r)
-		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/run-1/steps" {
+		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/lifecycle/run-1/steps" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
@@ -265,7 +265,7 @@ func TestAttachReport_multipartShape(t *testing.T) {
 	var gotBody []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requireHeaders(t, r)
-		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/run-1/attachments" {
+		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/lifecycle/run-1/attachments" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		if err := r.ParseMultipartForm(1 << 20); err != nil {
@@ -345,7 +345,7 @@ func TestFinishRun_happyPath(t *testing.T) {
 	var got FinishRunRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requireHeaders(t, r)
-		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/run-1/finish" {
+		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/lifecycle/run-1/finish" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		_ = json.NewDecoder(r.Body).Decode(&got)
@@ -385,7 +385,7 @@ func TestGetRun_happyPath(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("method = %s", r.Method)
 		}
-		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/run-7" {
+		if r.URL.Path != "/api/v1/namespaces/team-alpha/tcm/external-runs/lifecycle/run-7" {
 			t.Errorf("path = %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")

@@ -49,7 +49,7 @@ type ExternalRunOptions struct {
 }
 
 // ToExternalRun materialises the Tester report into an
-// ExternalRunRequest ready for client.ExternalRuns().Submit(). Every
+// ExternalRunRequest ready for client.ExternalRuns().Report(). Every
 // StepRecord becomes one ExternalStep; protocol-specific fields
 // (Protocol, Method, URL, StatusOrCode) land in the per-step Metadata
 // map keyed as "protocol" / "method" / "url" / "statusOrCode" so the

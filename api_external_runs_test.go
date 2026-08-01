@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestExternalRunsSubmit(t *testing.T) {
+func TestExternalRunsReport(t *testing.T) {
 	var capturedPath string
 	var capturedBody ExternalRunRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +26,7 @@ func TestExternalRunsSubmit(t *testing.T) {
 	defer srv.Close()
 
 	c := NewClient(srv.URL, WithNamespace("test-ns"))
-	resp, err := c.ExternalRuns().Submit(context.Background(), "", ExternalRunRequest{
+	resp, err := c.ExternalRuns().Report(context.Background(), "", ExternalRunRequest{
 		CaseName: "smoke",
 		Status:   ExternalStatusPassed,
 	})
@@ -52,7 +52,7 @@ func TestExternalRunsSubmitNamespaceOverride(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := NewClient(srv.URL, WithNamespace("default-ns"))
-	_, _ = c.ExternalRuns().Submit(context.Background(), "override-ns", ExternalRunRequest{
+	_, _ = c.ExternalRuns().Report(context.Background(), "override-ns", ExternalRunRequest{
 		CaseName: "x", Status: ExternalStatusPassed,
 	})
 	if !strings.Contains(capturedPath, "/override-ns/") {
@@ -64,7 +64,7 @@ func TestExternalRunsSubmitRequiresNamespace(t *testing.T) {
 	c := NewClient("http://unreachable.test")
 	// No client namespace, no override → error.
 	c.namespace = ""
-	_, err := c.ExternalRuns().Submit(context.Background(), "", ExternalRunRequest{
+	_, err := c.ExternalRuns().Report(context.Background(), "", ExternalRunRequest{
 		CaseName: "x", Status: ExternalStatusPassed,
 	})
 	if err == nil {
@@ -72,7 +72,7 @@ func TestExternalRunsSubmitRequiresNamespace(t *testing.T) {
 	}
 }
 
-func TestExternalRunsSubmitBatch(t *testing.T) {
+func TestExternalRunsReportBatch(t *testing.T) {
 	calls := 0
 	var rows []ExternalRunRequest
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +107,7 @@ func TestExternalRunsSubmitBatch(t *testing.T) {
 			Status:   ExternalStatusPassed,
 		}
 	}
-	resp, err := c.ExternalRuns().SubmitBatch(context.Background(), "", in)
+	resp, err := c.ExternalRuns().ReportBatch(context.Background(), "", in)
 	if err != nil {
 		t.Fatalf("SubmitBatch: %v", err)
 	}
@@ -150,4 +150,32 @@ func intToStr(n int) string {
 		b = append([]byte{'-'}, b...)
 	}
 	return string(b)
+}
+
+// TestExternalRunsParametersSerialised guards SDK↔server parity for the
+// data-driven `parameters` field (twin of labels): it must reach the wire so a
+// parametrised test's inputs map onto custom fields server-side.
+func TestExternalRunsParametersSerialised(t *testing.T) {
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, WithNamespace("ns"))
+	_, _ = c.ExternalRuns().Report(context.Background(), "", ExternalRunRequest{
+		CaseName: "param case", Status: ExternalStatusPassed,
+		Parameters: map[string]string{"browser": "firefox", "locale": "ru"},
+	})
+	var got map[string]any
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	params, ok := got["parameters"].(map[string]any)
+	if !ok {
+		t.Fatalf("parameters missing from wire body: %s", body)
+	}
+	if params["browser"] != "firefox" || params["locale"] != "ru" {
+		t.Fatalf("parameters wrong on wire: %v", params)
+	}
 }
