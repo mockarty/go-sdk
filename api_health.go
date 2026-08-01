@@ -66,3 +66,13 @@ func (a *HealthAPI) Ready(ctx context.Context) error {
 	_ = resp
 	return nil
 }
+
+// Version returns the server version (releaseId from the health endpoint), or
+// "unknown" if unavailable. Parity with Python health.version() / Java version().
+func (a *HealthAPI) Version(ctx context.Context) string {
+	resp, err := a.Check(ctx)
+	if err != nil || resp == nil || resp.ReleaseID == "" {
+		return "unknown"
+	}
+	return resp.ReleaseID
+}

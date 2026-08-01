@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // PerfAPI provides methods for managing performance tests.
@@ -125,11 +126,11 @@ type PerfRunRequest struct {
 	// RunnerID — pin to a specific runner ID, "local" to force local,
 	// or empty for auto-assign.
 	RunnerID string `json:"runnerId,omitempty"`
-	// RequiredRunnerLabels — Phase 3 label DSL (AND'd with the expr).
+	// RequiredRunnerLabels — runner-label DSL (AND'd with the expr).
 	RequiredRunnerLabels []string `json:"requiredRunnerLabels,omitempty"`
-	// RunnerLabelExpr — Phase 3 label DSL expression.
+	// RunnerLabelExpr — runner-label DSL expression.
 	RunnerLabelExpr string `json:"runnerLabelExpr,omitempty"`
-	// CITriggerID — Phase 4 CI Triggers. When set, the server fires the
+	// CITriggerID — CI Triggers. When set, the server fires the
 	// trigger to mint a dispatch_token before queuing the task; the
 	// ephemeral runner the CI pipeline spawns claims by token.
 	CITriggerID string `json:"ciTriggerId,omitempty"`
@@ -173,7 +174,7 @@ func (a *PerfAPI) Stop(ctx context.Context, taskID string) error {
 }
 
 // Results returns all performance test results.
-func (a *PerfAPI) Results(ctx context.Context) ([]PerfResult, error) {
+func (a *PerfAPI) ListResults(ctx context.Context) ([]PerfResult, error) {
 	var results []PerfResult
 	if err := a.client.do(ctx, "GET", "/api/v1/perf-results", nil, &results); err != nil {
 		return nil, err
@@ -206,13 +207,21 @@ func (a *PerfAPI) Compare(ctx context.Context, ids []string) (*PerfComparison, e
 // Schedule type
 // ---------------------------------------------------------------------------
 
-// PerfSchedule represents a scheduled performance test run.
+// PerfSchedule represents a scheduled performance test run. Field names and
+// JSON tags mirror the server's runner.PerfSchedule contract: the cron field is
+// `cronExpression` (not `cron`) and timestamps are RFC3339 (time.Time, not the
+// legacy int64 — the server emits time.Time, so an int64 field fails to decode).
 type PerfSchedule struct {
-	ID        string `json:"id,omitempty"`
-	ConfigID  string `json:"configId,omitempty"`
-	Cron      string `json:"cron,omitempty"`
-	Enabled   bool   `json:"enabled"`
-	CreatedAt int64  `json:"createdAt,omitempty"`
+	ID             string     `json:"id,omitempty"`
+	ConfigID       string     `json:"configId,omitempty"`
+	Name           string     `json:"name,omitempty"`
+	Namespace      string     `json:"namespace,omitempty"`
+	CronExpression string     `json:"cronExpression,omitempty"`
+	Enabled        bool       `json:"enabled"`
+	CreatedAt      time.Time  `json:"createdAt,omitempty"`
+	UpdatedAt      time.Time  `json:"updatedAt,omitempty"`
+	NextRunAt      *time.Time `json:"nextRunAt,omitempty"`
+	LastRunAt      *time.Time `json:"lastRunAt,omitempty"`
 }
 
 // ---------------------------------------------------------------------------
@@ -330,11 +339,24 @@ func (a *PerfAPI) DeleteResult(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/perf-results/"+url.PathEscape(id), nil, nil)
 }
 
-// RunCollection starts a performance test from a collection.
-func (a *PerfAPI) RunCollection(ctx context.Context, req any) (*PerfTask, error) {
-	var task PerfTask
-	if err := a.client.do(ctx, "POST", "/api/v1/perf/run-collection", req, &task); err != nil {
+// PerfRunGroup is the result of running a whole collection as a perf suite.
+// A collection fans out into one perf task per request, so the server returns
+// a run-group id plus the per-request task ids — NOT a single PerfTask.
+type PerfRunGroup struct {
+	RunGroupID string   `json:"runGroupId"`
+	TaskIDs    []string `json:"taskIds"`
+}
+
+// RunCollection starts a performance suite from a collection — every request
+// in the collection becomes its own perf task. Returns the run-group id (to
+// correlate results via GET /perf-results/group/:runGroupId) and the spawned
+// task ids.
+//
+// POST /api/v1/perf/run-collection
+func (a *PerfAPI) RunCollection(ctx context.Context, req any) (*PerfRunGroup, error) {
+	var group PerfRunGroup
+	if err := a.client.do(ctx, "POST", "/api/v1/perf/run-collection", req, &group); err != nil {
 		return nil, err
 	}
-	return &task, nil
+	return &group, nil
 }
