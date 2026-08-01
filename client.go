@@ -48,6 +48,8 @@ type Client struct {
 	importAPI            *ImportAPI
 	testRunAPI           *TestRunAPI
 	tagAPI               *TagAPI
+	uiTestAPI            *UITestAPI
+	gitSyncAPI           *GitSyncAPI
 	folderAPI            *FolderAPI
 	undefinedAPI         *UndefinedAPI
 	statsAPI             *StatsAPI
@@ -110,6 +112,8 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.importAPI = &ImportAPI{client: c}
 	c.testRunAPI = &TestRunAPI{client: c}
 	c.tagAPI = &TagAPI{client: c}
+	c.uiTestAPI = &UITestAPI{client: c}
+	c.gitSyncAPI = &GitSyncAPI{client: c}
 	c.folderAPI = &FolderAPI{client: c}
 	c.undefinedAPI = &UndefinedAPI{client: c}
 	c.statsAPI = &StatsAPI{client: c}
@@ -195,6 +199,12 @@ func (c *Client) TestRuns() *TestRunAPI { return c.testRunAPI }
 
 // Tags returns the Tag API for managing mock tags.
 func (c *Client) Tags() *TagAPI { return c.tagAPI }
+
+// UITests returns the recorded-UI-test API (save / run / poll / export).
+func (c *Client) UITests() *UITestAPI { return c.uiTestAPI }
+
+// GitSync returns the git-sync API (bind a repo, pull/push autotest collections).
+func (c *Client) GitSync() *GitSyncAPI { return c.gitSyncAPI }
 
 // Folders returns the Folder API for managing mock folders.
 func (c *Client) Folders() *FolderAPI { return c.folderAPI }
@@ -286,21 +296,37 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any) ([]b
 //   - body is io.Reader     → sent as-is
 //   - anything else         → JSON-marshalled (the common case)
 func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.ReadCloser, error) {
+	return c.doRawCT(ctx, method, path, body, "application/json")
+}
+
+// doRawCT is doRaw with an explicit request Content-Type. Multipart uploads
+// (TCM attachments) need "multipart/form-data; boundary=..." rather than JSON.
+//
+// The body is buffered into a []byte ONCE up front so every retry replays the
+// exact same bytes: a []byte / io.Reader / multipart body must NOT be
+// re-JSON-marshalled on retry (the previous code double-encoded []byte uploads
+// and would have JSON-marshalled an already-consumed io.Reader).
+func (c *Client) doRawCT(ctx context.Context, method, path string, body any, contentType string) (io.ReadCloser, error) {
 	url := c.baseURL + path
 
-	var bodyReader io.Reader
-	if body != nil {
+	hasBody := body != nil
+	var rawBody []byte
+	if hasBody {
 		switch b := body.(type) {
 		case []byte:
-			bodyReader = bytes.NewReader(b)
+			rawBody = b
 		case io.Reader:
-			bodyReader = b
+			data, err := io.ReadAll(b)
+			if err != nil {
+				return nil, fmt.Errorf("mockarty: read request body: %w", err)
+			}
+			rawBody = data
 		default:
 			data, err := json.Marshal(body)
 			if err != nil {
 				return nil, fmt.Errorf("mockarty: marshal request: %w", err)
 			}
-			bodyReader = bytes.NewReader(data)
+			rawBody = data
 		}
 	}
 
@@ -323,15 +349,12 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 			case <-time.After(delay):
 			}
 			delay *= 2 // exponential back-off
+		}
 
-			// Re-create body reader for retry
-			if body != nil {
-				data, err := json.Marshal(body)
-				if err != nil {
-					return nil, fmt.Errorf("mockarty: marshal request: %w", err)
-				}
-				bodyReader = bytes.NewReader(data)
-			}
+		// Fresh reader over the buffered bytes for every attempt (replayable).
+		var bodyReader io.Reader
+		if hasBody {
+			bodyReader = bytes.NewReader(rawBody)
 		}
 
 		req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
@@ -339,8 +362,8 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 			return nil, fmt.Errorf("mockarty: create request: %w", err)
 		}
 
-		if body != nil {
-			req.Header.Set("Content-Type", "application/json")
+		if hasBody {
+			req.Header.Set("Content-Type", contentType)
 		}
 		req.Header.Set("Accept", "application/json")
 
