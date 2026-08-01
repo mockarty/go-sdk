@@ -202,8 +202,10 @@ func main() {
 			fmt.Printf("Perf run from collection returned: %v\n", err)
 			fmt.Println("(Performance testing may require specific license tier)")
 		} else {
-			fmt.Printf("Performance test started: id=%s, status=%s\n",
-				perfTask.ID, perfTask.Status)
+			// A collection fans out into one perf task per request, so the
+			// server answers with a run-group id plus the spawned task ids.
+			fmt.Printf("Performance suite started: runGroup=%s, tasks=%d\n",
+				perfTask.RunGroupID, len(perfTask.TaskIDs))
 		}
 	}
 

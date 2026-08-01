@@ -157,8 +157,8 @@ func main() {
 		fmt.Printf("Found %d agent tasks:\n", len(tasks))
 		for _, t := range tasks {
 			createdAt := "unknown"
-			if t.CreatedAt > 0 {
-				createdAt = time.Unix(t.CreatedAt, 0).Format(time.RFC3339)
+			if !t.CreatedAt.IsZero() {
+				createdAt = t.CreatedAt.Format(time.RFC3339)
 			}
 			prompt := t.Prompt
 			if len(prompt) > 60 {

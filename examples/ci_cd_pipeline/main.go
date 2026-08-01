@@ -142,8 +142,8 @@ func main() {
 
 	// 3a. Publish a consumer pact
 	pact, err := client.Contracts().PublishPact(ctx, &mockarty.Pact{
-		Consumer:  "ci-frontend",
-		Provider:  "ci-service",
+		Consumer:  mockarty.PactParty{Name: "ci-frontend"},
+		Provider:  mockarty.PactParty{Name: "ci-service"},
 		Version:   buildID,
 		Namespace: namespace,
 		Spec: `{

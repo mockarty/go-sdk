@@ -104,7 +104,7 @@ err := client.Mocks().BatchRestore(ctx, ids)
 
 // Logs and versions
 logs, err := client.Mocks().Logs(ctx, "mock-id", &mockarty.LogsOptions{Limit: 50})
-versions, err := client.Mocks().Versions(ctx, "chain-id")
+versions, err := client.Mocks().GetChain(ctx, "chain-id")
 ```
 
 ### Namespaces
@@ -322,7 +322,7 @@ t.HTTP().GET("/me").ExpectStatus(200)
 t.Finish()
 
 client := mockarty.NewClient("http://...", mockarty.WithAPIKey("..."), mockarty.WithNamespace("qa"))
-_, err := client.ExternalRuns().Submit(ctx, "",
+_, err := client.ExternalRuns().Report(ctx, "",
     t.ToExternalRun(tester.ExternalRunOptions{
         CaseName:   "me-endpoint",
         AutoCreate: true,

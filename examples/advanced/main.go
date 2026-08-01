@@ -369,8 +369,14 @@ func main() {
 		fmt.Printf("List versions returned: %v\n", err)
 	} else {
 		fmt.Printf("Version history (%d versions):\n", len(versions))
-		for i, v := range versions {
-			fmt.Printf("  [%d] tags=%v, payload=%v\n", i+1, v.Tags, v.Response)
+		for _, v := range versions {
+			// A version row carries the revision metadata; the mock body of
+			// that revision hangs off v.Mock.
+			var payload any
+			if v.Mock != nil {
+				payload = v.Mock.Response
+			}
+			fmt.Printf("  [v%d] tags=%v, payload=%v\n", v.Version, v.Tags, payload)
 		}
 	}
 
@@ -493,7 +499,7 @@ func main() {
 	// -----------------------------------------------------------------------
 	fmt.Println("\n--- Chain Versions ---")
 
-	chainVersions, err := client.Mocks().Versions(ctx, chainID)
+	chainVersions, err := client.Mocks().GetChain(ctx, chainID)
 	if err != nil {
 		fmt.Printf("Versions returned: %v\n", err)
 	} else {

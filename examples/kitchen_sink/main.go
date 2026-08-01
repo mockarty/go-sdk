@@ -239,7 +239,7 @@ func uploadExternalRun(cfg config, t *tester.Tester) {
 		AutoCreate: true,
 		FullName:   "github.com/mockarty/mockarty-go/examples/kitchen_sink",
 	})
-	resp, err := client.ExternalRuns().Submit(context.Background(), cfg.Namespace, run)
+	resp, err := client.ExternalRuns().Report(context.Background(), cfg.Namespace, run)
 	if err != nil {
 		log.Printf("mockarty TCM upload: %v", err)
 		return
