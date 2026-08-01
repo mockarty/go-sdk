@@ -30,6 +30,7 @@ type config struct {
 	pkg         string
 	testClass   string
 	testMethod  string
+	allureID    string
 	severity    Severity
 	labels      []AllureLabel
 	links       []AllureLink
@@ -70,6 +71,14 @@ func WithTestClass(name string) Option { return func(c *config) { c.testClass = 
 // WithTestMethod seeds the "testMethod" label. Defaults to the subtest /
 // test function name.
 func WithTestMethod(name string) Option { return func(c *config) { c.testMethod = name } }
+
+// WithAllureID pins the Allure id of the test — the Go equivalent of
+// allure-pytest's `@allure.id("123")` and allure-java's `@AllureId(123)`.
+//
+// It is emitted as the AS_ID label (replacing the auto-computed stable id)
+// and, crucially, is what an Allure test plan's `"id"` field is matched
+// against, so a TestOps-driven selective run can address this test.
+func WithAllureID(id string) Option { return func(c *config) { c.allureID = id } }
 
 // WithDescription seeds the plain-text description shown in the Allure UI.
 func WithDescription(desc string) Option { return func(c *config) { c.description = desc } }

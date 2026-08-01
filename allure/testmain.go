@@ -5,6 +5,7 @@
 package allure
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -27,7 +28,22 @@ import (
 // Returns the testing.Main exit code so callers can pass it straight to
 // os.Exit. Calling it manually is optional — every other allure helper
 // works without TestMain, this just adds the executor.json + final flush.
+// It also owns the Allure test-plan lifecycle (ALLURE_TESTPLAN_PATH):
+//
+//   - a plan that cannot be read/parsed aborts BEFORE any test runs and
+//     returns [TestPlanUsageExitCode] (4) — never a silent full run;
+//   - a plan that selected nothing (empty plan, or no test matched)
+//     returns [TestPlanNoTestsExitCode] (5) — never a green exit 0 for a
+//     run that proved nothing.
+//
+// Both codes mirror pytest's, so a polyglot pipeline branches on the same
+// numbers whichever SDK produced them.
 func TestMain(m *testing.M) int {
+	plan, planErr := activeTestPlan()
+	if planErr != nil {
+		fmt.Fprintf(os.Stderr, "mockarty/allure: %v\n", planErr)
+		return TestPlanUsageExitCode
+	}
 	dir := ResolveResultsDir("")
 	if err := os.MkdirAll(dir, 0o755); err == nil {
 		w := NewFileWriter(dir)
@@ -35,6 +51,14 @@ func TestMain(m *testing.M) int {
 	}
 	code := m.Run()
 	flushAllSuites()
+	selected, _ := TestPlanStats()
+	if final := testPlanExitCode(code, plan, planErr, selected); final != code {
+		fmt.Fprintf(os.Stderr,
+			"mockarty/allure: the Allure test plan %s selected 0 of this package's tests — "+
+				"nothing was executed. This run proves nothing; exiting %d instead of 0.\n",
+			plan.Path, final)
+		return final
+	}
 	return code
 }
 

@@ -215,10 +215,13 @@ func (s *scope) applyConfigLabels() {
 	if s.cfg.severity != "" {
 		push(LabelSeverity, string(s.cfg.severity))
 	}
-	// AS_ID — short stable identifier used by Allure for history navigation
-	// when testClass+testMethod are both available. Falls back to fullName
-	// hash otherwise so parameterised tests still get an identity.
-	if asID := s.computeAllureStableID(); asID != "" {
+	// AS_ID — the author-pinned Allure id when WithAllureID was used
+	// (mirrors @allure.id / @AllureId), else a short stable identifier
+	// derived from testClass+testMethod for history navigation. Falls back
+	// to a fullName hash so parameterised tests still get an identity.
+	if s.cfg.allureID != "" {
+		push(LabelAllureID, s.cfg.allureID)
+	} else if asID := s.computeAllureStableID(); asID != "" {
 		push(LabelAllureID, asID)
 	}
 	// Append user labels, but NEVER emit internal bookkeeping labels (the

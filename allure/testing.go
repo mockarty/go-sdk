@@ -113,6 +113,14 @@ func T(t *testing.T, opts ...Option) *AllureT {
 			cfg.fullName = cfg.pkg + "::" + t.Name()
 		}
 	}
+	// Allure test plan (ALLURE_TESTPLAN_PATH): enforce BEFORE a scope is
+	// created, so a test the plan did not select produces no Allure result
+	// at all — a deselected test must not show up in the report as if it
+	// had been considered. Skips/fails the test and never returns when the
+	// plan excludes it or cannot be honoured.
+	if !applyTestPlan(t, cfg, t.Name()) {
+		return nil
+	}
 	dir := ResolveResultsDir(cfg.resultsDir)
 	writer := NewFileWriter(dir)
 	s := newScope(cfg, writer)
@@ -307,7 +315,7 @@ func (a *AllureT) Description(value string) { a.scope.setDescription(value) }
 // them, readers that do (our CLI) lift them onto the wire shape.
 
 const (
-	caseLabelPrefix     = "mockarty:case:"
+	caseLabelPrefix      = "mockarty:case:"
 	caseLabelDescription = "mockarty:case:description"
 	caseLabelExpected    = "mockarty:case:expected_result"
 	caseLabelClaim       = "mockarty:case:claim_ownership"
