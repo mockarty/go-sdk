@@ -206,8 +206,7 @@ func main() {
 		} else {
 			// A collection fans out into one perf task per request, so the
 			// server answers with a run-group id plus the spawned task ids.
-			fmt.Printf("Performance suite started: runGroupId=%s, tasks=%d
-",
+			fmt.Printf("Performance suite started: runGroupId=%s, tasks=%d\n",
 				group.RunGroupID, len(group.TaskIDs))
 		}
 	}
