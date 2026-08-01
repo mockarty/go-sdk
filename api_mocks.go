@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -30,14 +31,43 @@ type LogsOptions struct {
 	Offset int
 }
 
+// CreateOption tunes a Create call. Use CreateNew or Overwrite to resolve a
+// duplicate-entity (HTTP 409) conflict when a similar mock already exists
+// (same endpoint, possibly different conditions).
+type CreateOption func(*createOptions)
+
+type createOptions struct {
+	intent string
+}
+
+// CreateNew forces creating a brand-new mock even when a similar one exists,
+// instead of getting a 409 duplicate_entity conflict. Use it to seed several
+// condition-differentiated mocks on the same route/method.
+func CreateNew() CreateOption { return func(o *createOptions) { o.intent = "create_new" } }
+
+// Overwrite replaces the existing duplicate in place (reusing its id) instead
+// of getting a 409. The server still guards against a concurrent modification.
+func Overwrite() CreateOption { return func(o *createOptions) { o.intent = "overwrite" } }
+
 // Create creates a new mock or overwrites an existing one with the same ID.
-func (a *MockAPI) Create(ctx context.Context, mock *Mock) (*SaveMockResponse, error) {
+// When a similar mock already exists the server returns 409 duplicate_entity;
+// pass CreateNew() or Overwrite() to resolve the conflict.
+func (a *MockAPI) Create(ctx context.Context, mock *Mock, opts ...CreateOption) (*SaveMockResponse, error) {
 	if mock.Namespace == "" && a.client.namespace != "" {
 		mock.Namespace = a.client.namespace
 	}
 
+	var co createOptions
+	for _, o := range opts {
+		o(&co)
+	}
+	path := "/api/v1/mocks"
+	if co.intent != "" {
+		path += "?intent=" + url.QueryEscape(co.intent)
+	}
+
 	var resp SaveMockResponse
-	if err := a.client.do(ctx, "POST", "/api/v1/mocks", mock, &resp); err != nil {
+	if err := a.client.do(ctx, "POST", path, mock, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
@@ -56,9 +86,14 @@ func (a *MockAPI) Get(ctx context.Context, id string) (*Mock, error) {
 func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListResponse, error) {
 	params := url.Values{}
 
+	// Default page size matches the Python/Java SDKs (Page.limit = 50) so a
+	// bare List(ctx, nil) returns an identical first page across all three
+	// SDKs. Callers page further via opts.Offset / opts.Limit.
+	namespace := a.client.namespace
+	offset, limit := 0, 50
 	if opts != nil {
 		if opts.Namespace != "" {
-			params.Set("namespace", opts.Namespace)
+			namespace = opts.Namespace
 		}
 		if len(opts.Tags) > 0 {
 			params.Set("tags", strings.Join(opts.Tags, ","))
@@ -67,17 +102,17 @@ func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListRe
 			params.Set("search", opts.Search)
 		}
 		if opts.Offset > 0 {
-			params.Set("offset", strconv.Itoa(opts.Offset))
+			offset = opts.Offset
 		}
 		if opts.Limit > 0 {
-			params.Set("limit", strconv.Itoa(opts.Limit))
-		}
-	} else {
-		// Use default namespace
-		if a.client.namespace != "" {
-			params.Set("namespace", a.client.namespace)
+			limit = opts.Limit
 		}
 	}
+	if namespace != "" {
+		params.Set("namespace", namespace)
+	}
+	params.Set("offset", strconv.Itoa(offset))
+	params.Set("limit", strconv.Itoa(limit))
 
 	path := "/api/v1/mocks"
 	if len(params) > 0 {
@@ -106,6 +141,28 @@ func (a *MockAPI) Update(ctx context.Context, id string, mock *Mock) (*Mock, err
 // Delete soft-deletes a mock by ID.
 func (a *MockAPI) Delete(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id), nil, nil)
+}
+
+// GetChain returns all mocks in a chain by chain ID. 3-language parity: Python
+// mocks.get_chain / Java mocks.getChain — the Go SDK was missing chain ops.
+func (a *MockAPI) GetChain(ctx context.Context, chainID string) ([]*Mock, error) {
+	var mocks []*Mock
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, &mocks); err != nil {
+		return nil, err
+	}
+	return mocks, nil
+}
+
+// DeleteChain deletes every mock in a chain by chain ID. Parity with Python
+// mocks.delete_chain / Java mocks.deleteChain.
+func (a *MockAPI) DeleteChain(ctx context.Context, chainID string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, nil)
+}
+
+// Purge permanently deletes a mock by ID (bypasses the recycle bin). Parity
+// with Python mocks.purge / Java mocks.purge.
+func (a *MockAPI) Purge(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id)+"/purge", nil, nil)
 }
 
 // Restore restores a soft-deleted mock by ID (uses batch/restore endpoint).
@@ -179,22 +236,36 @@ func (a *MockAPI) Logs(ctx context.Context, id string, opts *LogsOptions) (*Mock
 	return &logs, nil
 }
 
-// Versions retrieves the chain mocks (related versions) for a given chain ID.
-func (a *MockAPI) Versions(ctx context.Context, chainID string) ([]*Mock, error) {
-	var mocks []*Mock
-	if err := a.client.do(ctx, "GET", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, &mocks); err != nil {
-		return nil, err
-	}
-	return mocks, nil
+// MockVersion is one entry of a mock's version history. The server stores the
+// mock body of every revision alongside the revision metadata, so a version row
+// is NOT a Mock — the mock itself hangs off the Mock field. Decoding these rows
+// straight into Mock silently produced entries whose ID was the version-row id
+// and whose body was empty.
+type MockVersion struct {
+	// Mock is the mock body as it was at this revision.
+	Mock            *Mock    `json:"mock,omitempty"`
+	ClosedAt        *int64   `json:"closed_at,omitempty"`
+	ModifiedBy      *string  `json:"modified_by,omitempty"`
+	ModifiedByEmail *string  `json:"modified_by_email,omitempty"`
+	CreatedBy       *string  `json:"created_by,omitempty"`
+	CreatedByEmail  *string  `json:"created_by_email,omitempty"`
+	Environment     *string  `json:"environment,omitempty"`
+	ID              string   `json:"id,omitempty"`
+	MockID          string   `json:"mock_id,omitempty"`
+	LifecycleState  string   `json:"lifecycle_state,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	CreatedAt       int64    `json:"created_at,omitempty"`
+	// Version is the revision number used by GetVersion / RestoreVersion.
+	Version int `json:"version"`
 }
 
-// ListVersions returns the version history for a mock.
+// ListVersions returns the version history for a mock, newest first.
 //
 // Wire shape: server returns `{mock_id, versions: [...], count}`.
 // The SDK unwraps the envelope and returns the slice.
-func (a *MockAPI) ListVersions(ctx context.Context, id string) ([]*Mock, error) {
+func (a *MockAPI) ListVersions(ctx context.Context, id string) ([]*MockVersion, error) {
 	var env struct {
-		Versions []*Mock `json:"versions"`
+		Versions []*MockVersion `json:"versions"`
 	}
 	if err := a.client.do(ctx, "GET", "/api/v1/mocks/"+url.PathEscape(id)+"/versions", nil, &env); err != nil {
 		return nil, err
@@ -202,14 +273,31 @@ func (a *MockAPI) ListVersions(ctx context.Context, id string) ([]*Mock, error) 
 	return env.Versions, nil
 }
 
-// GetVersion returns a specific version of a mock.
-func (a *MockAPI) GetVersion(ctx context.Context, id, version string) (*Mock, error) {
-	var mock Mock
-	path := "/api/v1/mocks/" + url.PathEscape(id) + "/versions/" + url.PathEscape(version)
-	if err := a.client.do(ctx, "GET", path, nil, &mock); err != nil {
-		return nil, err
+// GetVersion returns a specific revision of a mock.
+//
+// Wire shape: server returns `{version: {...}, previous_version: {...}}` —
+// the envelope is unwrapped here. Use GetVersionWithPrevious when the preceding
+// revision is needed for a diff.
+func (a *MockAPI) GetVersion(ctx context.Context, id, version string) (*MockVersion, error) {
+	current, _, err := a.GetVersionWithPrevious(ctx, id, version)
+	return current, err
+}
+
+// GetVersionWithPrevious returns a revision together with the one before it
+// (nil for version 1), which is what a version diff needs.
+func (a *MockAPI) GetVersionWithPrevious(ctx context.Context, id, version string) (current, previous *MockVersion, err error) {
+	var env struct {
+		Version         *MockVersion `json:"version"`
+		PreviousVersion *MockVersion `json:"previous_version"`
 	}
-	return &mock, nil
+	path := "/api/v1/mocks/" + url.PathEscape(id) + "/versions/" + url.PathEscape(version)
+	if err := a.client.do(ctx, "GET", path, nil, &env); err != nil {
+		return nil, nil, err
+	}
+	if env.Version == nil {
+		return nil, nil, fmt.Errorf("mockarty: mock %s has no version %s", id, version)
+	}
+	return env.Version, env.PreviousVersion, nil
 }
 
 // RestoreVersion restores a specific version of a mock.

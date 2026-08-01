@@ -200,6 +200,97 @@ type SmtpRequestContext struct {
 	ApplySortArray      bool         `json:"sortArray,omitempty"`
 }
 
+// S3RequestContext defines matching + declarative response rules for an S3
+// (object-storage) mock. Mirrors the server's mock_data.s3 shape: top-level
+// bucket/keyPrefix/endpoint selectors, optional condition/header/toxicity
+// matchers, an ordered rule list, and dispatch defaults.
+type S3RequestContext struct {
+	Conditions     []*Condition      `json:"conditions,omitempty"`
+	Headers        []*Condition      `json:"header,omitempty"`
+	Toxicity       []ToxicityRule    `json:"toxicity,omitempty"`
+	Rules          []S3OperationRule `json:"rules,omitempty"`
+	Bucket         string            `json:"bucket,omitempty"`
+	KeyPrefix      string            `json:"keyPrefix,omitempty"`
+	Endpoint       string            `json:"endpoint,omitempty"`
+	Defaults       *S3Defaults       `json:"defaults,omitempty"`
+	ApplySortArray bool              `json:"sortArray,omitempty"`
+}
+
+// S3OperationRule is one declarative response rule. Rules are sorted by
+// Priority DESC at dispatch and the first matching enabled rule wins.
+type S3OperationRule struct {
+	ID        string         `json:"id"`
+	Operation string         `json:"operation"`
+	Match     S3RuleMatch    `json:"match"`
+	Response  S3RuleResponse `json:"response"`
+	Priority  int            `json:"priority"`
+	Enabled   bool           `json:"enabled"`
+}
+
+// S3RuleMatch narrows a rule by bucket / key. Exact fields take precedence;
+// BucketPattern is a regex, KeyPattern a glob, KeyPrefix a HasPrefix check.
+// Empty fields impose no filter on that axis.
+type S3RuleMatch struct {
+	Bucket        string `json:"bucket,omitempty"`
+	BucketPattern string `json:"bucketPattern,omitempty"`
+	Key           string `json:"key,omitempty"`
+	KeyPattern    string `json:"keyPattern,omitempty"`
+	KeyPrefix     string `json:"keyPrefix,omitempty"`
+}
+
+// S3RuleResponse is the response a matching rule synthesises. Type selects the
+// variant: "file" (TemplatePath), "inline" (base64 InlineBody), "xmlError"
+// (ErrorCode/ErrorMessage) or "passthrough" (fall back to the in-memory S3
+// engine). UserMeta is emitted as x-amz-meta-* headers.
+type S3RuleResponse struct {
+	UserMeta       map[string]string `json:"userMeta,omitempty"`
+	Type           string            `json:"type"`
+	TemplatePath   string            `json:"templatePath,omitempty"`
+	InlineBody     string            `json:"inlineBody,omitempty"`
+	ContentType    string            `json:"contentType,omitempty"`
+	ETag           string            `json:"etag,omitempty"`
+	LastModified   string            `json:"lastModified,omitempty"`
+	CacheControl   string            `json:"cacheControl,omitempty"`
+	ErrorCode      string            `json:"errorCode,omitempty"`
+	ErrorMessage   string            `json:"errorMessage,omitempty"`
+	StatusOverride int               `json:"statusOverride,omitempty"`
+	DelayMs        int               `json:"delayMs,omitempty"`
+}
+
+// S3Defaults controls the dispatcher fallback when no rule matches.
+// PassthroughToBackend=true hands the request to the in-memory S3 engine.
+type S3Defaults struct {
+	Owner                *S3Owner `json:"owner,omitempty"`
+	DefaultErrorCode     string   `json:"defaultErrorCode,omitempty"`
+	ExtraBuckets         []string `json:"extraBuckets,omitempty"`
+	PassthroughToBackend bool     `json:"passthroughToBackend"`
+}
+
+// S3Owner is the bucket owner reported in ListBuckets / ACL envelopes.
+type S3Owner struct {
+	ID          string `json:"id,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
+}
+
+// ToxicityRule is a chaos rule scoped to an S3 mock (latency, errors, data
+// corruption). Type names the fault; Params carries fault-specific knobs.
+type ToxicityRule struct {
+	Params      map[string]interface{} `json:"params,omitempty"`
+	Type        string                 `json:"type"`
+	Scope       ToxicityScope          `json:"scope,omitempty"`
+	Probability int                    `json:"probability,omitempty"`
+	Priority    int                    `json:"priority,omitempty"`
+	Disabled    bool                   `json:"disabled,omitempty"`
+}
+
+// ToxicityScope narrows a toxicity rule to specific buckets / keys / S3
+// operations. Empty fields impose no filter.
+type ToxicityScope struct {
+	BucketRegex string   `json:"bucketRegex,omitempty"`
+	KeyRegex    string   `json:"keyRegex,omitempty"`
+	Operations  []string `json:"operations,omitempty"`
+}
+
 // RabbitMQOutputProps holds AMQP message properties for published response messages.
 type RabbitMQOutputProps struct {
 	DeliveryMode  uint8  `json:"deliveryMode,omitempty"`
@@ -295,7 +386,19 @@ type ContentResponse struct {
 	SSEEventChain       *SSEEventChain      `json:"sseEventChain,omitempty"`
 	GraphQLErrors       []GraphQLError      `json:"graphqlErrors,omitempty"`
 	SOAPFault           *SOAPFault          `json:"soapFault,omitempty"`
+	Script              *ResponseScript     `json:"script,omitempty"`
 	MCPIsError          bool                `json:"mcpIsError,omitempty"`
+}
+
+// ResponseScript builds the response dynamically with JavaScript when the mock
+// is hit. The script receives `request` and fills `response`. See the Scripted
+// Responses guide. Code is required; Language defaults to "javascript";
+// TimeoutMs overrides the per-mock budget; AllowNet opts into outbound calls.
+type ResponseScript struct {
+	Code      string `json:"code"`
+	Language  string `json:"language,omitempty"`
+	TimeoutMs int32  `json:"timeoutMs,omitempty"`
+	AllowNet  bool   `json:"allowNet,omitempty"`
 }
 
 // OneOf allows a mock to return one of multiple responses.
@@ -375,6 +478,7 @@ type Mock struct {
 	Kafka    *KafkaRequestContext    `json:"kafka,omitempty"`
 	RabbitMQ *RabbitMQRequestContext `json:"rabbitmq,omitempty"`
 	SMTP     *SmtpRequestContext     `json:"smtp,omitempty"`
+	S3       *S3RequestContext       `json:"s3,omitempty"`
 
 	// Response configuration (use exactly one of Response, OneOf, or Proxy)
 	Response  *ContentResponse `json:"response,omitempty"`
@@ -388,12 +492,18 @@ type Mock struct {
 	UseCounter int32 `json:"useCounter,omitempty"`
 	Priority   int64 `json:"priority,omitempty"`
 
+	// Transient marks a lightweight mock that skips per-hit bookkeeping
+	// (request logging, live updates, usage counter) to shed load under high
+	// traffic / load testing. Matching and the response are unchanged.
+	Transient bool `json:"transient,omitempty"`
+
 	// Metadata
 	Tags     []string `json:"tags,omitempty"`
 	FolderID string   `json:"folderId,omitempty"`
 
 	// Timestamps (set by server)
 	CreatedAt int64 `json:"createdAt,omitempty"`
+	UpdatedAt int64 `json:"updatedAt,omitempty"`
 	LastUse   int64 `json:"lastUse,omitempty"`
 	ExpireAt  int64 `json:"expireAt,omitempty"`
 	ClosedAt  int64 `json:"closedAt,omitempty"`
@@ -409,9 +519,15 @@ type Mock struct {
 
 // SaveMockResponse is the response from creating/updating a mock.
 //
-// Wire shape (admin node, POST /api/v1/mocks):
+// Wire shape (admin node, POST /api/v1/mocks). As of 2026-06-21 (G2 envelope
+// unification) the server emits the mock's fields at the TOP LEVEL (matching
+// GET /mocks/:id) and keeps the "mock" wrapper as a deprecated mirror for one
+// release cycle:
 //
-//	{"id":"...","mock":{...},"isNew":<bool>,"success":true,"message":"..."}
+//	{"id":"...","name":"...",...,"mock":{...},"isNew":<bool>,"success":true,"message":"..."}
+//
+// UnmarshalJSON reads the "mock" wrapper when present and otherwise
+// reconstructs Mock from the top-level fields, so it decodes both shapes.
 //
 // The server's `isNew` field is semantically "was overwrite" — it's
 // true when an existing mock with the same id was replaced. The legacy
@@ -450,6 +566,14 @@ func (s *SaveMockResponse) UnmarshalJSON(data []byte) error {
 		s.IsNew = *aux.LegacyOverwritten
 	}
 	s.Overwritten = s.IsNew
+	// G2 flat-shape fallback (2026-06-21): when the server omits the
+	// deprecated "mock" wrapper (flat-only response), the mock's fields sit at
+	// the top level alongside the envelope keys. Decode them directly into
+	// Mock — the envelope keys (message/isNew/success/mockId/…) aren't Mock
+	// fields, so they're ignored. Skipped when the wrapper was present.
+	if s.Mock.ID == "" {
+		_ = json.Unmarshal(data, &s.Mock)
+	}
 	return nil
 }
 

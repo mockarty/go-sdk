@@ -66,6 +66,57 @@ func TestSaveMockResponse_AcceptsLegacyOverwrittenField(t *testing.T) {
 	}
 }
 
+// TestSaveMockResponse_DecodesFlatShape proves the G2 envelope unification:
+// a flat-only response (mock fields at the top level, no "mock" wrapper) still
+// populates Mock from the top-level fields. Guards the forward path for when
+// the deprecated wrapper is eventually removed.
+func TestSaveMockResponse_DecodesFlatShape(t *testing.T) {
+	payload := []byte(`{
+		"id": "mock_42",
+		"namespace": "sandbox",
+		"serverName": "api",
+		"isNew": true,
+		"success": true,
+		"message": "Mock created successfully"
+	}`)
+
+	var got SaveMockResponse
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.ID != "mock_42" {
+		t.Errorf("ID = %q; want mock_42", got.ID)
+	}
+	if got.Mock.ID != "mock_42" {
+		t.Errorf("Mock.ID = %q; want reconstructed from flat top-level fields", got.Mock.ID)
+	}
+	if got.Mock.Namespace != "sandbox" {
+		t.Errorf("Mock.Namespace = %q; want sandbox (flat field reconstructed)", got.Mock.Namespace)
+	}
+	if !got.IsNew || !got.Success {
+		t.Errorf("IsNew=%v Success=%v; want both true", got.IsNew, got.Success)
+	}
+}
+
+// TestSaveMockResponse_WrapperWinsOverFlat proves that when BOTH the wrapper
+// and flat fields are present (the dual-emit transition shape), the explicit
+// "mock" wrapper is used verbatim and the flat fallback does not clobber it.
+func TestSaveMockResponse_WrapperWinsOverFlat(t *testing.T) {
+	payload := []byte(`{
+		"id": "m9",
+		"namespace": "flat-ns",
+		"mock": {"id": "m9", "namespace": "wrapper-ns"},
+		"isNew": false
+	}`)
+	var got SaveMockResponse
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.Mock.Namespace != "wrapper-ns" {
+		t.Errorf("Mock.Namespace = %q; want wrapper-ns (wrapper must win when present)", got.Mock.Namespace)
+	}
+}
+
 // TestSaveMockResponse_NewIsFalse confirms a non-overwrite save sets the
 // flag to false on both accessors (regression guard against constant-true).
 func TestSaveMockResponse_NewIsFalse(t *testing.T) {
