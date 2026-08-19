@@ -66,6 +66,7 @@ type Client struct {
 	externalRunsAPI      *ExternalRunsAPI
 	flowRunsAPI          *FlowRunsAPI
 	discoveryAPI         *DiscoveryAPI
+	economicsAPI         *EconomicsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -130,6 +131,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.externalRunsAPI = &ExternalRunsAPI{client: c}
 	c.flowRunsAPI = &FlowRunsAPI{client: c}
 	c.discoveryAPI = &DiscoveryAPI{client: c}
+	c.economicsAPI = &EconomicsAPI{client: c}
 
 	return c
 }
@@ -146,6 +148,9 @@ func (c *Client) FlowRuns() *FlowRunsAPI { return c.flowRunsAPI }
 // framework's collected case list (pytest --collect-only, `go test -list`,
 // etc.) into the Mockarty catalogue. See sdk/go-sdk/api_discovery.go.
 func (c *Client) Discovery() *DiscoveryAPI { return c.discoveryAPI }
+
+// Economics returns the administrator LLM usage and immutable price-book API.
+func (c *Client) Economics() *EconomicsAPI { return c.economicsAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
