@@ -69,6 +69,7 @@ type Client struct {
 	flowRunsAPI          *FlowRunsAPI
 	discoveryAPI         *DiscoveryAPI
 	experienceAPI        *ExperienceAPI
+	economicsAPI         *EconomicsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -135,6 +136,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.flowRunsAPI = &FlowRunsAPI{client: c}
 	c.discoveryAPI = &DiscoveryAPI{client: c}
 	c.experienceAPI = &ExperienceAPI{client: c}
+	c.economicsAPI = &EconomicsAPI{client: c}
 
 	return c
 }
@@ -154,6 +156,9 @@ func (c *Client) Discovery() *DiscoveryAPI { return c.discoveryAPI }
 
 // Experience returns the reusable run-experience search and record API.
 func (c *Client) Experience() *ExperienceAPI { return c.experienceAPI }
+
+// Economics returns the administrator LLM usage and immutable price-book API.
+func (c *Client) Economics() *EconomicsAPI { return c.economicsAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
