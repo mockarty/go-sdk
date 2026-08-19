@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	dockercontainer "github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -55,30 +57,37 @@ func New(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
 		}
 	}
 
-	mounts := make(testcontainers.ContainerMounts, 0, len(cfg.stubFiles))
+	// Bind mounts. testcontainers-go v0.27 SILENTLY DROPS bind mounts supplied
+	// via the deprecated ContainerMounts/GenericBindMountSource API, so stubs
+	// never reached the container (empty /mocks -> a hard-to-debug 404). Use the
+	// supported HostConfigModifier + hc.Mounts path instead, and resolve every
+	// host path to ABSOLUTE — Docker rejects relative bind sources, so a common
+	// idiom like WithMappings("./fixtures") otherwise no-ops.
+	absHost := func(p string) string {
+		if a, err := filepath.Abs(p); err == nil {
+			return a
+		}
+		return p
+	}
+	var dockerMounts []mount.Mount
 	for _, hostPath := range cfg.stubFiles {
-		mounts = append(mounts, testcontainers.ContainerMount{
-			Source: testcontainers.GenericBindMountSource{HostPath: hostPath},
-			Target: testcontainers.ContainerMountTarget(
-				StubsMount + "/" + filepath.Base(hostPath),
-			),
-			ReadOnly: true,
+		dockerMounts = append(dockerMounts, mount.Mount{
+			Type: mount.TypeBind, ReadOnly: true,
+			Source: absHost(hostPath), Target: StubsMount + "/" + filepath.Base(hostPath),
 		})
 	}
 	// WithMappings(dir) — entire directory mounted at /mocks.
 	if cfg.mappingsDir != "" {
-		mounts = append(mounts, testcontainers.ContainerMount{
-			Source:   testcontainers.GenericBindMountSource{HostPath: cfg.mappingsDir},
-			Target:   testcontainers.ContainerMountTarget(MappingsMount),
-			ReadOnly: true,
+		dockerMounts = append(dockerMounts, mount.Mount{
+			Type: mount.TypeBind, ReadOnly: true,
+			Source: absHost(cfg.mappingsDir), Target: MappingsMount,
 		})
 	}
 	// WithHAR(path) — single file mounted at /har/traffic.har.
 	if cfg.harFile != "" {
-		mounts = append(mounts, testcontainers.ContainerMount{
-			Source:   testcontainers.GenericBindMountSource{HostPath: cfg.harFile},
-			Target:   testcontainers.ContainerMountTarget(HARMount),
-			ReadOnly: true,
+		dockerMounts = append(dockerMounts, mount.Mount{
+			Type: mount.TypeBind, ReadOnly: true,
+			Source: absHost(cfg.harFile), Target: HARMount,
 		})
 	}
 
@@ -108,8 +117,15 @@ func New(ctx context.Context, opts ...Option) (*MockartyContainer, error) {
 		Image:        cfg.image,
 		ExposedPorts: exposed,
 		Env:          env,
-		Mounts:       mounts,
 		Cmd:          cfg.cmd,
+		// Bind stubs/mappings/HAR via HostConfigModifier (hc.Mounts) — the
+		// deprecated ContainerMounts API is silently dropped on testcontainers-go
+		// v0.27, which left /mocks empty and every seeded stub 404ing.
+		HostConfigModifier: func(hc *dockercontainer.HostConfig) {
+			if len(dockerMounts) > 0 {
+				hc.Mounts = append(hc.Mounts, dockerMounts...)
+			}
+		},
 		// Wait on the WireMock-compat admin health endpoint served on
 		// the SAME 8080 listener as the mocks. The earlier draft polled
 		// /health on port 9090 (Prometheus metrics port), which the

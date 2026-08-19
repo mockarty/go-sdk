@@ -9,7 +9,7 @@ import (
 	"net/url"
 )
 
-// CITriggersAPI is the minimal SDK surface for the Phase 4 CI Triggers
+// CITriggersAPI is the minimal SDK surface for the CI Triggers
 // feature. Per SDK scope policy (feedback_sdk_cli_scope.md): only the
 // surface that's genuinely useful from CI/CD pipelines + scripts. CRUD
 // of triggers themselves is an administrative UI concern and lives on
@@ -149,7 +149,7 @@ func (a *CITriggersAPI) Get(ctx context.Context, id, namespace string) (*CITrigg
 // matches the runner.Task.ID; the returned run carries the external
 // CI job ID + the current external state. Returns ErrNotFound when no
 // CI run is associated with the task.
-func (a *CITriggersAPI) GetRun(ctx context.Context, taskID string) (*CIRun, error) {
+func (a *CITriggersAPI) GetRunByTask(ctx context.Context, taskID string) (*CIRun, error) {
 	var resp struct {
 		Run CIRun `json:"run"`
 	}

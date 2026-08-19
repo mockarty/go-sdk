@@ -103,7 +103,7 @@ func newFakeAdmin(t *testing.T) *fakeAdmin {
 	return f
 }
 
-func TestRunnerSubmit(t *testing.T) {
+func TestRunnerReport(t *testing.T) {
 	t.Parallel()
 	f := newFakeAdmin(t)
 	r := fuzz.NewRunner(f.server.URL, "default", "tok-abc")

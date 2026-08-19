@@ -130,6 +130,17 @@ func (a *RecorderAPI) ExportSession(ctx context.Context, id string) ([]byte, err
 	return data, nil
 }
 
+// Export exports a session with options and returns the structured import
+// result (creates mocks + reports the outcome). Parity with Java
+// export(id, options) / Python export. Use ExportSession for raw HAR bytes.
+func (a *RecorderAPI) Export(ctx context.Context, id string, options map[string]any) (map[string]any, error) {
+	var result map[string]any
+	if err := a.client.do(ctx, "POST", "/api/v1/recorder/"+url.PathEscape(id)+"/export", options, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // ExportSessionAsPostman exports a recording session as a Postman Collection
 // v2.1 JSON document. Use this to migrate captured traffic into Postman,
 // Insomnia, or any tool that imports the v2.1 format.

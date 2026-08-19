@@ -40,4 +40,5 @@ type Mock struct {
 	Ttl        int64                  `json:"ttl,omitempty"`
 	UseCounter int64                  `json:"useCounter,omitempty"`
 	UseLimiter int64                  `json:"useLimiter,omitempty"`
+	Transient  bool                   `json:"transient,omitempty"`
 }

@@ -104,7 +104,7 @@ err := client.Mocks().BatchRestore(ctx, ids)
 
 // Logs and versions
 logs, err := client.Mocks().Logs(ctx, "mock-id", &mockarty.LogsOptions{Limit: 50})
-versions, err := client.Mocks().Versions(ctx, "chain-id")
+versions, err := client.Mocks().GetChain(ctx, "chain-id")
 ```
 
 ### Namespaces
@@ -147,6 +147,64 @@ result, err := client.Collections().Execute(ctx, "collection-id")
 task, err := client.Perf().Run(ctx, &mockarty.PerfConfig{...})
 err := client.Perf().Stop(ctx, "task-id")
 results, err := client.Perf().Results(ctx)
+```
+
+### MCP client
+
+Drive Mockarty's agent-facing tool surface programmatically over the admin
+node's Model Context Protocol endpoint — list the tools the server exposes and
+call them with typed arguments. The MCP client reuses the SDK client's server
+URL + API key; tool licensing is enforced server-side. It handles the MCP
+handshake, session, and both JSON and SSE response framing transparently.
+
+```go
+mcp := client.MCP()
+
+tools, err := mcp.ListTools(ctx)          // discover available tools
+res, err := mcp.CallTool(ctx, "list_mocks", map[string]any{})
+fmt.Println(res.Text())                    // JSON result text
+```
+
+See `examples/mcp_client`.
+
+### Agent tasks (submit-and-wait)
+
+Dispatch a free-form task into Mockarty's autonomous agent network and block
+for its result:
+
+```go
+task, err := client.AgentTasks().SubmitAndWait(ctx,
+    &mockarty.AgentTask{Title: "audit", Prompt: "Fuzz the /users API and summarise"},
+    2*time.Second)
+// task.Result holds the finished output; errors.Is(err, mockarty.ErrAgentTaskFailed) on failure.
+```
+
+### Issue tracker (task automation)
+
+Create/read/update/transition issues, comment, search, claim the next issue,
+and manage projects/sprints — the full task-automation surface:
+
+```go
+it := client.IssueTracker()
+iss, _ := it.CreateIssue(ctx, "", mockarty.Issue{"projectId": pid, "type": "bug", "title": "500 on /pay"})
+_, _ = it.AddComment(ctx, "", iss["id"].(string), "repro attached")
+_, _ = it.MoveIssue(ctx, "", iss["id"].(string), "in_progress", "")
+next, _ := it.NextIssue(ctx, "", map[string]string{"assigneeId": me})
+```
+
+### Test Case Management (TCM)
+
+Author cases, run them, poll case-runs, file defects, and manage folders +
+attachments:
+
+```go
+tcm := client.TCM()
+c, _ := tcm.CreateCase(ctx, "", mockarty.TCMObject{"folderId": fid, "title": "Checkout smoke"})
+run, _ := tcm.RunCase(ctx, "", c["id"].(string), nil)
+cr, _ := tcm.GetCaseRun(ctx, "", run["runId"].(string))
+if cr["status"] == "failed" {
+    _, _ = tcm.CreateDefect(ctx, "", mockarty.TCMObject{"title": "checkout broke", "caseRunId": run["runId"]})
+}
 ```
 
 ## Mock Builder
@@ -322,7 +380,7 @@ t.HTTP().GET("/me").ExpectStatus(200)
 t.Finish()
 
 client := mockarty.NewClient("http://...", mockarty.WithAPIKey("..."), mockarty.WithNamespace("qa"))
-_, err := client.ExternalRuns().Submit(ctx, "",
+_, err := client.ExternalRuns().Report(ctx, "",
     t.ToExternalRun(tester.ExternalRunOptions{
         CaseName:   "me-endpoint",
         AutoCreate: true,

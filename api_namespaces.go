@@ -23,6 +23,10 @@ func (a *NamespaceAPI) Create(ctx context.Context, name string) error {
 	return a.client.do(ctx, "POST", "/api/v1/namespaces", &namespaceCreateRequest{Name: name}, nil)
 }
 
+// CopyMocks was removed — it POSTed to a non-existent
+// /api/v1/namespaces/copy-mocks route (404). Use Mocks().CopyToNamespace(ids,
+// target) for the real, server-backed mock-copy operation.
+
 // List returns all available namespaces.
 //
 // The admin server returns the list inside an envelope:

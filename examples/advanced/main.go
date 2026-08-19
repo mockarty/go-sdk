@@ -493,7 +493,7 @@ func main() {
 	// -----------------------------------------------------------------------
 	fmt.Println("\n--- Chain Versions ---")
 
-	chainVersions, err := client.Mocks().Versions(ctx, chainID)
+	chainVersions, err := client.Mocks().GetChain(ctx, chainID)
 	if err != nil {
 		fmt.Printf("Versions returned: %v\n", err)
 	} else {

@@ -53,7 +53,7 @@ type PromptVersion struct {
 // Wire shape: server emits `{templates:[...], count, namespace}` —
 // older SDK builds decoded into bare []Prompt and 'cannot unmarshal
 // object' on every call. Unwrap the envelope here.
-func (a *PromptsAPI) ListPrompts(ctx context.Context) ([]Prompt, error) {
+func (a *PromptsAPI) List(ctx context.Context) ([]Prompt, error) {
 	var env struct {
 		Templates []Prompt `json:"templates"`
 	}
@@ -68,7 +68,7 @@ func (a *PromptsAPI) ListPrompts(ctx context.Context) ([]Prompt, error) {
 }
 
 // CreatePrompt creates a new prompt (becomes version 1).
-func (a *PromptsAPI) CreatePrompt(ctx context.Context, p Prompt) (*Prompt, error) {
+func (a *PromptsAPI) Create(ctx context.Context, p Prompt) (*Prompt, error) {
 	if p.Namespace == "" {
 		p.Namespace = a.client.namespace
 	}
@@ -80,7 +80,7 @@ func (a *PromptsAPI) CreatePrompt(ctx context.Context, p Prompt) (*Prompt, error
 }
 
 // GetPrompt fetches the current version of a prompt.
-func (a *PromptsAPI) GetPrompt(ctx context.Context, id string) (*Prompt, error) {
+func (a *PromptsAPI) Get(ctx context.Context, id string) (*Prompt, error) {
 	if id == "" {
 		return nil, fmt.Errorf("mockarty: prompt id is required")
 	}
@@ -93,7 +93,7 @@ func (a *PromptsAPI) GetPrompt(ctx context.Context, id string) (*Prompt, error) 
 
 // UpdatePrompt saves a new version of the prompt. The previous body is
 // appended to version history (FIFO-capped at 20).
-func (a *PromptsAPI) UpdatePrompt(ctx context.Context, id string, p Prompt) (*Prompt, error) {
+func (a *PromptsAPI) Update(ctx context.Context, id string, p Prompt) (*Prompt, error) {
 	if id == "" {
 		return nil, fmt.Errorf("mockarty: prompt id is required")
 	}
@@ -105,7 +105,7 @@ func (a *PromptsAPI) UpdatePrompt(ctx context.Context, id string, p Prompt) (*Pr
 }
 
 // DeletePrompt removes a prompt along with its version history.
-func (a *PromptsAPI) DeletePrompt(ctx context.Context, id string) error {
+func (a *PromptsAPI) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return fmt.Errorf("mockarty: prompt id is required")
 	}

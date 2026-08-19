@@ -166,7 +166,7 @@ func main() {
 				batchIDs := []string{findings[0].ID, findings[1].ID}
 
 				fmt.Println("\n--- Batch Triage Findings ---")
-				err = client.Fuzzing().BatchTriageFindings(ctx, batchIDs, "confirmed")
+				err = client.Fuzzing().BatchTriage(ctx, batchIDs, "confirmed")
 				if err != nil {
 					fmt.Printf("Batch triage returned: %v\n", err)
 				} else {
@@ -174,7 +174,7 @@ func main() {
 				}
 
 				fmt.Println("\n--- Batch Analyze Findings ---")
-				err = client.Fuzzing().BatchAnalyzeFindings(ctx, batchIDs)
+				err = client.Fuzzing().BatchAnalyze(ctx, batchIDs)
 				if err != nil {
 					fmt.Printf("Batch analyze returned: %v\n", err)
 				} else {

@@ -288,7 +288,7 @@ func (a *AllureT) Label(name, value string) { a.scope.addLabel(name, value) }
 func (a *AllureT) Description(value string) { a.scope.setDescription(value) }
 
 // ────────────────────────────────────────────────────────────────────
-// Mockarty Phase 2.6 case-extension setters
+// Mockarty case-extension setters
 // ────────────────────────────────────────────────────────────────────
 //
 // These setters carry Mockarty-extended fields beyond the Allure
@@ -307,7 +307,7 @@ func (a *AllureT) Description(value string) { a.scope.setDescription(value) }
 // them, readers that do (our CLI) lift them onto the wire shape.
 
 const (
-	caseLabelPrefix     = "mockarty:case:"
+	caseLabelPrefix      = "mockarty:case:"
 	caseLabelDescription = "mockarty:case:description"
 	caseLabelExpected    = "mockarty:case:expected_result"
 	caseLabelClaim       = "mockarty:case:claim_ownership"

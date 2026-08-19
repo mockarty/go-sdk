@@ -63,6 +63,28 @@ func (a *TestRunAPI) List(ctx context.Context) ([]TestRun, error) {
 	return a.ListWithOptions(ctx, ListTestRunsOptions{})
 }
 
+// ListByMode returns test runs filtered by mode. Parity with Python
+// list_by_mode / Java listByMode.
+func (a *TestRunAPI) ListByMode(ctx context.Context, mode string) ([]TestRun, error) {
+	return a.ListWithOptions(ctx, ListTestRunsOptions{Mode: mode})
+}
+
+// ListByCollection returns test runs for a collection (client-side filter).
+// Parity with Python list_by_collection / Java listByCollection.
+func (a *TestRunAPI) ListByCollection(ctx context.Context, collectionID string) ([]TestRun, error) {
+	all, err := a.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]TestRun, 0, len(all))
+	for _, r := range all {
+		if r.CollectionID == collectionID {
+			out = append(out, r)
+		}
+	}
+	return out, nil
+}
+
 // ListWithOptions returns test runs with server-side filters (mode / reference
 // id / pagination). The server returns an envelope { runs: [...], total: N };
 // this method returns just the slice. Use List for the default zero-filter

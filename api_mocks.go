@@ -85,9 +85,14 @@ func (a *MockAPI) Get(ctx context.Context, id string) (*Mock, error) {
 func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListResponse, error) {
 	params := url.Values{}
 
+	// Default page size matches the Python/Java SDKs (Page.limit = 50) so a
+	// bare List(ctx, nil) returns an identical first page across all three
+	// SDKs. Callers page further via opts.Offset / opts.Limit.
+	namespace := a.client.namespace
+	offset, limit := 0, 50
 	if opts != nil {
 		if opts.Namespace != "" {
-			params.Set("namespace", opts.Namespace)
+			namespace = opts.Namespace
 		}
 		if len(opts.Tags) > 0 {
 			params.Set("tags", strings.Join(opts.Tags, ","))
@@ -96,17 +101,17 @@ func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListRe
 			params.Set("search", opts.Search)
 		}
 		if opts.Offset > 0 {
-			params.Set("offset", strconv.Itoa(opts.Offset))
+			offset = opts.Offset
 		}
 		if opts.Limit > 0 {
-			params.Set("limit", strconv.Itoa(opts.Limit))
-		}
-	} else {
-		// Use default namespace
-		if a.client.namespace != "" {
-			params.Set("namespace", a.client.namespace)
+			limit = opts.Limit
 		}
 	}
+	if namespace != "" {
+		params.Set("namespace", namespace)
+	}
+	params.Set("offset", strconv.Itoa(offset))
+	params.Set("limit", strconv.Itoa(limit))
 
 	path := "/api/v1/mocks"
 	if len(params) > 0 {
@@ -135,6 +140,28 @@ func (a *MockAPI) Update(ctx context.Context, id string, mock *Mock) (*Mock, err
 // Delete soft-deletes a mock by ID.
 func (a *MockAPI) Delete(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id), nil, nil)
+}
+
+// GetChain returns all mocks in a chain by chain ID. 3-language parity: Python
+// mocks.get_chain / Java mocks.getChain — the Go SDK was missing chain ops.
+func (a *MockAPI) GetChain(ctx context.Context, chainID string) ([]*Mock, error) {
+	var mocks []*Mock
+	if err := a.client.do(ctx, "GET", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, &mocks); err != nil {
+		return nil, err
+	}
+	return mocks, nil
+}
+
+// DeleteChain deletes every mock in a chain by chain ID. Parity with Python
+// mocks.delete_chain / Java mocks.deleteChain.
+func (a *MockAPI) DeleteChain(ctx context.Context, chainID string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, nil)
+}
+
+// Purge permanently deletes a mock by ID (bypasses the recycle bin). Parity
+// with Python mocks.purge / Java mocks.purge.
+func (a *MockAPI) Purge(ctx context.Context, id string) error {
+	return a.client.do(ctx, "DELETE", "/api/v1/mocks/"+url.PathEscape(id)+"/purge", nil, nil)
 }
 
 // Restore restores a soft-deleted mock by ID (uses batch/restore endpoint).
@@ -206,15 +233,6 @@ func (a *MockAPI) Logs(ctx context.Context, id string, opts *LogsOptions) (*Mock
 		return nil, err
 	}
 	return &logs, nil
-}
-
-// Versions retrieves the chain mocks (related versions) for a given chain ID.
-func (a *MockAPI) Versions(ctx context.Context, chainID string) ([]*Mock, error) {
-	var mocks []*Mock
-	if err := a.client.do(ctx, "GET", "/api/v1/mocks/chains/"+url.PathEscape(chainID), nil, &mocks); err != nil {
-		return nil, err
-	}
-	return mocks, nil
 }
 
 // ListVersions returns the version history for a mock.

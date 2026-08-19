@@ -27,7 +27,7 @@ func main() {
 		mockarty.WithNamespace("sandbox"),
 	)
 
-	p, err := client.Prompts().CreatePrompt(ctx, mockarty.Prompt{
+	p, err := client.Prompts().Create(ctx, mockarty.Prompt{
 		Name:  "tcm-step-summarizer",
 		Body:  "Summarize the following test step in one sentence: {{.step}}",
 		Model: "claude-opus-4-7",
@@ -36,15 +36,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("create: %v", err)
 	}
-	defer client.Prompts().DeletePrompt(ctx, p.ID) //nolint:errcheck
+	defer client.Prompts().Delete(ctx, p.ID) //nolint:errcheck
 	fmt.Printf("[1] Created prompt %s v%d\n", p.Name, p.Version)
 
 	// Two edits → versions 2 and 3
-	p, _ = client.Prompts().UpdatePrompt(ctx, p.ID, mockarty.Prompt{
+	p, _ = client.Prompts().Update(ctx, p.ID, mockarty.Prompt{
 		Name: p.Name,
 		Body: "Summarize in ≤15 words: {{.step}}",
 	})
-	p, _ = client.Prompts().UpdatePrompt(ctx, p.ID, mockarty.Prompt{
+	p, _ = client.Prompts().Update(ctx, p.ID, mockarty.Prompt{
 		Name: p.Name,
 		Body: "One sentence summary, verb-first: {{.step}}",
 	})

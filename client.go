@@ -48,10 +48,14 @@ type Client struct {
 	importAPI            *ImportAPI
 	testRunAPI           *TestRunAPI
 	tagAPI               *TagAPI
+	uiTestAPI            *UITestAPI
+	gitSyncAPI           *GitSyncAPI
 	folderAPI            *FolderAPI
 	undefinedAPI         *UndefinedAPI
 	statsAPI             *StatsAPI
 	agentTaskAPI         *AgentTaskAPI
+	issueTrackerAPI      *IssueTrackerAPI
+	mcpAPI               *MCPAPI
 	namespaceSettingsAPI *NamespaceSettingsAPI
 	proxyAPI             *ProxyAPI
 	environmentAPI       *EnvironmentAPI
@@ -64,6 +68,7 @@ type Client struct {
 	externalRunsAPI      *ExternalRunsAPI
 	flowRunsAPI          *FlowRunsAPI
 	discoveryAPI         *DiscoveryAPI
+	experienceAPI        *ExperienceAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -110,10 +115,13 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.importAPI = &ImportAPI{client: c}
 	c.testRunAPI = &TestRunAPI{client: c}
 	c.tagAPI = &TagAPI{client: c}
+	c.uiTestAPI = &UITestAPI{client: c}
+	c.gitSyncAPI = &GitSyncAPI{client: c}
 	c.folderAPI = &FolderAPI{client: c}
 	c.undefinedAPI = &UndefinedAPI{client: c}
 	c.statsAPI = &StatsAPI{client: c}
 	c.agentTaskAPI = &AgentTaskAPI{client: c}
+	c.issueTrackerAPI = &IssueTrackerAPI{client: c}
 	c.namespaceSettingsAPI = &NamespaceSettingsAPI{client: c}
 	c.proxyAPI = &ProxyAPI{client: c}
 	c.environmentAPI = &EnvironmentAPI{client: c}
@@ -126,6 +134,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.externalRunsAPI = &ExternalRunsAPI{client: c}
 	c.flowRunsAPI = &FlowRunsAPI{client: c}
 	c.discoveryAPI = &DiscoveryAPI{client: c}
+	c.experienceAPI = &ExperienceAPI{client: c}
 
 	return c
 }
@@ -142,6 +151,9 @@ func (c *Client) FlowRuns() *FlowRunsAPI { return c.flowRunsAPI }
 // framework's collected case list (pytest --collect-only, `go test -list`,
 // etc.) into the Mockarty catalogue. See sdk/go-sdk/api_discovery.go.
 func (c *Client) Discovery() *DiscoveryAPI { return c.discoveryAPI }
+
+// Experience returns the reusable run-experience search and record API.
+func (c *Client) Experience() *ExperienceAPI { return c.experienceAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
@@ -196,6 +208,12 @@ func (c *Client) TestRuns() *TestRunAPI { return c.testRunAPI }
 // Tags returns the Tag API for managing mock tags.
 func (c *Client) Tags() *TagAPI { return c.tagAPI }
 
+// UITests returns the recorded-UI-test API (save / run / poll / export).
+func (c *Client) UITests() *UITestAPI { return c.uiTestAPI }
+
+// GitSync returns the git-sync API (bind a repo, pull/push autotest collections).
+func (c *Client) GitSync() *GitSyncAPI { return c.gitSyncAPI }
+
 // Folders returns the Folder API for managing mock folders.
 func (c *Client) Folders() *FolderAPI { return c.folderAPI }
 
@@ -207,6 +225,9 @@ func (c *Client) Stats() *StatsAPI { return c.statsAPI }
 
 // AgentTasks returns the Agent Task API for managing AI agent tasks.
 func (c *Client) AgentTasks() *AgentTaskAPI { return c.agentTaskAPI }
+
+// IssueTracker returns the issue-tracker task-automation API.
+func (c *Client) IssueTracker() *IssueTrackerAPI { return c.issueTrackerAPI }
 
 // NamespaceSettings returns the Namespace Settings API.
 func (c *Client) NamespaceSettings() *NamespaceSettingsAPI { return c.namespaceSettingsAPI }

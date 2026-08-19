@@ -102,6 +102,31 @@ func main() {
 	fmt.Println("[2] Created POST /api/users mock with body condition (email equals)")
 
 	// -----------------------------------------------------------------------
+	// 2b. Scripted response — compute the body from the request with JavaScript.
+	// The script receives `request` and fills `response`. See the Scripted
+	// Responses guide. Use ScriptWithNet(...) to allow outbound mk.http calls.
+	// -----------------------------------------------------------------------
+	calcMock := mockarty.NewMockBuilder().
+		ID("calc").
+		HTTP(func(h *mockarty.HTTPBuilder) {
+			h.Route("/api/calc/:op").Method("POST")
+		}).
+		Response(func(r *mockarty.ResponseBuilder) {
+			r.Script(`
+				const d = request.json();
+				const out = request.params.op === "double" ? d.v * 2 : d.v / 2;
+				response.status = 201;
+				response.json({ op: request.params.op, in: d.v, out: out });
+			`)
+		}).
+		Build()
+
+	if _, err := client.Mocks().Create(ctx, calcMock); err != nil {
+		log.Fatalf("Failed to create scripted mock: %v", err)
+	}
+	fmt.Println("[2b] Created POST /api/calc/:op mock with a scripted response")
+
+	// -----------------------------------------------------------------------
 	// 3. PUT with header conditions
 	// -----------------------------------------------------------------------
 	// This mock only matches when the Authorization header contains "Bearer".

@@ -84,6 +84,15 @@ func (b *MockBuilder) Priority(p int64) *MockBuilder {
 	return b
 }
 
+// Transient marks the mock as lightweight: the resolver skips per-hit
+// bookkeeping (request logging, live updates, usage counter) so high-volume /
+// load-test traffic doesn't pay for recording every call. Matching and the
+// response are unchanged.
+func (b *MockBuilder) Transient(on bool) *MockBuilder {
+	b.mock.Transient = on
+	return b
+}
+
 // MockStore sets the mock-scoped store values.
 func (b *MockBuilder) MockStore(store map[string]any) *MockBuilder {
 	b.mock.MockStore = store
@@ -878,6 +887,21 @@ func (r *ResponseBuilder) JSONBody(payload any) *ResponseBuilder {
 // TemplatePath sets a file-based template for the response payload.
 func (r *ResponseBuilder) TemplatePath(path string) *ResponseBuilder {
 	r.resp.PayloadTemplatePath = path
+	return r
+}
+
+// Script sets a JavaScript scripted response: the code receives `request` and
+// fills `response` when the mock is hit. See the Scripted Responses guide.
+func (r *ResponseBuilder) Script(code string) *ResponseBuilder {
+	r.resp.Script = &ResponseScript{Code: code}
+	return r
+}
+
+// ScriptWithNet sets a scripted response that may make outbound calls
+// (mk.http.send). Off by default; enable only when the response must reach an
+// external system.
+func (r *ResponseBuilder) ScriptWithNet(code string) *ResponseBuilder {
+	r.resp.Script = &ResponseScript{Code: code, AllowNet: true}
 	return r
 }
 

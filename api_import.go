@@ -257,6 +257,27 @@ func (a *ImportAPI) Mockarty(ctx context.Context, data []byte) (*ImportResult, e
 	return &result, nil
 }
 
+// Curl imports a set of cURL commands into a collection. Parity with Python
+// curl / Java curl.
+func (a *ImportAPI) Curl(ctx context.Context, commands []string) (*ImportResult, error) {
+	body := map[string][]string{"commands": commands}
+	var result ImportResult
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/curl", body, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// Insomnia imports an Insomnia collection (raw export JSON) into a collection.
+// Parity with Python insomnia / Java insomnia.
+func (a *ImportAPI) Insomnia(ctx context.Context, data []byte) (*ImportResult, error) {
+	var result ImportResult
+	if err := a.client.do(ctx, "POST", "/api/v1/api-tester/import/insomnia", json.RawMessage(data), &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
 // detectContentType returns "yaml" for likely YAML payloads, "json"
 // for JSON. The server defaults to JSON when blank, so we only need to
 // flag YAML explicitly. Heuristic: first non-whitespace byte is `{` or

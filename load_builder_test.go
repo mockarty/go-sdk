@@ -23,7 +23,7 @@ func TestLoadTestBasicScript(t *testing.T) {
 		"import http from 'k6/http'",
 		"export const options",
 		"export default function",
-		"http.get(`${__ENV.BASE_URL}/health`)",
+		"http.get(`${BASE_URL}/health`)",
 		`"vus":5`,
 		`"duration":"30s"`,
 	} {
@@ -76,7 +76,7 @@ func TestLoadTestPostBodyJSON(t *testing.T) {
 		Post("/cart", map[string]any{"sku": "abc", "qty": 2}).
 		ToK6Script()
 
-	if !strings.Contains(script, "http.post(`${__ENV.BASE_URL}/cart`") {
+	if !strings.Contains(script, "http.post(`${BASE_URL}/cart`") {
 		t.Errorf("missing post call:\n%s", script)
 	}
 	if !strings.Contains(script, "application/json") {
@@ -104,7 +104,7 @@ func TestLoadTestEnvAndBaseURL(t *testing.T) {
 
 func TestLoadTestDefaultRequestGetRoot(t *testing.T) {
 	script := NewLoadTest("t").Target("http://x").ToK6Script()
-	if !strings.Contains(script, "http.get(`${__ENV.BASE_URL}/`)") {
+	if !strings.Contains(script, "http.get(`${BASE_URL}/`)") {
 		t.Errorf("default request not GET /:\n%s", script)
 	}
 }
@@ -161,5 +161,101 @@ func TestLoadTestSaveConfig(t *testing.T) {
 	}
 	if parsed["name"] != "x" {
 		t.Errorf("name = %v", parsed["name"])
+	}
+}
+
+// TestToK6Script_NoDuplicateLetR guards the multi-request k6 export: a flat
+// sequence of `let r = ...` per request is a JS SyntaxError (redeclaration in
+// the same scope). The script must declare `let r;` once, then assign.
+func TestToK6Script_NoDuplicateLetR(t *testing.T) {
+	script := NewLoadTest("noletdup").Target("http://x").Get("/a").Post("/b", nil).Put("/c", nil).ToK6Script()
+	if got := strings.Count(script, "let r"); got != 1 {
+		t.Fatalf("expected exactly one `let r` declaration, got %d:\n%s", got, script)
+	}
+	if c := strings.Count(script, "r = http."); c != 3 {
+		t.Fatalf("expected 3 `r = http.` assignments for 3 requests, got %d", c)
+	}
+}
+
+// TestLoadTestBakesBaseURLDefault verifies the exported k6 script is
+// self-contained: Target() is baked as `const BASE_URL = __ENV.BASE_URL ||
+// '<target>'` (runnable standalone, overridable via -e/__ENV) and threshold
+// expressions are NOT HTML-escaped (p(95)<500, never p(95)<500).
+func TestLoadTestBakesBaseURLDefault(t *testing.T) {
+	script := NewLoadTest("t").
+		Target("http://127.0.0.1:5870").
+		Get("/health").
+		Threshold("http_req_duration", "p(95)<500").
+		ToK6Script()
+
+	if !strings.Contains(script, "const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:5870';") {
+		t.Errorf("missing baked BASE_URL default in:\n%s", script)
+	}
+	if strings.Contains(script, "${__ENV.BASE_URL}") {
+		t.Errorf("script should reference ${BASE_URL}, not ${__ENV.BASE_URL}:\n%s", script)
+	}
+	if strings.Contains(script, "\\u003c") {
+		t.Errorf("threshold got HTML-escaped (\\u003c) — want literal '<':\n%s", script)
+	}
+	if !strings.Contains(script, "p(95)<500") {
+		t.Errorf("threshold expression not emitted verbatim:\n%s", script)
+	}
+}
+
+// TestLoadTestNoBaseURLNoConst — without Target() there is no BASE_URL const
+// and requests use literal paths (nothing to bake).
+func TestLoadTestNoBaseURLNoConst(t *testing.T) {
+	script := NewLoadTest("t").Get("/health").ToK6Script()
+	if strings.Contains(script, "const BASE_URL") {
+		t.Errorf("no Target() set — should not emit BASE_URL const:\n%s", script)
+	}
+}
+
+// TestLoadTestDrainStageTargetZero guards that a ramp-down-to-zero stage emits
+// "target":0 (a bare {"duration":".."} is not a valid k6 stage). The int
+// `omitempty` on LoadStage.Target used to drop the 0.
+func TestLoadTestDrainStageTargetZero(t *testing.T) {
+	script := NewLoadTest("t").Target("http://x").Get("/").
+		Stages(Stage("10s", 5), Stage("10s", 0)).
+		ToK6Script()
+	if !strings.Contains(script, `{"duration":"10s","target":0}`) {
+		t.Errorf("drain stage must keep target:0, got:\n%s", script)
+	}
+	if strings.Contains(script, `{"duration":"10s"}`) {
+		t.Errorf("stage emitted without a target (invalid k6):\n%s", script)
+	}
+	// An RPS stage still swaps target for targetRps.
+	rps := NewLoadTest("t").Target("http://x").Get("/").Stages(RPSStage("10s", 100)).ToK6Script()
+	if !strings.Contains(rps, `"targetRps":100`) {
+		t.Errorf("RPS stage must emit targetRps:\n%s", rps)
+	}
+}
+
+// TestLoadTestPerEndpointChecks verifies custom per-request checks replace the
+// default status<400 assertion and that a request without checks keeps it.
+func TestLoadTestPerEndpointChecks(t *testing.T) {
+	script := NewLoadTest("checks").Target("http://x").
+		Post("/order", map[string]any{"sku": "a"}).ExpectStatus(201).Check("has id", "res.json().id !== undefined").
+		Get("/health").
+		ToK6Script()
+
+	want := "  check(r, { 'status is 201': (res) => res.status === 201, 'has id': (res) => res.json().id !== undefined });"
+	if !strings.Contains(script, want) {
+		t.Errorf("custom check line missing.\nwant: %s\ngot script:\n%s", want, script)
+	}
+	// The second request (no checks) keeps the default.
+	if !strings.Contains(script, "check(r, { 'status < 400': (res) => res.status < 400 });") {
+		t.Errorf("default check missing for uncustomised request:\n%s", script)
+	}
+}
+
+// TestLoadTestCheckNoRequestIsNoop guards Check/ExpectStatus called before any
+// request — must not panic and must not emit a stray check.
+func TestLoadTestCheckNoRequestIsNoop(t *testing.T) {
+	// No request added yet; Check is a no-op, Target-only build uses the
+	// default GET "/" which still gets the default check.
+	script := NewLoadTest("t").Target("http://x").Check("x", "true").ExpectStatus(200).ToK6Script()
+	if !strings.Contains(script, "check(r, { 'status < 400'") {
+		t.Errorf("expected default check on the implicit GET / request:\n%s", script)
 	}
 }

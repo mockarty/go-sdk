@@ -314,7 +314,7 @@ func (c *Client) AddSteps(ctx context.Context, runID string, steps []Step) error
 // mime may be empty — the server then derives it from the file name. To
 // stream a large file without buffering, supply a *bytes.Buffer or any
 // other io.Reader via an internal helper (kept private until a use case
-// arrives — see Phase 2 follow-ups).
+// arrives — see the follow-up notes).
 func (c *Client) AttachReport(ctx context.Context, runID, name string, content []byte, mime string) error {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {

@@ -5,7 +5,10 @@ package mockarty
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -115,4 +118,61 @@ func (a *AgentTaskAPI) Export(ctx context.Context, id string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// Terminal errors returned by WaitForResult when an agent task ends without
+// succeeding. Callers match with errors.Is.
+var (
+	ErrAgentTaskFailed    = errors.New("mockarty: agent task failed")
+	ErrAgentTaskCancelled = errors.New("mockarty: agent task cancelled")
+)
+
+// WaitForResult polls an agent task until it reaches a terminal state or ctx
+// expires. On "completed" it returns the finished task (with .Result); on
+// "failed"/"cancelled" it returns the task wrapped in ErrAgentTaskFailed /
+// ErrAgentTaskCancelled. pollInterval <= 0 defaults to 2s. This is the
+// automation counterpart to Submit — dispatch a task into the agent network
+// and block for its result without hand-rolling a poll loop.
+func (a *AgentTaskAPI) WaitForResult(ctx context.Context, id string, pollInterval time.Duration) (*AgentTask, error) {
+	if pollInterval <= 0 {
+		pollInterval = 2 * time.Second
+	}
+	t := time.NewTicker(pollInterval)
+	defer t.Stop()
+
+	for {
+		task, err := a.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		// Case-insensitive to match the Python/Java SDKs and survive a server
+		// that ever capitalises a terminal status.
+		switch strings.ToLower(task.Status) {
+		case "completed", "done", "succeeded":
+			return task, nil
+		case "failed", "error":
+			return task, fmt.Errorf("%w: task %s", ErrAgentTaskFailed, id)
+		case "cancelled", "canceled":
+			return task, fmt.Errorf("%w: task %s", ErrAgentTaskCancelled, id)
+		}
+		select {
+		case <-ctx.Done():
+			return task, ctx.Err()
+		case <-t.C:
+		}
+	}
+}
+
+// SubmitAndWait submits a task and blocks until it reaches a terminal state,
+// combining Submit + WaitForResult — the one-call automation entry point for
+// "run this in the agent network and give me the result".
+func (a *AgentTaskAPI) SubmitAndWait(ctx context.Context, task *AgentTask, pollInterval time.Duration) (*AgentTask, error) {
+	submitted, err := a.Submit(ctx, task)
+	if err != nil {
+		return nil, err
+	}
+	if submitted.ID == "" {
+		return submitted, fmt.Errorf("mockarty: agent task submitted without an id")
+	}
+	return a.WaitForResult(ctx, submitted.ID, pollInterval)
 }

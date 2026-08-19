@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -502,7 +503,7 @@ func TestMockAPI_Logs_NoOptions(t *testing.T) {
 	}
 }
 
-func TestMockAPI_Versions(t *testing.T) {
+func TestMockAPI_GetChain(t *testing.T) {
 	_, client := newTestServer(t, map[string]http.HandlerFunc{
 		"GET /api/v1/mocks/chains/": func(w http.ResponseWriter, r *http.Request) {
 			mocks := []*Mock{
@@ -515,7 +516,7 @@ func TestMockAPI_Versions(t *testing.T) {
 		},
 	})
 
-	versions, err := client.Mocks().Versions(context.Background(), "chain-1")
+	versions, err := client.Mocks().GetChain(context.Background(), "chain-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -956,5 +957,51 @@ func TestMockAPI_Create_FullRoundtrip(t *testing.T) {
 	}
 	if responseCtx["delay"] != float64(50) {
 		t.Errorf("expected delay 50, got %v", responseCtx["delay"])
+	}
+}
+
+// TestMockAPI_List_DefaultsAndNamespace locks the cross-SDK parity contract:
+// a bare List(nil) sends offset=0&limit=50 (matching the Python/Java Page
+// default) and scopes to the client's configured namespace even when a
+// non-nil opts without an explicit Namespace is passed.
+func TestMockAPI_List_DefaultsAndNamespace(t *testing.T) {
+	var gotQuery url.Values
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"mocks":[],"count":0,"limit":50}`))
+	}
+
+	cases := []struct {
+		name          string
+		opts          *ListMocksOptions
+		wantNamespace string
+		wantOffset    string
+		wantLimit     string
+	}{
+		{"nil opts uses client ns + default page", nil, "team-a", "0", "50"},
+		{"opts without namespace keeps client ns", &ListMocksOptions{Limit: 5}, "team-a", "0", "5"},
+		{"opts namespace overrides client ns", &ListMocksOptions{Namespace: "team-b"}, "team-b", "0", "50"},
+		{"explicit offset+limit honoured", &ListMocksOptions{Offset: 20, Limit: 10}, "team-a", "20", "10"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotQuery = nil
+			srv := httptest.NewServer(http.HandlerFunc(handler))
+			defer srv.Close()
+			client := NewClient(srv.URL, WithAPIKey("k"), WithNamespace("team-a"))
+			if _, err := client.Mocks().List(context.Background(), tc.opts); err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			if g := gotQuery.Get("namespace"); g != tc.wantNamespace {
+				t.Errorf("namespace = %q, want %q", g, tc.wantNamespace)
+			}
+			if g := gotQuery.Get("offset"); g != tc.wantOffset {
+				t.Errorf("offset = %q, want %q", g, tc.wantOffset)
+			}
+			if g := gotQuery.Get("limit"); g != tc.wantLimit {
+				t.Errorf("limit = %q, want %q", g, tc.wantLimit)
+			}
+		})
 	}
 }

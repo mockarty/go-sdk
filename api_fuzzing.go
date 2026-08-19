@@ -87,7 +87,7 @@ func (a *FuzzingAPI) Start(ctx context.Context, config *FuzzingConfig) (*Fuzzing
 
 // StartFromConfig launches a run referencing a previously-saved
 // FuzzConfig by ID. Equivalent to the UI's "Run this config" button.
-// The SDK passes only the configId; runner selection + Phase 4 CI
+// The SDK passes only the configId; runner selection + CI
 // trigger plumbing are left out of the minimal surface — call the
 // REST API directly when you need them.
 func (a *FuzzingAPI) StartFromConfig(ctx context.Context, configID string) (*FuzzingRun, error) {
@@ -319,7 +319,7 @@ func (a *FuzzingAPI) AnalyzeFinding(ctx context.Context, id string) (any, error)
 }
 
 // BatchAnalyzeFindings runs AI analysis on multiple findings.
-func (a *FuzzingAPI) BatchAnalyzeFindings(ctx context.Context, ids []string) error {
+func (a *FuzzingAPI) BatchAnalyze(ctx context.Context, ids []string) error {
 	body := struct {
 		IDs []string `json:"ids"`
 	}{IDs: ids}
@@ -327,7 +327,7 @@ func (a *FuzzingAPI) BatchAnalyzeFindings(ctx context.Context, ids []string) err
 }
 
 // BatchTriageFindings updates the triage status for multiple findings.
-func (a *FuzzingAPI) BatchTriageFindings(ctx context.Context, ids []string, status string) error {
+func (a *FuzzingAPI) BatchTriage(ctx context.Context, ids []string, status string) error {
 	body := struct {
 		IDs    []string `json:"ids"`
 		Status string   `json:"status"`
@@ -426,7 +426,7 @@ func (a *FuzzingAPI) DeleteSchedule(ctx context.Context, id string) error {
 // ---------------------------------------------------------------------------
 
 // BatchManualTriageFuzzFindings updates the triage status and optional note for multiple findings.
-func (a *FuzzingAPI) BatchManualTriageFuzzFindings(ctx context.Context, ids []string, status string, note *string) (int, error) {
+func (a *FuzzingAPI) BatchManualTriage(ctx context.Context, ids []string, status string, note *string) (int, error) {
 	body := struct {
 		IDs    []string `json:"ids"`
 		Status string   `json:"status"`
@@ -442,7 +442,7 @@ func (a *FuzzingAPI) BatchManualTriageFuzzFindings(ctx context.Context, ids []st
 }
 
 // BatchDeleteFuzzFindings deletes multiple fuzzing findings by IDs.
-func (a *FuzzingAPI) BatchDeleteFuzzFindings(ctx context.Context, ids []string) (int, error) {
+func (a *FuzzingAPI) BatchDeleteFindings(ctx context.Context, ids []string) (int, error) {
 	body := struct {
 		IDs []string `json:"ids"`
 	}{IDs: ids}
@@ -460,7 +460,7 @@ func (a *FuzzingAPI) BatchDeleteFuzzFindings(ctx context.Context, ids []string) 
 // ---------------------------------------------------------------------------
 
 // ListFuzzQuarantine returns quarantine entries with pagination.
-func (a *FuzzingAPI) ListFuzzQuarantine(ctx context.Context, limit, offset int) ([]QuarantineEntry, int, error) {
+func (a *FuzzingAPI) ListQuarantine(ctx context.Context, limit, offset int) ([]QuarantineEntry, int, error) {
 	params := url.Values{}
 	if limit > 0 {
 		params.Set("limit", strconv.Itoa(limit))
@@ -488,7 +488,7 @@ func (a *FuzzingAPI) ListFuzzQuarantine(ctx context.Context, limit, offset int) 
 }
 
 // CreateFuzzQuarantine creates a new quarantine entry.
-func (a *FuzzingAPI) CreateFuzzQuarantine(ctx context.Context, entry *QuarantineEntry) (*QuarantineEntry, error) {
+func (a *FuzzingAPI) CreateQuarantine(ctx context.Context, entry *QuarantineEntry) (*QuarantineEntry, error) {
 	var result QuarantineEntry
 	if err := a.client.do(ctx, "POST", "/api/v1/fuzzing/quarantine", entry, &result); err != nil {
 		return nil, err
@@ -497,12 +497,12 @@ func (a *FuzzingAPI) CreateFuzzQuarantine(ctx context.Context, entry *Quarantine
 }
 
 // DeleteFuzzQuarantine deletes a quarantine entry by ID.
-func (a *FuzzingAPI) DeleteFuzzQuarantine(ctx context.Context, id string) error {
+func (a *FuzzingAPI) DeleteQuarantine(ctx context.Context, id string) error {
 	return a.client.do(ctx, "DELETE", "/api/v1/fuzzing/quarantine/"+url.PathEscape(id), nil, nil)
 }
 
 // BatchDeleteFuzzQuarantine deletes multiple quarantine entries by IDs.
-func (a *FuzzingAPI) BatchDeleteFuzzQuarantine(ctx context.Context, ids []string) (int, error) {
+func (a *FuzzingAPI) BatchDeleteQuarantine(ctx context.Context, ids []string) (int, error) {
 	body := struct {
 		IDs []string `json:"ids"`
 	}{IDs: ids}
@@ -516,7 +516,7 @@ func (a *FuzzingAPI) BatchDeleteFuzzQuarantine(ctx context.Context, ids []string
 }
 
 // QuarantineFuzzFinding creates a quarantine entry from a finding.
-func (a *FuzzingAPI) QuarantineFuzzFinding(ctx context.Context, findingID string, reason string) (*QuarantineEntry, error) {
+func (a *FuzzingAPI) QuarantineFinding(ctx context.Context, findingID string, reason string) (*QuarantineEntry, error) {
 	body := struct {
 		FindingID string `json:"findingId"`
 		Reason    string `json:"reason"`
@@ -529,7 +529,7 @@ func (a *FuzzingAPI) QuarantineFuzzFinding(ctx context.Context, findingID string
 }
 
 // BatchQuarantineFuzzFindings creates quarantine entries from multiple findings.
-func (a *FuzzingAPI) BatchQuarantineFuzzFindings(ctx context.Context, findingIDs []string, reason string) (created, triaged, failed int, err error) {
+func (a *FuzzingAPI) BatchQuarantineFindings(ctx context.Context, findingIDs []string, reason string) (created, triaged, failed int, err error) {
 	body := struct {
 		FindingIDs []string `json:"findingIds"`
 		Reason     string   `json:"reason"`

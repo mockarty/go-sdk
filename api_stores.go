@@ -70,6 +70,17 @@ func (a *StoreAPI) GlobalDeleteMany(ctx context.Context, keys ...string) error {
 	return nil
 }
 
+// GlobalSetMany sets multiple key-value pairs in the global store (one request
+// per key). Parity with Python global_set_many / Java globalSetMany.
+func (a *StoreAPI) GlobalSetMany(ctx context.Context, entries map[string]any) error {
+	for k, v := range entries {
+		if err := a.GlobalSet(ctx, k, v); err != nil {
+			return fmt.Errorf("mockarty: set global store key %q: %w", k, err)
+		}
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // Chain Store
 // ---------------------------------------------------------------------------
@@ -98,6 +109,17 @@ func (a *StoreAPI) ChainSet(ctx context.Context, chainID, key string, value any)
 		"value": value,
 	}
 	return a.client.do(ctx, "POST", "/api/v1/stores/chain/"+url.PathEscape(chainID)+a.nsParam(), body, nil)
+}
+
+// ChainSetMany sets multiple key-value pairs in a chain store (one request per
+// key). Parity with Python chain_set_many / Java chainSetMany.
+func (a *StoreAPI) ChainSetMany(ctx context.Context, chainID string, entries map[string]any) error {
+	for k, v := range entries {
+		if err := a.ChainSet(ctx, chainID, k, v); err != nil {
+			return fmt.Errorf("mockarty: set chain store key %q: %w", k, err)
+		}
+	}
+	return nil
 }
 
 // ChainDelete deletes a key from a chain store.

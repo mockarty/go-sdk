@@ -4,6 +4,7 @@
 package mockarty
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -49,6 +50,23 @@ type LoadStage struct {
 	TargetRPS int    `json:"targetRps,omitempty"`
 }
 
+// MarshalJSON emits a VU stage's `target` even when it is 0 (a ramp-down-to-zero
+// drain stage) — a bare `{"duration":"10s"}` is not a valid k6 stage. Only an
+// arrival-rate stage (TargetRPS>0) swaps `target` for `targetRps`. Mirrors the
+// Python (`{"duration","target"}`) and Java (`stagesAsMaps`) serialization.
+func (s LoadStage) MarshalJSON() ([]byte, error) {
+	if s.TargetRPS > 0 {
+		return json.Marshal(struct {
+			Duration  string `json:"duration"`
+			TargetRPS int    `json:"targetRps"`
+		}{s.Duration, s.TargetRPS})
+	}
+	return json.Marshal(struct {
+		Duration string `json:"duration"`
+		Target   int    `json:"target"`
+	}{s.Duration, s.Target})
+}
+
 // Stage is a convenience constructor for a VU-target ramp stage.
 func Stage(duration string, target int) LoadStage {
 	return LoadStage{Duration: duration, Target: target}
@@ -59,12 +77,21 @@ func RPSStage(duration string, targetRPS int) LoadStage {
 	return LoadStage{Duration: duration, TargetRPS: targetRPS}
 }
 
+// loadCheck is one per-request assertion emitted as a k6 check entry:
+// `'<Name>': (res) => <Expr>`. Expr is a JavaScript boolean expression that
+// may reference the response as `res`.
+type loadCheck struct {
+	name string
+	expr string
+}
+
 // loadRequest is one HTTP request in the scenario's iteration body.
 type loadRequest struct {
 	method  string
 	path    string
 	body    any
 	headers map[string]string
+	checks  []loadCheck
 }
 
 // LoadConfig is the perf-config JSON shape consumed by
@@ -152,6 +179,26 @@ func (b *LoadTest) Patch(path string, body any) *LoadTest {
 // Delete appends a DELETE request.
 func (b *LoadTest) Delete(path string) *LoadTest { return b.Request("DELETE", path, nil, nil) }
 
+// Check attaches a named assertion to the MOST RECENTLY added request. name is
+// the check label; expr is a JavaScript boolean expression that may reference
+// the response as `res` (e.g. "res.json().id !== undefined"). When a request
+// has one or more checks they REPLACE the default `status < 400` check. No-op
+// if no request has been added yet.
+func (b *LoadTest) Check(name, expr string) *LoadTest {
+	if len(b.requests) == 0 {
+		return b
+	}
+	last := &b.requests[len(b.requests)-1]
+	last.checks = append(last.checks, loadCheck{name: name, expr: expr})
+	return b
+}
+
+// ExpectStatus is a shorthand for Check that asserts the response status code,
+// e.g. ExpectStatus(201) → check `'status is 201': (res) => res.status === 201`.
+func (b *LoadTest) ExpectStatus(code int) *LoadTest {
+	return b.Check(fmt.Sprintf("status is %d", code), fmt.Sprintf("res.status === %d", code))
+}
+
 // VUs sets a constant virtual-user count (ignored when stages are set).
 func (b *LoadTest) VUs(n int) *LoadTest { b.vus = n; return b }
 
@@ -213,7 +260,14 @@ func (b *LoadTest) ToK6Script() string {
 	sb.WriteString("export const options = ")
 	sb.WriteString(b.optionsJS())
 	sb.WriteString(";\n\n")
+	// Bake the Target() base URL as a runnable default so the exported script
+	// works out of the box (matching the perf engine's own builder pattern),
+	// while staying overridable at run time via `-e BASE_URL=...` / __ENV.
+	if b.baseURL != "" {
+		sb.WriteString("const BASE_URL = __ENV.BASE_URL || " + jsStr(b.baseURL) + ";\n\n")
+	}
 	sb.WriteString("export default function () {\n")
+	sb.WriteString("  let r;\n")
 	for _, req := range b.resolvedRequests() {
 		sb.WriteString(b.requestJS(req))
 	}
@@ -249,8 +303,13 @@ func (b *LoadTest) optionsJS() string {
 		opts["vus"] = 1
 		opts["duration"] = "30s"
 	}
-	data, _ := json.Marshal(opts)
-	return string(data)
+	// Encode without HTML escaping so threshold expressions like
+	// "p(95)<500" stay readable (json.Marshal would emit "<").
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(opts)
+	return strings.TrimRight(buf.String(), "\n")
 }
 
 func (b *LoadTest) requestJS(req loadRequest) string {
@@ -260,7 +319,7 @@ func (b *LoadTest) requestJS(req loadRequest) string {
 		if path != "" && !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
-		url = "`${__ENV.BASE_URL}" + path + "`"
+		url = "`${BASE_URL}" + path + "`"
 	} else {
 		url = jsStr(req.path)
 	}
@@ -301,19 +360,34 @@ func (b *LoadTest) requestJS(req loadRequest) string {
 	var sb strings.Builder
 	if req.body == nil {
 		if params != "" {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, null, %s);\n", method, url, params))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, null, %s);\n", method, url, params))
 		} else {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s);\n", method, url))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s);\n", method, url))
 		}
 	} else {
 		if params != "" {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, %s, %s);\n", method, url, bodyLit, params))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, %s, %s);\n", method, url, bodyLit, params))
 		} else {
-			sb.WriteString(fmt.Sprintf("  let r = http.%s(%s, %s);\n", method, url, bodyLit))
+			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, %s);\n", method, url, bodyLit))
 		}
 	}
-	sb.WriteString("  check(r, { 'status < 400': (res) => res.status < 400 });\n")
+	sb.WriteString(checkJS(req.checks))
 	return sb.String()
+}
+
+// checkJS emits the k6 `check(r, { ... })` line for a request. With no custom
+// checks it emits the default `status < 400` assertion (backward compatible);
+// otherwise it emits every custom check in insertion order. The emission is
+// kept byte-identical across the Go/Python/Java SDKs.
+func checkJS(checks []loadCheck) string {
+	if len(checks) == 0 {
+		return "  check(r, { 'status < 400': (res) => res.status < 400 });\n"
+	}
+	parts := make([]string, 0, len(checks))
+	for _, c := range checks {
+		parts = append(parts, jsStr(c.name)+": (res) => "+c.expr)
+	}
+	return "  check(r, { " + strings.Join(parts, ", ") + " });\n"
 }
 
 // sortedKeys returns map keys in sorted order (small maps, simple insertion).
