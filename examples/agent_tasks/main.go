@@ -193,5 +193,14 @@ func main() {
 		fmt.Println("All agent tasks cleared")
 	}
 
+	// Recovery is always explicit: list metadata first, then export or claim a
+	// selected pre-namespace transcript after an operator chooses its workspace.
+	legacyPage, err := client.AgentTasks().ListLegacySessions(ctx, 20, "")
+	if err != nil {
+		fmt.Printf("List recoverable sessions returned: %v\n", err)
+	} else {
+		fmt.Printf("Recoverable pre-namespace sessions: %d\n", len(legacyPage.Sessions))
+	}
+
 	fmt.Println("\nAgent task examples completed!")
 }

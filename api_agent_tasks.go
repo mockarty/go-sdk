@@ -5,7 +5,11 @@ package mockarty
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -31,6 +35,62 @@ type AgentTask struct {
 	Prompt    string    `json:"prompt,omitempty"`
 	Status    string    `json:"status,omitempty"`
 	Result    any       `json:"result,omitempty"`
+}
+
+// LegacyAgentSessionSummary describes one pre-namespace session available to
+// its authenticated owner for explicit export or recovery.
+type LegacyAgentSessionSummary struct {
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+	ExpiresAt  time.Time `json:"expiresAt"`
+	OriginalID string    `json:"originalId"`
+	AppName    string    `json:"appName"`
+	EventCount int64     `json:"eventCount"`
+}
+
+// AgentSession is a durable, namespace-scoped agent conversation.
+type AgentSession struct {
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+	ExpiresAt time.Time       `json:"expiresAt"`
+	ID        string          `json:"id"`
+	UserID    string          `json:"userId"`
+	Namespace string          `json:"namespace"`
+	AppName   string          `json:"appName"`
+	State     json.RawMessage `json:"state,omitempty"`
+}
+
+// AgentSessionEvent is one recovered conversation turn.
+type AgentSessionEvent struct {
+	CreatedAt   time.Time       `json:"createdAt"`
+	SessionID   string          `json:"sessionId"`
+	Role        string          `json:"role"`
+	Content     string          `json:"content,omitempty"`
+	ToolCalls   json.RawMessage `json:"toolCalls,omitempty"`
+	ToolResults json.RawMessage `json:"toolResults,omitempty"`
+	ID          int64           `json:"id"`
+}
+
+// LegacyAgentSessionPage is a bounded keyset page of recoverable sessions.
+type LegacyAgentSessionPage struct {
+	Sessions   []LegacyAgentSessionSummary `json:"sessions"`
+	NextCursor string                      `json:"nextCursor,omitempty"`
+}
+
+// LegacyAgentSessionExport is one bounded transcript page.
+type LegacyAgentSessionExport struct {
+	Session     AgentSession        `json:"session"`
+	Events      []AgentSessionEvent `json:"events"`
+	NextEventID int64               `json:"nextEventId,omitempty"`
+	Truncated   bool                `json:"truncated"`
+}
+
+// LegacyAgentSessionClaimRequest requires explicit acknowledgement because a
+// pre-namespace transcript has no trustworthy original workspace assignment.
+type LegacyAgentSessionClaimRequest struct {
+	Namespace                string `json:"namespace"`
+	SessionKey               string `json:"sessionKey,omitempty"`
+	AcknowledgeUnknownOrigin bool   `json:"acknowledgeUnknownOrigin"`
 }
 
 // List returns all agent tasks.
@@ -115,4 +175,79 @@ func (a *AgentTaskAPI) Export(ctx context.Context, id string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// ListLegacySessions lists owner-scoped recoverable sessions using a bounded
+// keyset page. Pass the returned NextCursor to continue.
+func (a *AgentTaskAPI) ListLegacySessions(ctx context.Context, limit int, cursor string) (*LegacyAgentSessionPage, error) {
+	if limit < 1 || limit > 100 {
+		return nil, fmt.Errorf("legacy session page limit must be between 1 and 100")
+	}
+	query := url.Values{}
+	query.Set("limit", strconv.Itoa(limit))
+	if cursor != "" {
+		query.Set("cursor", cursor)
+	}
+	path := "/api/v1/agent/sessions/legacy"
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var page LegacyAgentSessionPage
+	if err := a.client.do(ctx, "GET", path, nil, &page); err != nil {
+		return nil, err
+	}
+	if page.Sessions == nil {
+		page.Sessions = []LegacyAgentSessionSummary{}
+	}
+	return &page, nil
+}
+
+// ExportLegacySession returns one bounded page of a quarantined transcript.
+func (a *AgentTaskAPI) ExportLegacySession(ctx context.Context, id string, limit int, afterEventID int64) (*LegacyAgentSessionExport, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf("legacy session id is required")
+	}
+	if limit < 1 || limit > 2000 {
+		return nil, fmt.Errorf("legacy session export limit must be between 1 and 2000")
+	}
+	if afterEventID < 0 {
+		return nil, fmt.Errorf("legacy session event cursor must be non-negative")
+	}
+	query := url.Values{}
+	query.Set("limit", strconv.Itoa(limit))
+	query.Set("afterEventId", strconv.FormatInt(afterEventID, 10))
+	path := "/api/v1/agent/sessions/legacy/" + url.PathEscape(id) + "/export"
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var exported LegacyAgentSessionExport
+	if err := a.client.do(ctx, "GET", path, nil, &exported); err != nil {
+		return nil, err
+	}
+	if exported.Events == nil {
+		exported.Events = []AgentSessionEvent{}
+	}
+	return &exported, nil
+}
+
+// ClaimLegacySession atomically moves an owner-scoped transcript into a
+// write-authorized namespace. AcknowledgeUnknownOrigin must be true.
+func (a *AgentTaskAPI) ClaimLegacySession(ctx context.Context, id string, request LegacyAgentSessionClaimRequest) (*AgentSession, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf("legacy session id is required")
+	}
+	if strings.TrimSpace(request.Namespace) == "" {
+		return nil, fmt.Errorf("legacy session target namespace is required")
+	}
+	if !request.AcknowledgeUnknownOrigin {
+		return nil, fmt.Errorf("legacy session recovery requires acknowledging the unknown origin")
+	}
+	var envelope struct {
+		Session AgentSession `json:"session"`
+	}
+	path := "/api/v1/agent/sessions/legacy/" + url.PathEscape(id) + "/claim"
+	if err := a.client.do(ctx, "POST", path, request, &envelope); err != nil {
+		return nil, err
+	}
+	return &envelope.Session, nil
 }
