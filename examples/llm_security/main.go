@@ -32,4 +32,7 @@ func main() {
 	}
 	fmt.Printf("revision=%d decision=%s findings=%d recent_events=%d\n",
 		policy.Revision, result.Decision, len(result.Findings), len(events.Events))
+	if len(events.Events) > 0 {
+		fmt.Printf("latest_request_id=%s\n", events.Events[0].CorrelationID)
+	}
 }

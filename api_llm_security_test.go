@@ -50,15 +50,18 @@ func TestLLMSecurityListEventsIsScopedAndBounded(t *testing.T) {
 			request.URL.Query().Get("limit") != "25" {
 			t.Fatalf("request = %s %s", request.Method, request.URL.String())
 		}
-		_ = json.NewEncoder(writer).Encode(LLMSecurityEventsResponse{})
+		_, _ = writer.Write([]byte(`{"events":[{"createdAt":"2026-08-20T00:00:00Z","mode":"enforce",` +
+			`"source":"agent","ruleId":"pi.rule","category":"prompt_injection","decision":"block",` +
+			`"surface":"input","trustClass":"user","correlationId":"req-sdk-123","id":1,` +
+			`"latencyUs":2,"policyRevision":3,"matches":1,"score":900}]}`))
 	}))
 	defer server.Close()
 	response, err := NewClient(server.URL).LLMSecurity().ListNamespaceEvents(context.Background(), "team/blue", 25)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response.Events == nil {
-		t.Fatal("events must normalize to an empty slice")
+	if len(response.Events) != 1 || response.Events[0].CorrelationID != "req-sdk-123" {
+		t.Fatalf("events = %+v", response.Events)
 	}
 	if _, err = NewClient(server.URL).LLMSecurity().ListNamespaceEvents(context.Background(), "team", 501); err == nil {
 		t.Fatal("oversized limit accepted")

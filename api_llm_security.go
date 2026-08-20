@@ -153,6 +153,7 @@ type LLMSecurityEvent struct {
 	Surface        string    `json:"surface"`
 	TrustClass     string    `json:"trustClass"`
 	Fingerprint    string    `json:"fingerprint,omitempty"`
+	CorrelationID  string    `json:"correlationId,omitempty"`
 	ID             int64     `json:"id"`
 	LatencyUS      int64     `json:"latencyUs"`
 	PolicyRevision int64     `json:"policyRevision"`
