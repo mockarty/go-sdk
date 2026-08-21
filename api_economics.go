@@ -33,6 +33,32 @@ type LLMPriceList struct {
 	Prices []LLMPrice `json:"prices"`
 }
 
+type ResourcePrice struct {
+	CreatedAt             time.Time `json:"createdAt,omitempty"`
+	EffectiveFrom         time.Time `json:"effectiveFrom"`
+	ProviderMicrosPerUnit int64     `json:"providerMicrosPerUnit"`
+	CustomerMicrosPerUnit int64     `json:"customerMicrosPerUnit"`
+	ID                    string    `json:"id,omitempty"`
+	EventKind             string    `json:"eventKind"`
+	Provider              string    `json:"provider"`
+	Resource              string    `json:"resource"`
+	Unit                  string    `json:"unit"`
+	Currency              string    `json:"currency"`
+	Source                string    `json:"source,omitempty"`
+}
+
+type ResourcePriceList struct {
+	ResourcePrices []ResourcePrice `json:"resourcePrices"`
+}
+
+type ResourcePriceQuery struct {
+	EventKind string
+	Provider  string
+	Resource  string
+	Unit      string
+	Limit     int
+}
+
 type LLMUsageQuery struct {
 	GroupBy string
 	Days    int
@@ -76,6 +102,8 @@ type LLMUsageCost struct {
 	OverageMicros      int64  `json:"overageMicros"`
 	Calls              int64  `json:"calls"`
 	BYOKCalls          int64  `json:"byokCalls"`
+	ResourceEvents     int64  `json:"resourceEvents"`
+	ResourceQuantity   int64  `json:"resourceQuantity"`
 	Currency           string `json:"currency"`
 }
 
@@ -94,8 +122,17 @@ type LLMUsageOutcomeCost struct {
 	ProviderCostMicros int64  `json:"providerCostMicros"`
 	CustomerCostMicros int64  `json:"customerCostMicros"`
 	Calls              int64  `json:"calls"`
+	ResourceEvents     int64  `json:"resourceEvents"`
+	ResourceQuantity   int64  `json:"resourceQuantity"`
 	Outcome            string `json:"outcome"`
 	Currency           string `json:"currency"`
+}
+
+type ResourceUsageTotal struct {
+	Events    int64  `json:"events"`
+	Quantity  int64  `json:"quantity"`
+	EventKind string `json:"eventKind"`
+	Unit      string `json:"unit"`
 }
 
 type LLMUsageReconciliation struct {
@@ -123,7 +160,9 @@ type LLMUsageReport struct {
 	Costs          []LLMUsageCost         `json:"costs"`
 	Forecast       []LLMUsageForecast     `json:"forecast"`
 	OutcomeCosts   []LLMUsageOutcomeCost  `json:"outcomeCosts"`
+	ResourceTotals []ResourceUsageTotal   `json:"resourceTotals"`
 	UnpricedCalls  int64                  `json:"unpricedCalls"`
+	UnpricedEvents int64                  `json:"unpricedEvents"`
 }
 
 type LLMBudget struct {
@@ -188,6 +227,55 @@ func (a *EconomicsAPI) AppendPrice(ctx context.Context, price LLMPrice) (LLMPric
 	return out, nil
 }
 
+func (a *EconomicsAPI) ListResourcePrices(ctx context.Context, query ResourcePriceQuery) (ResourcePriceList, error) {
+	kind := strings.TrimSpace(query.EventKind)
+	unit := strings.TrimSpace(query.Unit)
+	if !validResourcePriceKindUnit(kind, unit, false) {
+		return ResourcePriceList{}, fmt.Errorf("mockarty: economics list resource prices: event kind must be tool_call or runner_seconds and unit must match")
+	}
+	q := url.Values{"eventKind": []string{kind}}
+	for key, value := range map[string]string{
+		"provider": query.Provider, "resource": query.Resource, "unit": unit,
+	} {
+		if value = strings.TrimSpace(value); value != "" {
+			q.Set(key, value)
+		}
+	}
+	if query.Limit > 0 {
+		q.Set("limit", strconv.Itoa(query.Limit))
+	}
+	var out ResourcePriceList
+	if err := a.client.do(ctx, http.MethodGet, "/api/v1/admin/llm-prices?"+q.Encode(), nil, &out); err != nil {
+		return ResourcePriceList{}, err
+	}
+	if out.ResourcePrices == nil {
+		out.ResourcePrices = []ResourcePrice{}
+	}
+	return out, nil
+}
+
+func (a *EconomicsAPI) AppendResourcePrice(ctx context.Context, price ResourcePrice) (ResourcePrice, error) {
+	if strings.TrimSpace(price.Provider) == "" || strings.TrimSpace(price.Resource) == "" ||
+		strings.TrimSpace(price.Currency) == "" || price.EffectiveFrom.IsZero() ||
+		price.ProviderMicrosPerUnit < 0 || price.CustomerMicrosPerUnit < 0 ||
+		!validResourcePriceKindUnit(strings.TrimSpace(price.EventKind), strings.TrimSpace(price.Unit), true) {
+		return ResourcePrice{}, fmt.Errorf("mockarty: economics append resource price: provider, resource, currency, effective time and a matching kind/unit are required")
+	}
+	var out ResourcePrice
+	if err := a.client.do(ctx, http.MethodPost, "/api/v1/admin/llm-prices", price, &out); err != nil {
+		return ResourcePrice{}, err
+	}
+	return out, nil
+}
+
+func validResourcePriceKindUnit(kind, unit string, requireUnit bool) bool {
+	if requireUnit && unit == "" {
+		return false
+	}
+	return (kind == "tool_call" && (unit == "" || unit == "calls")) ||
+		(kind == "runner_seconds" && (unit == "" || unit == "seconds"))
+}
+
 func (a *EconomicsAPI) GetUsage(ctx context.Context, query LLMUsageQuery) (LLMUsageReport, error) {
 	q := url.Values{}
 	if query.GroupBy != "" {
@@ -215,6 +303,9 @@ func (a *EconomicsAPI) GetUsage(ctx context.Context, query LLMUsageQuery) (LLMUs
 	}
 	if out.OutcomeCosts == nil {
 		out.OutcomeCosts = []LLMUsageOutcomeCost{}
+	}
+	if out.ResourceTotals == nil {
+		out.ResourceTotals = []ResourceUsageTotal{}
 	}
 	return out, nil
 }

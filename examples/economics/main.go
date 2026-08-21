@@ -20,4 +20,11 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("statement_bytes=%d\n", len(statement))
+	resourcePrices, err := client.Economics().ListResourcePrices(context.Background(), mockarty.ResourcePriceQuery{
+		EventKind: "tool_call", Provider: "mockarty-agent", Resource: "run_api_test", Limit: 20,
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("tool_price_versions=%d\n", len(resourcePrices.ResourcePrices))
 }

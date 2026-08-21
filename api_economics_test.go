@@ -30,7 +30,12 @@ func TestEconomicsPriceBookAndUsage(t *testing.T) {
 			if r.URL.Query().Get("groupBy") != "module" || r.URL.Query().Get("days") != "30" {
 				t.Fatalf("bad usage query: %s", r.URL.RawQuery)
 			}
-			_ = json.NewEncoder(w).Encode(LLMUsageReport{UnpricedCalls: 2})
+			_ = json.NewEncoder(w).Encode(LLMUsageReport{
+				UnpricedCalls: 2, UnpricedEvents: 3,
+				ResourceTotals: []ResourceUsageTotal{{
+					EventKind: "runner_seconds", Unit: "seconds", Events: 1, Quantity: 12,
+				}},
+			})
 		}
 	}))
 	defer srv.Close()
@@ -43,7 +48,9 @@ func TestEconomicsPriceBookAndUsage(t *testing.T) {
 	if got, err := c.Economics().ListPrices(ctx, "openai", "", 20); err != nil || len(got.Prices) != 1 {
 		t.Fatalf("list=%#v err=%v", got, err)
 	}
-	if got, err := c.Economics().GetUsage(ctx, LLMUsageQuery{GroupBy: "module", Days: 30}); err != nil || got.UnpricedCalls != 2 {
+	if got, err := c.Economics().GetUsage(ctx, LLMUsageQuery{GroupBy: "module", Days: 30}); err != nil ||
+		got.UnpricedCalls != 2 || got.UnpricedEvents != 3 || len(got.ResourceTotals) != 1 ||
+		got.ResourceTotals[0].Quantity != 12 {
 		t.Fatalf("usage=%#v err=%v", got, err)
 	}
 	if calls != 3 {
@@ -55,6 +62,57 @@ func TestEconomicsAppendPriceValidatesRequiredFields(t *testing.T) {
 	c := NewClient("http://example.invalid")
 	if _, err := c.Economics().AppendPrice(context.Background(), LLMPrice{}); err == nil {
 		t.Fatal("empty price accepted")
+	}
+}
+
+func TestEconomicsResourcePrices(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		switch r.Method {
+		case http.MethodPost:
+			var price ResourcePrice
+			if err := json.NewDecoder(r.Body).Decode(&price); err != nil || price.EventKind != "tool_call" ||
+				price.Resource != "run_api_test" || price.Unit != "calls" {
+				t.Fatalf("bad resource price request: %#v err=%v", price, err)
+			}
+			price.ID = "resource-price-1"
+			_ = json.NewEncoder(w).Encode(price)
+		case http.MethodGet:
+			if r.URL.Query().Get("eventKind") != "tool_call" || r.URL.Query().Get("resource") != "run_api_test" {
+				t.Fatalf("bad resource price query: %s", r.URL.RawQuery)
+			}
+			_ = json.NewEncoder(w).Encode(ResourcePriceList{ResourcePrices: []ResourcePrice{{ID: "resource-price-1"}}})
+		}
+	}))
+	defer srv.Close()
+	api := NewClient(srv.URL, WithAPIKey("k")).Economics()
+	price := ResourcePrice{EventKind: "tool_call", Provider: "mockarty-agent", Resource: "run_api_test",
+		Unit: "calls", Currency: "USD", EffectiveFrom: time.Now().UTC(), CustomerMicrosPerUnit: 500000}
+	if got, err := api.AppendResourcePrice(context.Background(), price); err != nil || got.ID != "resource-price-1" {
+		t.Fatalf("append resource price=%#v err=%v", got, err)
+	}
+	if got, err := api.ListResourcePrices(context.Background(), ResourcePriceQuery{
+		EventKind: "tool_call", Resource: "run_api_test",
+	}); err != nil || len(got.ResourcePrices) != 1 {
+		t.Fatalf("list resource prices=%#v err=%v", got, err)
+	}
+	if _, err := api.ListResourcePrices(context.Background(), ResourcePriceQuery{
+		EventKind: "runner_seconds", Unit: "calls",
+	}); err == nil {
+		t.Fatal("mismatched resource price query was accepted")
+	}
+	for _, invalid := range []ResourcePrice{
+		{},
+		{EventKind: "tool_call", Provider: "mockarty-agent", Resource: "x", Unit: "seconds", Currency: "USD", EffectiveFrom: time.Now()},
+		{EventKind: "runner_seconds", Provider: "mockarty-runner", Resource: "x", Unit: "seconds", Currency: "USD", EffectiveFrom: time.Now(), ProviderMicrosPerUnit: -1},
+	} {
+		if _, err := api.AppendResourcePrice(context.Background(), invalid); err == nil {
+			t.Fatalf("invalid resource price accepted: %#v", invalid)
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("HTTP calls=%d, invalid inputs must fail locally", calls)
 	}
 }
 
