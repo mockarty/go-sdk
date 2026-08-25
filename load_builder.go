@@ -106,7 +106,7 @@ type LoadConfig struct {
 	Stages      []LoadStage         `json:"stages,omitempty"`
 	VUs         int                 `json:"vus,omitempty"`
 	RPS         int                 `json:"rps,omitempty"`
-	MaxVUs      int                 `json:"maxVus,omitempty"`
+	MaxVUs      int                 `json:"maxVUs,omitempty"`
 	Iterations  int                 `json:"iterations,omitempty"`
 }
 
@@ -294,7 +294,7 @@ func (b *LoadTest) optionsJS() string {
 		opts["rps"] = b.rps
 	}
 	if b.maxVUs > 0 {
-		opts["maxVus"] = b.maxVUs
+		opts["maxVUs"] = b.maxVUs
 	}
 	if len(b.thresholds) > 0 {
 		opts["thresholds"] = b.thresholds

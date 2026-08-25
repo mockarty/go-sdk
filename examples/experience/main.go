@@ -17,4 +17,11 @@ func main() {
 	for _, item := range items.Results {
 		fmt.Printf("%s: %s (%s)\n", item.Kind, item.Text, item.Source)
 	}
+	queue, err := client.Experience().ListReview(context.Background(), mockarty.ExperienceReviewListRequest{State: "candidate", Limit: 20})
+	if err != nil {
+		panic(err)
+	}
+	for _, candidate := range queue.Items {
+		fmt.Printf("review %s %s v%d: %s\n", candidate.State, candidate.ID, candidate.Version, candidate.Source)
+	}
 }

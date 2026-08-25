@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 	"strings"
 	"time"
@@ -17,16 +18,69 @@ type PerfAPI struct {
 
 // PerfConfig defines the configuration for a performance test run.
 type PerfConfig struct {
-	ID          string         `json:"id,omitempty"`
-	Name        string         `json:"name"`
-	Script      string         `json:"script"`
-	Duration    string         `json:"duration,omitempty"`   // e.g. "30s", "5m"
-	VUs         int            `json:"vus,omitempty"`        // virtual users
-	Iterations  int            `json:"iterations,omitempty"` // total iterations (alternative to duration)
-	Thresholds  map[string]any `json:"thresholds,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
-	Environment map[string]any `json:"environment,omitempty"` // environment variables for script
-	Metadata    map[string]any `json:"metadata,omitempty"`
+	Options      *PerfOptions               `json:"options,omitempty"`
+	ParentID     *string                    `json:"parentId,omitempty"`
+	CreatedAt    *time.Time                 `json:"createdAt,omitempty"`
+	UpdatedAt    *time.Time                 `json:"updatedAt,omitempty"`
+	Environment  map[string]any             `json:"environment,omitempty"` // environment variables for script
+	Thresholds   map[string]any             `json:"thresholds,omitempty"`
+	Metadata     map[string]any             `json:"metadata,omitempty"`
+	Extra        map[string]json.RawMessage `json:"-"`
+	Tags         []string                   `json:"tags,omitempty"`
+	CollectionID string                     `json:"collectionId,omitempty"`
+	Namespace    string                     `json:"namespace,omitempty"`
+	UserID       string                     `json:"userId,omitempty"`
+	ID           string                     `json:"id,omitempty"`
+	Name         string                     `json:"name"`
+	Script       string                     `json:"script"`
+	Duration     string                     `json:"duration,omitempty"` // legacy inline-run field, e.g. "30s", "5m"
+	SortOrder    int                        `json:"sortOrder"`
+	VUs          int                        `json:"vus,omitempty"`        // legacy inline-run field: virtual users
+	Iterations   int                        `json:"iterations,omitempty"` // legacy inline-run field
+	IsFolder     bool                       `json:"isFolder"`
+}
+
+// PerfOptions is the typed `options` envelope of a saved performance
+// configuration. It mirrors the server's runner.PerfOptions wire contract.
+// The legacy flattened PerfConfig fields remain available for inline runs;
+// use Options when saving a reusable configuration with CreateConfig.
+type PerfOptions struct {
+	Thresholds          map[string][]string        `json:"thresholds,omitempty"`
+	Stages              []PerfStage                `json:"stages,omitempty"`
+	AbortCriteria       []AbortCriterion           `json:"abortCriteria,omitempty"`
+	MetricsPush         []string                   `json:"metricsPush,omitempty"`
+	Extra               map[string]json.RawMessage `json:"-"`
+	Duration            string                     `json:"duration,omitempty"`
+	GracefulStop        string                     `json:"gracefulStop,omitempty"`
+	GracefulRampDown    string                     `json:"gracefulRampDown,omitempty"`
+	MetricsPushInterval string                     `json:"metricsPushInterval,omitempty"`
+	StartAtUnixMs       int64                      `json:"startAtUnixMs,omitempty"`
+	VUs                 int                        `json:"vus,omitempty"`
+	Iterations          int                        `json:"iterations,omitempty"`
+	RPS                 int                        `json:"rps,omitempty"`
+	MaxVUs              int                        `json:"maxVUs,omitempty"`
+	ArrivalRate         bool                       `json:"arrivalRate,omitempty"`
+	EmitHistograms      bool                       `json:"emitHistograms,omitempty"`
+}
+
+// PerfStage describes one virtual-user or arrival-rate ramp stage.
+type PerfStage struct {
+	Extra     map[string]json.RawMessage `json:"-"`
+	Duration  string                     `json:"duration"`
+	Target    int                        `json:"target"`
+	TargetRPS int                        `json:"targetRPS,omitempty"`
+}
+
+// AbortCriterion describes one automatic performance-test stop condition.
+type AbortCriterion struct {
+	Extra     map[string]json.RawMessage `json:"-"`
+	Metric    string                     `json:"metric"`
+	Stat      string                     `json:"stat"`
+	Condition string                     `json:"condition"`
+	Duration  string                     `json:"duration,omitempty"`
+	Name      string                     `json:"name,omitempty"`
+	Value     float64                    `json:"value"`
+	Enabled   bool                       `json:"enabled"`
 }
 
 // PerfTask represents a running or completed performance test.

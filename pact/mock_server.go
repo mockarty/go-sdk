@@ -154,10 +154,17 @@ func (s *MockServer) UnmatchedRequests() []UnmatchedRequest {
 func (s *MockServer) Close() error {
 	var firstErr error
 	s.closeOnce.Do(func() {
-		s.server.Close()
+		// httptest.Server.Close also closes http.DefaultTransport idle
+		// connections. That process-wide side effect tears down requests owned by
+		// other pact servers (and unrelated tests) when suites run in parallel.
+		// Close the underlying HTTP server directly so teardown is scoped to this
+		// listener and its connections.
+		if err := s.server.Config.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			firstErr = fmt.Errorf("pact: close mock server: %w", err)
+		}
 		s.closed.Store(true)
 		s.consumer.finalize()
-		if _, err := WritePactFile(s.consumer); err != nil {
+		if _, err := WritePactFile(s.consumer); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	})

@@ -5,12 +5,176 @@ package mockarty
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+
+	"github.com/google/uuid"
 )
 
 // NamespaceSettingsAPI provides methods for managing namespace-level settings.
 type NamespaceSettingsAPI struct {
 	client *Client
+}
+
+// AutonomyNamespaceSettings is the user-manageable namespace policy for new
+// autonomous missions and retained mission evidence. A nil run-window pointer
+// inherits the lower policy layer; nil retention pointers inherit the instance
+// policy. Run windows are 1..20160 minutes; retention is 1..3650 days.
+type AutonomyNamespaceSettings struct {
+	DefaultBudget               AutonomyDefaultBudget `json:"defaultBudget"`
+	DefaultContextRefs          []AutonomyContextRef  `json:"defaultContextRefs"`
+	UpdatedAt                   string                `json:"updatedAt,omitempty"`
+	DefaultAutonomy             string                `json:"defaultAutonomy"`
+	JournalEventRetentionDays   *int                  `json:"journalEventRetentionDays,omitempty"`
+	JournalPayloadRetentionDays *int                  `json:"journalPayloadRetentionDays,omitempty"`
+	RunWindowMinutes            *int                  `json:"runWindowMinutes,omitempty"`
+	ETag                        string                `json:"etag,omitempty"`
+}
+
+type AutonomyDefaultBudget struct {
+	TokensTotal  int64   `json:"tokensTotal"`
+	TokensPerDay int64   `json:"tokensPerDay"`
+	USDCap       float64 `json:"usdCap"`
+}
+
+type AutonomyContextRef struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+}
+
+// AutonomySettingsSaveOptions controls retry identity and presence-sensitive
+// fields without breaking the ergonomic partial-update method. Reuse RequestID
+// after a timeout or connection loss. ReplaceDefaultBudget makes an all-zero
+// budget an explicit update instead of the legacy "omitted" signal.
+type AutonomySettingsSaveOptions struct {
+	RequestID            string
+	ReplaceDefaultBudget bool
+}
+
+// GetAutonomySettings returns the autonomous-mission defaults for the client's
+// configured namespace.
+func (a *NamespaceSettingsAPI) GetAutonomySettings(ctx context.Context) (*AutonomyNamespaceSettings, error) {
+	var out AutonomyNamespaceSettings
+	if err := a.client.do(ctx, "GET", "/api/v1/autotester/settings", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SaveAutonomySettings replaces autonomous-mission defaults for the client's
+// namespace. Nil run-window and retention pointers are omitted and therefore
+// preserve current overrides. Use ClearAutonomyRunWindow or
+// ClearAutonomyRetention for explicit inheritance.
+// Legal holds always take precedence over retention cleanup.
+func (a *NamespaceSettingsAPI) SaveAutonomySettings(ctx context.Context, settings *AutonomyNamespaceSettings) (*AutonomyNamespaceSettings, error) {
+	return a.SaveAutonomySettingsWithOptions(ctx, settings, AutonomySettingsSaveOptions{})
+}
+
+// SaveAutonomySettingsWithOptions is the retry-safe, presence-aware variant of
+// SaveAutonomySettings. An empty RequestID generates a new UUID for this call.
+func (a *NamespaceSettingsAPI) SaveAutonomySettingsWithOptions(ctx context.Context, settings *AutonomyNamespaceSettings, options AutonomySettingsSaveOptions) (*AutonomyNamespaceSettings, error) {
+	if settings == nil {
+		return nil, fmt.Errorf("autonomy settings are required")
+	}
+	current, err := a.GetAutonomySettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if settings.DefaultAutonomy != "" {
+		current.DefaultAutonomy = settings.DefaultAutonomy
+	}
+	if options.ReplaceDefaultBudget || settings.DefaultBudget != (AutonomyDefaultBudget{}) {
+		current.DefaultBudget = settings.DefaultBudget
+	}
+	if settings.DefaultContextRefs != nil {
+		current.DefaultContextRefs = settings.DefaultContextRefs
+	}
+	if settings.JournalEventRetentionDays != nil {
+		current.JournalEventRetentionDays = settings.JournalEventRetentionDays
+	}
+	if settings.JournalPayloadRetentionDays != nil {
+		current.JournalPayloadRetentionDays = settings.JournalPayloadRetentionDays
+	}
+	if settings.RunWindowMinutes != nil {
+		current.RunWindowMinutes = settings.RunWindowMinutes
+	}
+	var out AutonomyNamespaceSettings
+	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": autonomyRequestID(options.RequestID), "If-Match": current.ETag})
+	if err := a.client.do(ctx, "PUT", "/api/v1/autotester/settings", current, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ClearAutonomyRunWindow clears the namespace override so the product,
+// instance or built-in 480-minute wall applies.
+func (a *NamespaceSettingsAPI) ClearAutonomyRunWindow(ctx context.Context, options AutonomySettingsSaveOptions) (*AutonomyNamespaceSettings, error) {
+	current, err := a.GetAutonomySettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{
+		"defaultAutonomy": current.DefaultAutonomy, "defaultBudget": current.DefaultBudget,
+		"defaultContextRefs": current.DefaultContextRefs, "runWindowMinutes": nil,
+	}
+	if current.JournalEventRetentionDays != nil {
+		body["journalEventRetentionDays"] = *current.JournalEventRetentionDays
+	}
+	if current.JournalPayloadRetentionDays != nil {
+		body["journalPayloadRetentionDays"] = *current.JournalPayloadRetentionDays
+	}
+	var out AutonomyNamespaceSettings
+	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": autonomyRequestID(options.RequestID), "If-Match": current.ETag})
+	if err = a.client.do(ctx, "PUT", "/api/v1/autotester/settings", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ClearAutonomyRetention explicitly clears selected namespace overrides so
+// they inherit instance retention. Unselected overrides are preserved.
+func (a *NamespaceSettingsAPI) ClearAutonomyRetention(ctx context.Context, clearEvent, clearPayload bool) (*AutonomyNamespaceSettings, error) {
+	return a.ClearAutonomyRetentionWithOptions(ctx, clearEvent, clearPayload, AutonomySettingsSaveOptions{})
+}
+
+// ClearAutonomyRetentionWithOptions supports a stable retry identity after an
+// ambiguous network outcome. ReplaceDefaultBudget is ignored for this helper.
+func (a *NamespaceSettingsAPI) ClearAutonomyRetentionWithOptions(ctx context.Context, clearEvent, clearPayload bool, options AutonomySettingsSaveOptions) (*AutonomyNamespaceSettings, error) {
+	if !clearEvent && !clearPayload {
+		return nil, fmt.Errorf("at least one retention override must be selected")
+	}
+	current, err := a.GetAutonomySettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{
+		"defaultAutonomy":    current.DefaultAutonomy,
+		"defaultBudget":      current.DefaultBudget,
+		"defaultContextRefs": current.DefaultContextRefs,
+	}
+	if clearEvent {
+		body["journalEventRetentionDays"] = nil
+	} else if current.JournalEventRetentionDays != nil {
+		body["journalEventRetentionDays"] = *current.JournalEventRetentionDays
+	}
+	if clearPayload {
+		body["journalPayloadRetentionDays"] = nil
+	} else if current.JournalPayloadRetentionDays != nil {
+		body["journalPayloadRetentionDays"] = *current.JournalPayloadRetentionDays
+	}
+	var out AutonomyNamespaceSettings
+	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": autonomyRequestID(options.RequestID), "If-Match": current.ETag})
+	if err := a.client.do(ctx, "PUT", "/api/v1/autotester/settings", body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func autonomyRequestID(value string) string {
+	if value != "" {
+		return value
+	}
+	return uuid.NewString()
 }
 
 // NamespaceWebhook represents a namespace-scoped webhook configuration.

@@ -28,12 +28,96 @@ type AgentTaskAPI struct {
 // with 'cannot unmarshal string into Go struct field
 // AgentTask.task.createdAt of type int64'.
 type AgentTask struct {
-	CreatedAt time.Time `json:"createdAt,omitempty"`
-	ID        string    `json:"id,omitempty"`
-	Title     string    `json:"title,omitempty"`
-	Prompt    string    `json:"prompt,omitempty"`
-	Status    string    `json:"status,omitempty"`
-	Result    any       `json:"result,omitempty"`
+	CreatedAt                         time.Time     `json:"createdAt,omitempty"`
+	ID                                string        `json:"id,omitempty"`
+	Title                             string        `json:"title,omitempty"`
+	Prompt                            string        `json:"prompt,omitempty"`
+	Status                            string        `json:"status,omitempty"`
+	Result                            any           `json:"result,omitempty"`
+	ToolReceipts                      []ToolReceipt `json:"toolReceipts,omitempty"`
+	ToolReceiptReconcileBlockedReason string        `json:"toolReceiptReconcileBlockedReason,omitempty"`
+	// CanReconcileToolReceipts is true only after the task stops and the task
+	// owner's user has Coder Deploy permission in the task namespace. Owners
+	// without that permission can inspect receipts but cannot record a decision.
+	CanReconcileToolReceipts bool `json:"canReconcileToolReceipts"`
+	// ToolReceiptRetryAllowed is false for cancelled tasks even when evidence
+	// decisions (already_applied or mark_failed) remain available.
+	ToolReceiptRetryAllowed bool `json:"toolReceiptRetryAllowed"`
+}
+
+// ToolReceipt is the durable state of one external action issued by an agent.
+// awaiting_reconcile means Mockarty deliberately paused automatic recovery:
+// inspect the downstream system before choosing an outcome.
+type ToolReceipt struct {
+	DecisionAt         *time.Time `json:"decisionAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	Namespace          string     `json:"namespace"`
+	ReceiptKey         string     `json:"receiptKey"`
+	ArgsDigest         string     `json:"argsDigest"`
+	TaskID             string     `json:"taskId"`
+	AttemptID          string     `json:"attemptId"`
+	ToolName           string     `json:"toolName"`
+	EffectClass        string     `json:"effectClass"`
+	Result             string     `json:"result,omitempty"`
+	Status             string     `json:"status"`
+	DispatchEventID    string     `json:"dispatchEventId,omitempty"`
+	Decision           string     `json:"decision,omitempty"`
+	DecisionActor      string     `json:"decisionActor,omitempty"`
+	DecisionReason     string     `json:"decisionReason,omitempty"`
+	Version            int64      `json:"version"`
+	LogicalOrdinal     int        `json:"logicalOrdinal"`
+	ReplayCount        int        `json:"replayCount"`
+	DispatchGeneration int        `json:"dispatchGeneration"`
+	IsError            bool       `json:"isError"`
+}
+
+// ToolReceiptReconcileRequest records a version-fenced operator decision.
+// IdempotencyKey must remain stable when retrying the same request.
+type ToolReceiptReconcileRequest struct {
+	ExpectedVersion int64  `json:"expectedVersion"`
+	IdempotencyKey  string `json:"idempotencyKey"`
+	Decision        string `json:"decision"`
+	Reason          string `json:"reason"`
+	Result          string `json:"result,omitempty"`
+}
+
+// LegacyAgentSessionSummary is owner-only metadata for one pre-namespace
+// session held in quarantine. Message content is available only through the
+// explicit export endpoint/CLI, never through this list response.
+type LegacyAgentSessionSummary struct {
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+	ExpiresAt  time.Time `json:"expiresAt"`
+	OriginalID string    `json:"originalId"`
+	AppName    string    `json:"appName"`
+	EventCount int64     `json:"eventCount"`
+}
+
+// LegacyAgentSessionPage is one bounded keyset page.
+type LegacyAgentSessionPage struct {
+	NextCursor string                      `json:"nextCursor,omitempty"`
+	Sessions   []LegacyAgentSessionSummary `json:"sessions"`
+}
+
+// LegacyAgentSessionClaimRequest acknowledges that old history has no trusted
+// original workspace and chooses the destination explicitly.
+type LegacyAgentSessionClaimRequest struct {
+	Namespace                string `json:"namespace"`
+	SessionKey               string `json:"sessionKey,omitempty"`
+	AcknowledgeUnknownOrigin bool   `json:"acknowledgeUnknownOrigin"`
+}
+
+// AgentSession is the recovered, workspace-scoped session returned by Claim.
+type AgentSession struct {
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"userId"`
+	Namespace string    `json:"namespace"`
+	AppName   string    `json:"appName"`
+	State     any       `json:"state,omitempty"`
 }
 
 // List returns all agent tasks.
@@ -59,12 +143,36 @@ func (a *AgentTaskAPI) List(ctx context.Context) ([]AgentTask, error) {
 // Wire shape: server emits `{task: <AgentTask>}` envelope.
 func (a *AgentTaskAPI) Get(ctx context.Context, id string) (*AgentTask, error) {
 	var env struct {
-		Task AgentTask `json:"task"`
+		Task                              AgentTask     `json:"task"`
+		ToolReceipts                      []ToolReceipt `json:"toolReceipts"`
+		ToolReceiptReconcileBlockedReason string        `json:"toolReceiptReconcileBlockedReason"`
+		CanReconcileToolReceipts          bool          `json:"canReconcileToolReceipts"`
+		ToolReceiptRetryAllowed           bool          `json:"toolReceiptRetryAllowed"`
 	}
 	if err := a.client.do(ctx, "GET", "/api/v1/agent/tasks/"+url.PathEscape(id), nil, &env); err != nil {
 		return nil, err
 	}
+	env.Task.ToolReceipts = env.ToolReceipts
+	env.Task.CanReconcileToolReceipts = env.CanReconcileToolReceipts
+	env.Task.ToolReceiptRetryAllowed = env.ToolReceiptRetryAllowed
+	env.Task.ToolReceiptReconcileBlockedReason = env.ToolReceiptReconcileBlockedReason
 	return &env.Task, nil
+}
+
+// ReconcileToolReceipt resolves one awaiting_reconcile external action after
+// the caller has inspected the real downstream system. Decisions are
+// already_applied, retry_once, or mark_failed. retry_once must use an empty
+// Result and authorizes exactly one new physical dispatch generation.
+func (a *AgentTaskAPI) ReconcileToolReceipt(ctx context.Context, taskID, receiptKey string, request ToolReceiptReconcileRequest) (*ToolReceipt, error) {
+	var envelope struct {
+		Receipt ToolReceipt `json:"receipt"`
+	}
+	path := "/api/v1/agent/tasks/" + url.PathEscape(taskID) + "/tool-receipts/" +
+		url.PathEscape(receiptKey) + "/reconcile"
+	if err := a.client.do(ctx, "POST", path, request, &envelope); err != nil {
+		return nil, err
+	}
+	return &envelope.Receipt, nil
 }
 
 // Submit creates and submits a new agent task.
@@ -118,6 +226,44 @@ func (a *AgentTaskAPI) Export(ctx context.Context, id string) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// ListLegacySessions lists owner-only metadata for recoverable pre-namespace
+// sessions. limit must be 1..100; cursor is the opaque NextCursor from the
+// previous page. A zero limit asks the server to use its default.
+func (a *AgentTaskAPI) ListLegacySessions(ctx context.Context, limit int, cursor string) (*LegacyAgentSessionPage, error) {
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprint(limit))
+	}
+	if cursor != "" {
+		query.Set("cursor", cursor)
+	}
+	path := "/api/v1/agent/sessions/legacy"
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var page LegacyAgentSessionPage
+	if err := a.client.do(ctx, "GET", path, nil, &page); err != nil {
+		return nil, err
+	}
+	if page.Sessions == nil {
+		page.Sessions = []LegacyAgentSessionSummary{}
+	}
+	return &page, nil
+}
+
+// ClaimLegacySession atomically moves one quarantined session into a workspace
+// where the authenticated caller has write access.
+func (a *AgentTaskAPI) ClaimLegacySession(ctx context.Context, legacyID string, request LegacyAgentSessionClaimRequest) (*AgentSession, error) {
+	var envelope struct {
+		Session AgentSession `json:"session"`
+	}
+	path := "/api/v1/agent/sessions/legacy/" + url.PathEscape(legacyID) + "/claim"
+	if err := a.client.do(ctx, "POST", path, request, &envelope); err != nil {
+		return nil, err
+	}
+	return &envelope.Session, nil
 }
 
 // Terminal errors returned by WaitForResult when an agent task ends without
