@@ -24,6 +24,13 @@ import (
 //   - "fuzz_config"
 //   - "chaos_experiment"
 //   - "contract_pact"
+//   - "request"
+//   - "collection"
+//   - "ui_test"
+//   - "wiki_page"
+//   - "whiteboard"
+//   - "test_case"
+//   - "issue"
 //
 // Use the EntityType* constants below to avoid typos.
 type EntitySearchAPI struct {
@@ -39,6 +46,13 @@ const (
 	EntityTypeFuzzConfig      = "fuzz_config"
 	EntityTypeChaosExperiment = "chaos_experiment"
 	EntityTypeContractPact    = "contract_pact"
+	EntityTypeRequest         = "request"
+	EntityTypeCollection      = "collection"
+	EntityTypeUITest          = "ui_test"
+	EntityTypeWikiPage        = "wiki_page"
+	EntityTypeWhiteboard      = "whiteboard"
+	EntityTypeTestCase        = "test_case"
+	EntityTypeIssue           = "issue"
 )
 
 // EntitySearchPaging is the default and ceiling for the `limit` query

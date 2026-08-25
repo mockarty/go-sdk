@@ -77,12 +77,21 @@ func RPSStage(duration string, targetRPS int) LoadStage {
 	return LoadStage{Duration: duration, TargetRPS: targetRPS}
 }
 
+// loadCheck is one per-request assertion emitted as a k6 check entry:
+// `'<Name>': (res) => <Expr>`. Expr is a JavaScript boolean expression that
+// may reference the response as `res`.
+type loadCheck struct {
+	name string
+	expr string
+}
+
 // loadRequest is one HTTP request in the scenario's iteration body.
 type loadRequest struct {
 	method  string
 	path    string
 	body    any
 	headers map[string]string
+	checks  []loadCheck
 }
 
 // LoadConfig is the perf-config JSON shape consumed by
@@ -97,7 +106,7 @@ type LoadConfig struct {
 	Stages      []LoadStage         `json:"stages,omitempty"`
 	VUs         int                 `json:"vus,omitempty"`
 	RPS         int                 `json:"rps,omitempty"`
-	MaxVUs      int                 `json:"maxVus,omitempty"`
+	MaxVUs      int                 `json:"maxVUs,omitempty"`
 	Iterations  int                 `json:"iterations,omitempty"`
 }
 
@@ -169,6 +178,26 @@ func (b *LoadTest) Patch(path string, body any) *LoadTest {
 
 // Delete appends a DELETE request.
 func (b *LoadTest) Delete(path string) *LoadTest { return b.Request("DELETE", path, nil, nil) }
+
+// Check attaches a named assertion to the MOST RECENTLY added request. name is
+// the check label; expr is a JavaScript boolean expression that may reference
+// the response as `res` (e.g. "res.json().id !== undefined"). When a request
+// has one or more checks they REPLACE the default `status < 400` check. No-op
+// if no request has been added yet.
+func (b *LoadTest) Check(name, expr string) *LoadTest {
+	if len(b.requests) == 0 {
+		return b
+	}
+	last := &b.requests[len(b.requests)-1]
+	last.checks = append(last.checks, loadCheck{name: name, expr: expr})
+	return b
+}
+
+// ExpectStatus is a shorthand for Check that asserts the response status code,
+// e.g. ExpectStatus(201) → check `'status is 201': (res) => res.status === 201`.
+func (b *LoadTest) ExpectStatus(code int) *LoadTest {
+	return b.Check(fmt.Sprintf("status is %d", code), fmt.Sprintf("res.status === %d", code))
+}
 
 // VUs sets a constant virtual-user count (ignored when stages are set).
 func (b *LoadTest) VUs(n int) *LoadTest { b.vus = n; return b }
@@ -265,7 +294,7 @@ func (b *LoadTest) optionsJS() string {
 		opts["rps"] = b.rps
 	}
 	if b.maxVUs > 0 {
-		opts["maxVus"] = b.maxVUs
+		opts["maxVUs"] = b.maxVUs
 	}
 	if len(b.thresholds) > 0 {
 		opts["thresholds"] = b.thresholds
@@ -342,8 +371,23 @@ func (b *LoadTest) requestJS(req loadRequest) string {
 			sb.WriteString(fmt.Sprintf("  r = http.%s(%s, %s);\n", method, url, bodyLit))
 		}
 	}
-	sb.WriteString("  check(r, { 'status < 400': (res) => res.status < 400 });\n")
+	sb.WriteString(checkJS(req.checks))
 	return sb.String()
+}
+
+// checkJS emits the k6 `check(r, { ... })` line for a request. With no custom
+// checks it emits the default `status < 400` assertion (backward compatible);
+// otherwise it emits every custom check in insertion order. The emission is
+// kept byte-identical across the Go/Python/Java SDKs.
+func checkJS(checks []loadCheck) string {
+	if len(checks) == 0 {
+		return "  check(r, { 'status < 400': (res) => res.status < 400 });\n"
+	}
+	parts := make([]string, 0, len(checks))
+	for _, c := range checks {
+		parts = append(parts, jsStr(c.name)+": (res) => "+c.expr)
+	}
+	return "  check(r, { " + strings.Join(parts, ", ") + " });\n"
 }
 
 // sortedKeys returns map keys in sorted order (small maps, simple insertion).

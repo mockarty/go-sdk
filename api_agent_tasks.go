@@ -6,6 +6,7 @@ package mockarty
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -29,12 +30,58 @@ type AgentTaskAPI struct {
 // with 'cannot unmarshal string into Go struct field
 // AgentTask.task.createdAt of type int64'.
 type AgentTask struct {
-	CreatedAt time.Time `json:"createdAt,omitempty"`
-	ID        string    `json:"id,omitempty"`
-	Title     string    `json:"title,omitempty"`
-	Prompt    string    `json:"prompt,omitempty"`
-	Status    string    `json:"status,omitempty"`
-	Result    any       `json:"result,omitempty"`
+	CreatedAt                         time.Time     `json:"createdAt,omitempty"`
+	ID                                string        `json:"id,omitempty"`
+	Title                             string        `json:"title,omitempty"`
+	Prompt                            string        `json:"prompt,omitempty"`
+	Status                            string        `json:"status,omitempty"`
+	Result                            any           `json:"result,omitempty"`
+	ToolReceipts                      []ToolReceipt `json:"toolReceipts,omitempty"`
+	ToolReceiptReconcileBlockedReason string        `json:"toolReceiptReconcileBlockedReason,omitempty"`
+	// CanReconcileToolReceipts is true only after the task stops and the task
+	// owner's user has Coder Deploy permission in the task namespace. Owners
+	// without that permission can inspect receipts but cannot record a decision.
+	CanReconcileToolReceipts bool `json:"canReconcileToolReceipts"`
+	// ToolReceiptRetryAllowed is false for cancelled tasks even when evidence
+	// decisions (already_applied or mark_failed) remain available.
+	ToolReceiptRetryAllowed bool `json:"toolReceiptRetryAllowed"`
+}
+
+// ToolReceipt is the durable state of one external action issued by an agent.
+// awaiting_reconcile means Mockarty deliberately paused automatic recovery:
+// inspect the downstream system before choosing an outcome.
+type ToolReceipt struct {
+	DecisionAt         *time.Time `json:"decisionAt,omitempty"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	Namespace          string     `json:"namespace"`
+	ReceiptKey         string     `json:"receiptKey"`
+	ArgsDigest         string     `json:"argsDigest"`
+	TaskID             string     `json:"taskId"`
+	AttemptID          string     `json:"attemptId"`
+	ToolName           string     `json:"toolName"`
+	EffectClass        string     `json:"effectClass"`
+	Result             string     `json:"result,omitempty"`
+	Status             string     `json:"status"`
+	DispatchEventID    string     `json:"dispatchEventId,omitempty"`
+	Decision           string     `json:"decision,omitempty"`
+	DecisionActor      string     `json:"decisionActor,omitempty"`
+	DecisionReason     string     `json:"decisionReason,omitempty"`
+	Version            int64      `json:"version"`
+	LogicalOrdinal     int        `json:"logicalOrdinal"`
+	ReplayCount        int        `json:"replayCount"`
+	DispatchGeneration int        `json:"dispatchGeneration"`
+	IsError            bool       `json:"isError"`
+}
+
+// ToolReceiptReconcileRequest records a version-fenced operator decision.
+// IdempotencyKey must remain stable when retrying the same request.
+type ToolReceiptReconcileRequest struct {
+	ExpectedVersion int64  `json:"expectedVersion"`
+	IdempotencyKey  string `json:"idempotencyKey"`
+	Decision        string `json:"decision"`
+	Reason          string `json:"reason"`
+	Result          string `json:"result,omitempty"`
 }
 
 // LegacyAgentSessionSummary describes one pre-namespace session available to
@@ -116,12 +163,36 @@ func (a *AgentTaskAPI) List(ctx context.Context) ([]AgentTask, error) {
 // Wire shape: server emits `{task: <AgentTask>}` envelope.
 func (a *AgentTaskAPI) Get(ctx context.Context, id string) (*AgentTask, error) {
 	var env struct {
-		Task AgentTask `json:"task"`
+		Task                              AgentTask     `json:"task"`
+		ToolReceipts                      []ToolReceipt `json:"toolReceipts"`
+		ToolReceiptReconcileBlockedReason string        `json:"toolReceiptReconcileBlockedReason"`
+		CanReconcileToolReceipts          bool          `json:"canReconcileToolReceipts"`
+		ToolReceiptRetryAllowed           bool          `json:"toolReceiptRetryAllowed"`
 	}
 	if err := a.client.do(ctx, "GET", "/api/v1/agent/tasks/"+url.PathEscape(id), nil, &env); err != nil {
 		return nil, err
 	}
+	env.Task.ToolReceipts = env.ToolReceipts
+	env.Task.CanReconcileToolReceipts = env.CanReconcileToolReceipts
+	env.Task.ToolReceiptRetryAllowed = env.ToolReceiptRetryAllowed
+	env.Task.ToolReceiptReconcileBlockedReason = env.ToolReceiptReconcileBlockedReason
 	return &env.Task, nil
+}
+
+// ReconcileToolReceipt resolves one awaiting_reconcile external action after
+// the caller has inspected the real downstream system. Decisions are
+// already_applied, retry_once, or mark_failed. retry_once must use an empty
+// Result and authorizes exactly one new physical dispatch generation.
+func (a *AgentTaskAPI) ReconcileToolReceipt(ctx context.Context, taskID, receiptKey string, request ToolReceiptReconcileRequest) (*ToolReceipt, error) {
+	var envelope struct {
+		Receipt ToolReceipt `json:"receipt"`
+	}
+	path := "/api/v1/agent/tasks/" + url.PathEscape(taskID) + "/tool-receipts/" +
+		url.PathEscape(receiptKey) + "/reconcile"
+	if err := a.client.do(ctx, "POST", path, request, &envelope); err != nil {
+		return nil, err
+	}
+	return &envelope.Receipt, nil
 }
 
 // Submit creates and submits a new agent task.
@@ -250,4 +321,61 @@ func (a *AgentTaskAPI) ClaimLegacySession(ctx context.Context, id string, reques
 		return nil, err
 	}
 	return &envelope.Session, nil
+}
+
+// Terminal errors returned by WaitForResult when an agent task ends without
+// succeeding. Callers match with errors.Is.
+var (
+	ErrAgentTaskFailed    = errors.New("mockarty: agent task failed")
+	ErrAgentTaskCancelled = errors.New("mockarty: agent task cancelled")
+)
+
+// WaitForResult polls an agent task until it reaches a terminal state or ctx
+// expires. On "completed" it returns the finished task (with .Result); on
+// "failed"/"cancelled" it returns the task wrapped in ErrAgentTaskFailed /
+// ErrAgentTaskCancelled. pollInterval <= 0 defaults to 2s. This is the
+// automation counterpart to Submit — dispatch a task into the agent network
+// and block for its result without hand-rolling a poll loop.
+func (a *AgentTaskAPI) WaitForResult(ctx context.Context, id string, pollInterval time.Duration) (*AgentTask, error) {
+	if pollInterval <= 0 {
+		pollInterval = 2 * time.Second
+	}
+	t := time.NewTicker(pollInterval)
+	defer t.Stop()
+
+	for {
+		task, err := a.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		// Case-insensitive to match the Python/Java SDKs and survive a server
+		// that ever capitalises a terminal status.
+		switch strings.ToLower(task.Status) {
+		case "completed", "done", "succeeded":
+			return task, nil
+		case "failed", "error":
+			return task, fmt.Errorf("%w: task %s", ErrAgentTaskFailed, id)
+		case "cancelled", "canceled":
+			return task, fmt.Errorf("%w: task %s", ErrAgentTaskCancelled, id)
+		}
+		select {
+		case <-ctx.Done():
+			return task, ctx.Err()
+		case <-t.C:
+		}
+	}
+}
+
+// SubmitAndWait submits a task and blocks until it reaches a terminal state,
+// combining Submit + WaitForResult — the one-call automation entry point for
+// "run this in the agent network and give me the result".
+func (a *AgentTaskAPI) SubmitAndWait(ctx context.Context, task *AgentTask, pollInterval time.Duration) (*AgentTask, error) {
+	submitted, err := a.Submit(ctx, task)
+	if err != nil {
+		return nil, err
+	}
+	if submitted.ID == "" {
+		return submitted, fmt.Errorf("mockarty: agent task submitted without an id")
+	}
+	return a.WaitForResult(ctx, submitted.ID, pollInterval)
 }

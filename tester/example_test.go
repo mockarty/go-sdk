@@ -24,7 +24,7 @@ func Example() {
 			_ = json.NewEncoder(w).Encode(map[string]string{"token": "tok-abc"})
 		case "/me":
 			if r.Header.Get("Authorization") != "Bearer tok-abc" {
-				http.Error(w, "unauthorized", 401)
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]string{"user": "alice"})

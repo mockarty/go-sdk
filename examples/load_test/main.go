@@ -42,9 +42,20 @@ func main() {
 	fmt.Println("  mockarty-cli perf run --from-config checkout.json")
 
 	// 3) (Optional) submit the same config to a Mockarty server via the SDK:
-	//      cfg := profile.ToPerfConfig()
-	//      client := mockarty.NewClient("http://localhost:5770", mockarty.WithAPIKey("..."))
-	//      task, _ := client.Perf().Run(ctx, &mockarty.PerfConfig{
-	//          Name: cfg.Name, Script: cfg.Script,
-	//      })
+	// Saved configurations use a typed Options envelope. It keeps run controls
+	// (including an opt-in metrics sink) together when the profile is reused.
+	saved := &mockarty.PerfConfig{
+		Name:   "checkout soak",
+		Script: profile.ToK6Script(),
+		Options: &mockarty.PerfOptions{
+			Stages: []mockarty.PerfStage{
+				{Duration: "30s", Target: 50},
+				{Duration: "1m", Target: 50},
+				{Duration: "10s", Target: 0},
+			},
+			MetricsPush:         []string{"prometheus:https://metrics.example.test/push"},
+			MetricsPushInterval: "10s",
+		},
+	}
+	_ = saved // client.Perf().CreateConfig(ctx, saved)
 }

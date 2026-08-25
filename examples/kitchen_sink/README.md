@@ -15,7 +15,7 @@ Mockarty into your own test harness.
 | 5    | `t.Wrap()` | Group steps under one Allure parent for the report |
 | 6    | Jira REST | Auto-file a Bug if any step failed (mock endpoint, no real Jira needed) |
 | 7    | GitLab REST | Trigger pipeline → poll until `success` (mock endpoint) |
-| 8    | `client.ExternalRuns().Submit(...)` | Upload the run shape to Mockarty TCM as a synthetic case run |
+| 8    | `client.ExternalRuns().Report(...)` | Upload the run shape to Mockarty TCM as a synthetic case run |
 | 9    | Exit code | Non-zero on failure → `set -e` friendly |
 
 ## Run it

@@ -33,6 +33,37 @@ func TestLoadTestBasicScript(t *testing.T) {
 	}
 }
 
+func TestLoadTestMaxVUsUsesCanonicalWireSpelling(t *testing.T) {
+	profile := NewLoadTest("arrival").
+		Target("http://127.0.0.1:8080").
+		Get("/").
+		RPS(100).
+		MaxVUs(50)
+
+	script := profile.ToK6Script()
+	if !strings.Contains(script, `"maxVUs":50`) {
+		t.Fatalf("script missing canonical maxVUs: %s", script)
+	}
+	if strings.Contains(script, `"maxVus"`) {
+		t.Fatalf("script emitted legacy maxVus: %s", script)
+	}
+	raw, err := json.Marshal(profile.ToPerfConfig())
+	if err != nil {
+		t.Fatalf("marshal perf config: %v", err)
+	}
+	if !strings.Contains(string(raw), `"maxVUs":50`) || strings.Contains(string(raw), `"maxVus"`) {
+		t.Fatalf("perf config must emit canonical maxVUs only: %s", raw)
+	}
+
+	var legacy LoadConfig
+	if err := json.Unmarshal([]byte(`{"maxVus":41}`), &legacy); err != nil {
+		t.Fatalf("decode legacy maxVus input: %v", err)
+	}
+	if legacy.MaxVUs != 41 {
+		t.Fatalf("legacy maxVus input decoded as %d, want 41", legacy.MaxVUs)
+	}
+}
+
 func TestLoadTestStagesWinOverVUs(t *testing.T) {
 	cfg := NewLoadTest("ramp").
 		Target("http://x").
@@ -228,5 +259,34 @@ func TestLoadTestDrainStageTargetZero(t *testing.T) {
 	rps := NewLoadTest("t").Target("http://x").Get("/").Stages(RPSStage("10s", 100)).ToK6Script()
 	if !strings.Contains(rps, `"targetRps":100`) {
 		t.Errorf("RPS stage must emit targetRps:\n%s", rps)
+	}
+}
+
+// TestLoadTestPerEndpointChecks verifies custom per-request checks replace the
+// default status<400 assertion and that a request without checks keeps it.
+func TestLoadTestPerEndpointChecks(t *testing.T) {
+	script := NewLoadTest("checks").Target("http://x").
+		Post("/order", map[string]any{"sku": "a"}).ExpectStatus(201).Check("has id", "res.json().id !== undefined").
+		Get("/health").
+		ToK6Script()
+
+	want := "  check(r, { 'status is 201': (res) => res.status === 201, 'has id': (res) => res.json().id !== undefined });"
+	if !strings.Contains(script, want) {
+		t.Errorf("custom check line missing.\nwant: %s\ngot script:\n%s", want, script)
+	}
+	// The second request (no checks) keeps the default.
+	if !strings.Contains(script, "check(r, { 'status < 400': (res) => res.status < 400 });") {
+		t.Errorf("default check missing for uncustomised request:\n%s", script)
+	}
+}
+
+// TestLoadTestCheckNoRequestIsNoop guards Check/ExpectStatus called before any
+// request — must not panic and must not emit a stray check.
+func TestLoadTestCheckNoRequestIsNoop(t *testing.T) {
+	// No request added yet; Check is a no-op, Target-only build uses the
+	// default GET "/" which still gets the default check.
+	script := NewLoadTest("t").Target("http://x").Check("x", "true").ExpectStatus(200).ToK6Script()
+	if !strings.Contains(script, "check(r, { 'status < 400'") {
+		t.Errorf("expected default check on the implicit GET / request:\n%s", script)
 	}
 }

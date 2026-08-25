@@ -87,6 +87,16 @@ func main() {
 			fmt.Printf("  %s: %v\n", key, val)
 		}
 	}
+	catalog, err := client.Stats().ListCapabilities(ctx)
+	if err != nil {
+		fmt.Printf("List capabilities returned: %v\n", err)
+	} else {
+		fmt.Printf("Canonical capabilities: %d\n", catalog.Count)
+		for _, capability := range catalog.Capabilities {
+			fmt.Printf("  %s@%s (%s, available=%t)\n", capability.Key, capability.Version,
+				capability.Policy.SideEffect, capability.Availability.Available)
+		}
+	}
 
 	// -----------------------------------------------------------------------
 	// 5. Health check (from HealthAPI)

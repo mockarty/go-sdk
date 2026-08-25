@@ -22,6 +22,12 @@ const (
 	headerRequestID  = "X-Request-Id"
 )
 
+type requestHeadersContextKey struct{}
+
+func withRequestHeaders(ctx context.Context, headers map[string]string) context.Context {
+	return context.WithValue(ctx, requestHeadersContextKey{}, headers)
+}
+
 // Client is the Mockarty API client.
 // Create one using NewClient and reuse it across goroutines.
 type Client struct {
@@ -33,41 +39,51 @@ type Client struct {
 	maxRetries int
 	retryDelay time.Duration
 
-	// Sub-API singletons (lazy-initialized through accessor methods)
-	mockAPI              *MockAPI
-	namespaceAPI         *NamespaceAPI
-	storeAPI             *StoreAPI
-	collectionAPI        *CollectionAPI
-	perfAPI              *PerfAPI
-	healthAPI            *HealthAPI
-	generatorAPI         *GeneratorAPI
-	fuzzingAPI           *FuzzingAPI
-	contractAPI          *ContractAPI
-	recorderAPI          *RecorderAPI
-	templateAPI          *TemplateAPI
-	importAPI            *ImportAPI
-	testRunAPI           *TestRunAPI
-	tagAPI               *TagAPI
-	uiTestAPI            *UITestAPI
-	gitSyncAPI           *GitSyncAPI
-	folderAPI            *FolderAPI
-	undefinedAPI         *UndefinedAPI
-	statsAPI             *StatsAPI
-	agentTaskAPI         *AgentTaskAPI
-	namespaceSettingsAPI *NamespaceSettingsAPI
-	proxyAPI             *ProxyAPI
-	environmentAPI       *EnvironmentAPI
-	chaosAPI             *ChaosAPI
-	testPlansAPI         *TestPlansAPI
-	entitySearchAPI      *EntitySearchAPI
-	secretsAPI           *SecretsAPI
-	promptsAPI           *PromptsAPI
-	meAPI                *MeAPI
-	externalRunsAPI      *ExternalRunsAPI
-	flowRunsAPI          *FlowRunsAPI
-	discoveryAPI         *DiscoveryAPI
-	economicsAPI         *EconomicsAPI
-	llmSecurityAPI       *LLMSecurityAPI
+	// Sub-API singletons, all eagerly initialized in NewClient.
+	mockAPI                *MockAPI
+	namespaceAPI           *NamespaceAPI
+	storeAPI               *StoreAPI
+	collectionAPI          *CollectionAPI
+	perfAPI                *PerfAPI
+	healthAPI              *HealthAPI
+	generatorAPI           *GeneratorAPI
+	fuzzingAPI             *FuzzingAPI
+	contractAPI            *ContractAPI
+	recorderAPI            *RecorderAPI
+	templateAPI            *TemplateAPI
+	importAPI              *ImportAPI
+	testRunAPI             *TestRunAPI
+	tagAPI                 *TagAPI
+	uiTestAPI              *UITestAPI
+	gitSyncAPI             *GitSyncAPI
+	folderAPI              *FolderAPI
+	undefinedAPI           *UndefinedAPI
+	statsAPI               *StatsAPI
+	agentTaskAPI           *AgentTaskAPI
+	issueTrackerAPI        *IssueTrackerAPI
+	mcpAPI                 *MCPAPI
+	namespaceSettingsAPI   *NamespaceSettingsAPI
+	proxyAPI               *ProxyAPI
+	environmentAPI         *EnvironmentAPI
+	chaosAPI               *ChaosAPI
+	testPlansAPI           *TestPlansAPI
+	entitySearchAPI        *EntitySearchAPI
+	secretsAPI             *SecretsAPI
+	promptsAPI             *PromptsAPI
+	meAPI                  *MeAPI
+	externalRunsAPI        *ExternalRunsAPI
+	flowRunsAPI            *FlowRunsAPI
+	discoveryAPI           *DiscoveryAPI
+	experienceAPI          *ExperienceAPI
+	economicsAPI           *EconomicsAPI
+	cloudWebhooksAPI       *CloudWebhooksAPI
+	cloudSpacesAPI         *CloudSpacesAPI
+	cloudEntitlementsAPI   *CloudEntitlementsAPI
+	autonomousMissionsAPI  *AutonomousMissionsAPI
+	workflowDefinitionsAPI *WorkflowDefinitionsAPI
+	coderDeliveryAPI       *CoderDeliveryAPI
+	deliveryPolicyAPI      *DeliveryPolicyAPI
+	llmSecurityAPI         *LLMSecurityAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -120,6 +136,8 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.undefinedAPI = &UndefinedAPI{client: c}
 	c.statsAPI = &StatsAPI{client: c}
 	c.agentTaskAPI = &AgentTaskAPI{client: c}
+	c.issueTrackerAPI = &IssueTrackerAPI{client: c}
+	c.mcpAPI = &MCPAPI{client: c, endpoint: c.baseURL + "/mcp"}
 	c.namespaceSettingsAPI = &NamespaceSettingsAPI{client: c}
 	c.proxyAPI = &ProxyAPI{client: c}
 	c.environmentAPI = &EnvironmentAPI{client: c}
@@ -132,7 +150,15 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.externalRunsAPI = &ExternalRunsAPI{client: c}
 	c.flowRunsAPI = &FlowRunsAPI{client: c}
 	c.discoveryAPI = &DiscoveryAPI{client: c}
+	c.experienceAPI = &ExperienceAPI{client: c}
 	c.economicsAPI = &EconomicsAPI{client: c}
+	c.cloudWebhooksAPI = &CloudWebhooksAPI{client: c}
+	c.cloudSpacesAPI = &CloudSpacesAPI{client: c}
+	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
+	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
+	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
+	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
+	c.deliveryPolicyAPI = &DeliveryPolicyAPI{client: c}
 	c.llmSecurityAPI = &LLMSecurityAPI{client: c}
 
 	return c
@@ -151,8 +177,33 @@ func (c *Client) FlowRuns() *FlowRunsAPI { return c.flowRunsAPI }
 // etc.) into the Mockarty catalogue. See sdk/go-sdk/api_discovery.go.
 func (c *Client) Discovery() *DiscoveryAPI { return c.discoveryAPI }
 
+// Experience returns the reusable run-experience search and record API.
+func (c *Client) Experience() *ExperienceAPI { return c.experienceAPI }
+
 // Economics returns the administrator LLM usage and immutable price-book API.
 func (c *Client) Economics() *EconomicsAPI { return c.economicsAPI }
+
+// WorkflowDefinitions returns the versioned workflow authoring API.
+func (c *Client) WorkflowDefinitions() *WorkflowDefinitionsAPI { return c.workflowDefinitionsAPI }
+
+// CloudWebhooks returns the curated Cloud webhook lifecycle API.
+func (c *Client) CloudWebhooks() *CloudWebhooksAPI { return c.cloudWebhooksAPI }
+
+// CloudSpaces returns the explicit Space collaboration API.
+func (c *Client) CloudSpaces() *CloudSpacesAPI { return c.cloudSpacesAPI }
+
+// CloudEntitlements returns the committed Cloud entitlement projection API.
+func (c *Client) CloudEntitlements() *CloudEntitlementsAPI { return c.cloudEntitlementsAPI }
+
+// AutonomousMissions returns the API used to submit and supervise autonomous
+// testing missions.
+func (c *Client) AutonomousMissions() *AutonomousMissionsAPI { return c.autonomousMissionsAPI }
+
+// CoderDelivery returns the admitted-repository and deployment mission API.
+func (c *Client) CoderDelivery() *CoderDeliveryAPI { return c.coderDeliveryAPI }
+
+// DeliveryPolicy returns the administrator environment-policy API.
+func (c *Client) DeliveryPolicy() *DeliveryPolicyAPI { return c.deliveryPolicyAPI }
 
 // LLMSecurity returns the layered prompt-security management API.
 func (c *Client) LLMSecurity() *LLMSecurityAPI { return c.llmSecurityAPI }
@@ -227,6 +278,9 @@ func (c *Client) Stats() *StatsAPI { return c.statsAPI }
 
 // AgentTasks returns the Agent Task API for managing AI agent tasks.
 func (c *Client) AgentTasks() *AgentTaskAPI { return c.agentTaskAPI }
+
+// IssueTracker returns the issue-tracker task-automation API.
+func (c *Client) IssueTracker() *IssueTrackerAPI { return c.issueTrackerAPI }
 
 // NamespaceSettings returns the Namespace Settings API.
 func (c *Client) NamespaceSettings() *NamespaceSettingsAPI { return c.namespaceSettingsAPI }
@@ -376,6 +430,13 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 			req.Header.Set("Content-Type", contentType)
 		}
 		req.Header.Set("Accept", "application/json")
+		if headers, ok := ctx.Value(requestHeadersContextKey{}).(map[string]string); ok {
+			for name, value := range headers {
+				if value != "" {
+					req.Header.Set(name, value)
+				}
+			}
+		}
 
 		if c.apiKey != "" {
 			req.Header.Set(headerAPIKey, c.apiKey)

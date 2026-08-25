@@ -146,9 +146,7 @@ func (s *WSStep) SendBinary(b []byte) *WSStep {
 
 // ExpectConnected asserts the WS handshake succeeded.
 func (s *WSStep) ExpectConnected() *WSStep {
-	if !s.ensureSent() {
-		// fall through — dial error already recorded as failure
-	}
+	_ = s.ensureSent() // a dial error is recorded below as the assertion failure
 	if s.dialErr != nil {
 		s.fail(fmt.Sprintf("ExpectConnected: %v", s.dialErr))
 	}

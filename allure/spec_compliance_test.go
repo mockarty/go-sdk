@@ -99,7 +99,9 @@ func TestTestCaseID_IsMD5OfFullName(t *testing.T) {
 		t.Errorf("testCaseId = %q, want md5(fullName) = %q", got, want)
 	}
 	// Independent of parameters: two different param sets, one testCaseId.
-	if computeTestCaseID(fn) != computeTestCaseID(fn) {
+	first := computeTestCaseID(fn)
+	second := computeTestCaseID(fn)
+	if first != second {
 		t.Error("testCaseId not stable")
 	}
 }

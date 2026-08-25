@@ -407,9 +407,7 @@ func parseSSE(r io.Reader) []SSEEvent {
 			field = line
 			value = ""
 		}
-		if strings.HasPrefix(value, " ") {
-			value = value[1:]
-		}
+		value = strings.TrimPrefix(value, " ")
 		switch field {
 		case "event":
 			cur.Event = value

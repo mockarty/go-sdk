@@ -6,35 +6,38 @@ package pact
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"sync/atomic"
 )
 
-// MockServer is the in-process consumer-side mock backed by
-// httptest.Server. Lifetime is tied to one test (or sub-test) — Start
+// MockServer is the in-process consumer-side HTTP mock. Lifetime is tied to one
+// test (or sub-test) — Start
 // returns a fresh server, the test points its HTTP client at URL(),
 // then calls Verify() + Close() at teardown.
 //
 // MockServer is safe for concurrent use by multiple goroutines so
 // table-driven and parallel sub-tests can share a single mock.
 type MockServer struct {
+	mu           sync.Mutex
+	closeOnce    sync.Once
 	consumer     *Consumer
-	server       *httptest.Server
+	server       *http.Server
 	interactions []*recordedInteraction
+	serveDone    chan error
+	url          string
 	// unmatched accumulates the structured failure reports for every
 	// request that did not match any declared interaction. The slice is
 	// the source of truth for Verify() — it returns one error per
 	// unmatched request, with the full per-matcher mismatch breakdown.
 	unmatched []UnmatchedRequest
-	mu        sync.Mutex
-	closeOnce sync.Once
 	closed    atomic.Bool
 }
 
@@ -59,9 +62,10 @@ type recordedInteraction struct {
 	called   int64
 }
 
-// newMockServer wires the http.Handler that serves declared
-// interactions, starts the underlying httptest.Server, and returns a
-// MockServer ready to use.
+// newMockServer wires the http.Handler that serves declared interactions and
+// starts a loopback-only server. We own the server instead of httptest.Server so
+// Close can gracefully wait for this server's handlers without the process-wide
+// http.DefaultTransport.CloseIdleConnections side effect in httptest.Close.
 func newMockServer(c *Consumer, snapshot []Interaction) (*MockServer, error) {
 	ms := &MockServer{consumer: c}
 	for i := range snapshot {
@@ -74,7 +78,21 @@ func newMockServer(c *Consumer, snapshot []Interaction) (*MockServer, error) {
 		ms.interactions = append(ms.interactions, rec)
 	}
 	handler := http.HandlerFunc(ms.serve)
-	ms.server = httptest.NewServer(handler)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("pact: listen for mock server: %w", err)
+	}
+	ms.server = &http.Server{Handler: handler}
+	ms.serveDone = make(chan error, 1)
+	ms.url = "http://" + listener.Addr().String()
+	go func() {
+		err := ms.server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		ms.serveDone <- err
+		close(ms.serveDone)
+	}()
 	return ms, nil
 }
 
@@ -86,7 +104,7 @@ func (s *MockServer) URL() string {
 	if s.closed.Load() {
 		panic("pact: MockServer.URL called after Close")
 	}
-	return s.server.URL
+	return s.url
 }
 
 // Verify returns an error if any declared interaction was never hit,
@@ -154,10 +172,18 @@ func (s *MockServer) UnmatchedRequests() []UnmatchedRequest {
 func (s *MockServer) Close() error {
 	var firstErr error
 	s.closeOnce.Do(func() {
-		s.server.Close()
+		// Shutdown stops accepting new work and waits for every active handler.
+		// Only after that fence is it safe to finalize the consumer and write the
+		// pact artifact: otherwise an in-flight match can race the snapshot.
 		s.closed.Store(true)
+		if err := s.server.Shutdown(context.Background()); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			firstErr = fmt.Errorf("pact: close mock server: %w", err)
+		}
+		if err := <-s.serveDone; err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("pact: serve mock server: %w", err)
+		}
 		s.consumer.finalize()
-		if _, err := WritePactFile(s.consumer); err != nil {
+		if _, err := WritePactFile(s.consumer); err != nil && firstErr == nil {
 			firstErr = err
 		}
 	})

@@ -14,7 +14,7 @@ import (
 
 // makeVarint produces the byte sequence for one VARINT tag+value.
 func makeVarint(field int, value uint64) []byte {
-	tag := uint64(field)<<3 | 0 // wire type 0
+	tag := uint64(field) << 3 // wire type 0
 	out := []byte{}
 	out = appendVarint(out, tag)
 	out = appendVarint(out, value)

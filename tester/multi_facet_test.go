@@ -5,6 +5,7 @@
 package tester
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -34,7 +35,7 @@ func TestMultiFacetFlow(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"token": "tok-42"})
 		case "/me":
 			if r.Header.Get("Authorization") != "Bearer tok-42" {
-				http.Error(w, "unauthorized", 401)
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"user": "alice"})
@@ -121,7 +122,7 @@ func TestMultiFacetFlow(t *testing.T) {
 	}
 
 	// Verify the token interpolated into the Kafka key.
-	msgs, _ := kfk.Consume(nil, kafka.ConsumeOptions{Topic: "user.events", MaxMessages: 1})
+	msgs, _ := kfk.Consume(context.Background(), kafka.ConsumeOptions{Topic: "user.events", MaxMessages: 1})
 	if len(msgs) != 1 || msgs[0].Key != "k-tok-42" {
 		t.Fatalf("kafka key interpolation failed: %+v", msgs)
 	}

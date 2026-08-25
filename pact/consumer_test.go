@@ -223,7 +223,7 @@ func TestStartTwiceReusesConsumerState(t *testing.T) {
 func TestStartNilContextRejected(t *testing.T) {
 	t.Parallel()
 	c := pact.NewConsumer("A")
-	//nolint:staticcheck // explicit nil to assert defensive return
+	//lint:ignore SA1012 explicit nil asserts the public defensive guard
 	if _, err := c.Start(nil); err == nil {
 		t.Fatalf("nil context should error")
 	}

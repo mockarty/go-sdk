@@ -38,6 +38,7 @@ func main() {
 	// The AI agent can generate mocks, analyze APIs, suggest test scenarios,
 	// and more. Provide a natural language prompt describing what you need.
 	task, err := client.AgentTasks().Submit(ctx, &mockarty.AgentTask{
+		Title: "Generate user-management mocks",
 		Prompt: "Create a REST API mock for a user management service with " +
 			"CRUD endpoints: GET /users, GET /users/:id, POST /users, " +
 			"PUT /users/:id, DELETE /users/:id. Each endpoint should return " +
@@ -70,6 +71,17 @@ func main() {
 		}
 
 		time.Sleep(2 * time.Second)
+	}
+	if detail, detailErr := client.AgentTasks().Get(ctx, task.ID); detailErr == nil {
+		for _, receipt := range detail.ToolReceipts {
+			if receipt.Status == "awaiting_reconcile" {
+				fmt.Printf("External action %s needs review (version %d); inspect the downstream system before reconciling it.\n",
+					receipt.ToolName, receipt.Version)
+				if !detail.CanReconcileToolReceipts {
+					fmt.Println("The task owner's user needs Coder Deploy permission and the task must be stopped before recording a decision.")
+				}
+			}
+		}
 	}
 
 	// -----------------------------------------------------------------------
