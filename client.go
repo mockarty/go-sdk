@@ -84,6 +84,7 @@ type Client struct {
 	coderDeliveryAPI       *CoderDeliveryAPI
 	deliveryPolicyAPI      *DeliveryPolicyAPI
 	llmSecurityAPI         *LLMSecurityAPI
+	pageAnalyzerAPI        *PageAnalyzerAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -160,6 +161,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
 	c.deliveryPolicyAPI = &DeliveryPolicyAPI{client: c}
 	c.llmSecurityAPI = &LLMSecurityAPI{client: c}
+	c.pageAnalyzerAPI = &PageAnalyzerAPI{client: c}
 
 	return c
 }
@@ -167,6 +169,9 @@ func NewClient(baseURL string, opts ...Option) *Client {
 // ExternalRuns returns the external-runs upload API — used to ship
 // arbitrary test results (e.g. fluent Tester DSL output) into TCM.
 func (c *Client) ExternalRuns() *ExternalRunsAPI { return c.externalRunsAPI }
+
+// PageAnalyzer returns the HTTP-level page analysis API.
+func (c *Client) PageAnalyzer() *PageAnalyzerAPI { return c.pageAnalyzerAPI }
 
 // FlowRuns returns the client for POST /api/v1/api-tester/flow-runs —
 // the server-side IR runner. See sdk/go-sdk/api_flow_runs.go for usage.
