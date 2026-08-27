@@ -25,9 +25,8 @@ func main() {
 		log.Fatal(err)
 	}
 	started, err := api.Start(ctx, mockarty.MissionStartRequest{
-		Goal:                   "Verify the checkout API and fuzz the payment endpoint",
+		Goal:                   "Take the checkout release to production quality and provide evidence",
 		ProductID:              productID,
-		Kind:                   "testing",
 		Autonomy:               "auto",
 		BudgetTokensTotal:      100000,
 		ExpectedSettingsDigest: settings.SettingsDigest,

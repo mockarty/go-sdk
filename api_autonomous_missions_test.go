@@ -126,6 +126,12 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 			if body["goal"] != "ship checkout" || body["productId"] != "product/checkout" || body["expectedSettingsDigest"] != digest {
 				t.Fatalf("start body = %#v", body)
 			}
+			if _, present := body["kind"]; present {
+				t.Fatalf("goal-first start sent executor kind: %#v", body)
+			}
+			if _, present := body["chain"]; present {
+				t.Fatalf("goal-first start sent executor chain: %#v", body)
+			}
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"created": true,
@@ -143,7 +149,7 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 	if err != nil || settings.SettingsDigest != digest || len(settings.Settings) != 1 || !settings.Settings[0].RuntimeApplied {
 		t.Fatalf("effective settings = %+v err=%v", settings, err)
 	}
-	started, err := api.Start(ctx, MissionStartRequest{Goal: " ship checkout ", ProductID: "product/checkout", Kind: "testing", ExpectedSettingsDigest: digest})
+	started, err := api.Start(ctx, MissionStartRequest{Goal: " ship checkout ", ProductID: "product/checkout", ExpectedSettingsDigest: digest})
 	if err != nil || !started.Created || started.Mission.ID != "m-unified" {
 		t.Fatalf("start = %+v err=%v", started, err)
 	}

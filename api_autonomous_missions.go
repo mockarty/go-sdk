@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// AutonomousMissionsAPI submits and supervises durable autonomous testing missions.
+// AutonomousMissionsAPI submits and supervises durable goal-first autonomous missions.
 type AutonomousMissionsAPI struct{ client *Client }
 
 var missionSettingsDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -48,7 +48,9 @@ type MissionEffectiveSettings struct {
 	Count          int                       `json:"count"`
 }
 
-// MissionStartRequest starts a mission in the unified /api/v1/missions ledger.
+// MissionStartRequest starts a goal-first mission in the unified ledger. Kind
+// and Chain are compatibility overrides; omit them to let Mockarty plan the
+// required capability graph from Goal.
 type MissionStartRequest struct {
 	Data                   map[string]any `json:"data,omitempty"`
 	Namespace              string         `json:"namespace,omitempty"`
