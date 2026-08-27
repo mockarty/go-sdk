@@ -102,6 +102,39 @@ type MissionStartResponse struct {
 	Created bool           `json:"created"`
 }
 
+// MissionCancelRequest is the durable operator intent accepted by Cancel.
+// Reuse IdempotencyKey after a lost response to receive the original receipt.
+type MissionCancelRequest struct {
+	Reason         string `json:"reason,omitempty"`
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+}
+
+// MissionControlReceipt is the public, restart-stable control projection.
+type MissionControlReceipt struct {
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
+	CommittedAt      *time.Time `json:"committedAt,omitempty"`
+	ResolvedAt       *time.Time `json:"resolvedAt,omitempty"`
+	ID               string     `json:"id"`
+	MissionID        string     `json:"missionId"`
+	IdempotencyKey   string     `json:"idempotencyKey"`
+	Action           string     `json:"action"`
+	Phase            string     `json:"phase"`
+	Outcome          string     `json:"outcome"`
+	Reason           string     `json:"reason"`
+	Resolution       string     `json:"resolution,omitempty"`
+	ResolvedBy       string     `json:"resolvedBy,omitempty"`
+	ResolutionReason string     `json:"resolutionReason,omitempty"`
+}
+
+// MissionControlResponse returns the current mission and its durable receipt.
+type MissionControlResponse struct {
+	Error   map[string]any        `json:"error,omitempty"`
+	Mission UnifiedMission        `json:"mission"`
+	Control MissionControlReceipt `json:"control"`
+	Pending bool                  `json:"pending,omitempty"`
+}
+
 // AutonomousMissionBudgetHint is the wire budget accepted by mission intake.
 type AutonomousMissionBudgetHint struct {
 	USDCap       float64 `json:"usd_cap,omitempty"`
@@ -249,6 +282,25 @@ func (a *AutonomousMissionsAPI) Start(ctx context.Context, req MissionStartReque
 	var out MissionStartResponse
 	if err := a.client.do(ctx, http.MethodPost, "/api/v1/missions", req, &out); err != nil {
 		return MissionStartResponse{}, err
+	}
+	if out.Mission.Chain == nil {
+		out.Mission.Chain = []map[string]any{}
+	}
+	return out, nil
+}
+
+// Cancel durably stops a unified mission and every unfinished component.
+func (a *AutonomousMissionsAPI) Cancel(ctx context.Context, missionID string, req MissionCancelRequest) (MissionControlResponse, error) {
+	missionID = strings.TrimSpace(missionID)
+	if missionID == "" {
+		return MissionControlResponse{}, fmt.Errorf("mockarty: mission cancel: mission id is required")
+	}
+	req.Reason = strings.TrimSpace(req.Reason)
+	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
+	var out MissionControlResponse
+	path := "/api/v1/missions/" + url.PathEscape(missionID) + "/cancel"
+	if err := a.client.do(ctx, http.MethodPost, path, req, &out); err != nil {
+		return MissionControlResponse{}, err
 	}
 	if out.Mission.Chain == nil {
 		out.Mission.Chain = []map[string]any{}

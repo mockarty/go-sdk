@@ -137,6 +137,18 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 				"created": true,
 				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "productId": "product/checkout", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "queued", "chain": []map[string]any{}},
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/missions/m-unified/cancel":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["reason"] != "release withdrawn" || body["idempotencyKey"] != "cancel-1" {
+				t.Fatalf("cancel body = %#v", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "canceled", "chain": []map[string]any{}},
+				"control": map[string]any{"id": "control-1", "missionId": "m-unified", "idempotencyKey": "cancel-1", "action": "cancel", "phase": "committed", "outcome": "applied", "reason": "release withdrawn", "createdAt": "2026-08-27T00:00:00Z", "updatedAt": "2026-08-27T00:00:01Z"},
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -156,8 +168,15 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 	if started.Mission.Chain == nil {
 		t.Fatal("start response chain must be non-nil")
 	}
-	if calls != 2 {
-		t.Fatalf("calls=%d, want 2", calls)
+	cancelled, err := api.Cancel(ctx, started.Mission.ID, MissionCancelRequest{
+		Reason: " release withdrawn ", IdempotencyKey: " cancel-1 ",
+	})
+	if err != nil || cancelled.Control.Reason != "release withdrawn" ||
+		cancelled.Control.IdempotencyKey != "cancel-1" || cancelled.Mission.Status != "canceled" {
+		t.Fatalf("cancel = %+v err=%v", cancelled, err)
+	}
+	if calls != 3 {
+		t.Fatalf("calls=%d, want 3", calls)
 	}
 }
 
@@ -185,6 +204,9 @@ func TestAutonomousMissionsUnifiedValidationBeforeNetwork(t *testing.T) {
 		if _, err := api.Start(ctx, req); err == nil {
 			t.Fatalf("invalid unified start accepted: %+v", req)
 		}
+	}
+	if _, err := api.Cancel(ctx, " ", MissionCancelRequest{}); err == nil {
+		t.Fatal("empty cancel mission id accepted")
 	}
 	if calls != 0 {
 		t.Fatalf("validation issued %d network calls", calls)

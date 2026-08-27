@@ -35,4 +35,14 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("mission=%s status=%s created=%t\n", started.Mission.ID, started.Mission.Status, started.Created)
+	if os.Getenv("MOCKARTY_EXAMPLE_CANCEL") == "1" {
+		cancelled, cancelErr := api.Cancel(ctx, started.Mission.ID, mockarty.MissionCancelRequest{
+			Reason: "example run no longer needed", IdempotencyKey: "autonomous-missions-example-cancel",
+		})
+		if cancelErr != nil {
+			log.Fatal(cancelErr)
+		}
+		fmt.Printf("cancel receipt=%s outcome=%s reason=%s\n",
+			cancelled.Control.ID, cancelled.Control.Outcome, cancelled.Control.Reason)
+	}
 }
