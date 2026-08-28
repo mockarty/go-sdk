@@ -72,9 +72,8 @@ func (a *CloudEntitlementsAPI) Get(ctx context.Context, spaceID string) (*CloudE
 		return nil, fmt.Errorf("mockarty: Space id is required")
 	}
 	values := url.Values{"space_id": []string{spaceID}}
-	headers := map[string]string{"Authorization": "Bearer " + a.client.apiKey}
 	var out CloudEntitlementProjection
-	err := a.client.do(withRequestHeaders(ctx, headers), http.MethodGet,
+	err := a.client.do(ctx, http.MethodGet,
 		"/api/v1/cloud/entitlements?"+values.Encode(), nil, &out)
 	return &out, err
 }
