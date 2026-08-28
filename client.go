@@ -87,7 +87,6 @@ type Client struct {
 	cloudWebhooksAPI       *CloudWebhooksAPI
 	cloudSpacesAPI         *CloudSpacesAPI
 	cloudEntitlementsAPI   *CloudEntitlementsAPI
-	cloudSharedProjectsAPI *CloudSharedProjectsAPI
 	autonomousMissionsAPI  *AutonomousMissionsAPI
 	workflowDefinitionsAPI *WorkflowDefinitionsAPI
 	coderDeliveryAPI       *CoderDeliveryAPI
@@ -165,7 +164,6 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudWebhooksAPI = &CloudWebhooksAPI{client: c}
 	c.cloudSpacesAPI = &CloudSpacesAPI{client: c}
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
-	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
@@ -209,9 +207,6 @@ func (c *Client) CloudSpaces() *CloudSpacesAPI { return c.cloudSpacesAPI }
 
 // CloudEntitlements returns the committed Cloud entitlement projection API.
 func (c *Client) CloudEntitlements() *CloudEntitlementsAPI { return c.cloudEntitlementsAPI }
-
-// CloudSharedProjects returns the public Shared SaaS project CRUD API.
-func (c *Client) CloudSharedProjects() *CloudSharedProjectsAPI { return c.cloudSharedProjectsAPI }
 
 // AutonomousMissions returns the API used to submit and supervise autonomous
 // testing missions.
