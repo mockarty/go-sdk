@@ -37,7 +37,7 @@ func TestCloudSharedProjectsCRUDUsesPublicCloudProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	const createRequestID = "11111111-1111-4111-8111-111111111111"
-	project, err := api.CreateWithRequestID(context.Background(), "space-a", "A", json.RawMessage(`{}`), createRequestID)
+	project, err := api.Create(context.Background(), "space-a", "A", json.RawMessage(`{}`), createRequestID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,10 @@ func TestCloudSharedProjectsRejectsNonCanonicalRequestID(t *testing.T) {
 		t.Fatal("zero-value client unexpectedly exposes an initialized API")
 	}
 	client := NewClient("http://127.0.0.1:1")
-	if _, err := client.CloudSharedProjects().CreateWithRequestID(context.Background(), "space-a", "A", json.RawMessage(`{}`), "retry"); err == nil {
+	if _, err := client.CloudSharedProjects().Create(context.Background(), "space-a", "A", json.RawMessage(`{}`), "retry"); err == nil {
 		t.Fatal("noncanonical request id accepted")
+	}
+	if _, err := client.CloudSharedProjects().Create(context.Background(), "space-a", "A", json.RawMessage(`{}`), "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"); err == nil {
+		t.Fatal("multiple request ids accepted")
 	}
 }

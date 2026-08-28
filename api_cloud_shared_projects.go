@@ -30,7 +30,14 @@ type CloudSharedProjectPage struct {
 	HasMore    bool                 `json:"has_more"`
 }
 
-func (a *CloudSharedProjectsAPI) mutationContext(ctx context.Context, requestID string) (context.Context, error) {
+func (a *CloudSharedProjectsAPI) mutationContext(ctx context.Context, requestIDs ...string) (context.Context, error) {
+	if len(requestIDs) > 1 {
+		return nil, fmt.Errorf("mockarty: at most one request id is allowed")
+	}
+	requestID := uuid.NewString()
+	if len(requestIDs) == 1 {
+		requestID = requestIDs[0]
+	}
 	parsed, err := uuid.Parse(requestID)
 	if err != nil || parsed.String() != requestID {
 		return nil, fmt.Errorf("mockarty: request id must be a canonical UUID")
@@ -84,18 +91,14 @@ func (a *CloudSharedProjectsAPI) Get(ctx context.Context, spaceID, projectID str
 	return &out, err
 }
 
-func (a *CloudSharedProjectsAPI) Create(ctx context.Context, spaceID, name string, body json.RawMessage) (*CloudSharedProject, error) {
-	return a.CreateWithRequestID(ctx, spaceID, name, body, uuid.NewString())
-}
-
-// CreateWithRequestID creates a project with a stable operation UUID. Reuse
-// the same UUID only for the exact same create after an ambiguous response.
-func (a *CloudSharedProjectsAPI) CreateWithRequestID(ctx context.Context, spaceID, name string, body json.RawMessage, requestID string) (*CloudSharedProject, error) {
+// Create creates a project. Pass one stable request ID only when an exact
+// create must be retried after an ambiguous response.
+func (a *CloudSharedProjectsAPI) Create(ctx context.Context, spaceID, name string, body json.RawMessage, requestID ...string) (*CloudSharedProject, error) {
 	path, err := cloudSharedProjectPath(spaceID, "")
 	if err != nil {
 		return nil, err
 	}
-	ctx, err = a.mutationContext(ctx, requestID)
+	ctx, err = a.mutationContext(ctx, requestID...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,17 +107,14 @@ func (a *CloudSharedProjectsAPI) CreateWithRequestID(ctx context.Context, spaceI
 	return &out, err
 }
 
-func (a *CloudSharedProjectsAPI) Update(ctx context.Context, spaceID string, project CloudSharedProject) (*CloudSharedProject, error) {
-	return a.UpdateWithRequestID(ctx, spaceID, project, uuid.NewString())
-}
-
-// UpdateWithRequestID updates a project and supplies an audit-correlation UUID.
-func (a *CloudSharedProjectsAPI) UpdateWithRequestID(ctx context.Context, spaceID string, project CloudSharedProject, requestID string) (*CloudSharedProject, error) {
+// Update updates a project. An optional stable request ID supplies audit
+// correlation for an exact retry without adding a second SDK operation.
+func (a *CloudSharedProjectsAPI) Update(ctx context.Context, spaceID string, project CloudSharedProject, requestID ...string) (*CloudSharedProject, error) {
 	path, err := cloudSharedProjectPath(spaceID, project.ID)
 	if err != nil {
 		return nil, err
 	}
-	ctx, err = a.mutationContext(ctx, requestID)
+	ctx, err = a.mutationContext(ctx, requestID...)
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +123,9 @@ func (a *CloudSharedProjectsAPI) UpdateWithRequestID(ctx context.Context, spaceI
 	return &out, err
 }
 
-func (a *CloudSharedProjectsAPI) Delete(ctx context.Context, spaceID, projectID string, revision int64) error {
-	return a.DeleteWithRequestID(ctx, spaceID, projectID, revision, uuid.NewString())
-}
-
-// DeleteWithRequestID deletes a project and supplies an audit-correlation UUID.
-func (a *CloudSharedProjectsAPI) DeleteWithRequestID(ctx context.Context, spaceID, projectID string, revision int64, requestID string) error {
+// Delete deletes a project. An optional stable request ID supplies audit
+// correlation for an exact retry without adding a second SDK operation.
+func (a *CloudSharedProjectsAPI) Delete(ctx context.Context, spaceID, projectID string, revision int64, requestID ...string) error {
 	path, err := cloudSharedProjectPath(spaceID, projectID)
 	if err != nil {
 		return err
@@ -136,7 +133,7 @@ func (a *CloudSharedProjectsAPI) DeleteWithRequestID(ctx context.Context, spaceI
 	if revision < 1 {
 		return fmt.Errorf("mockarty: revision must be positive")
 	}
-	ctx, err = a.mutationContext(ctx, requestID)
+	ctx, err = a.mutationContext(ctx, requestID...)
 	if err != nil {
 		return err
 	}

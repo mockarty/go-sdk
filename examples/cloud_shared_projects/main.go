@@ -18,7 +18,7 @@ func main() {
 	if requestID == "" {
 		project, err = client.CloudSharedProjects().Create(ctx, os.Getenv("MOCKARTY_SPACE_ID"), "SDK example", json.RawMessage(`{"version":1}`))
 	} else {
-		project, err = client.CloudSharedProjects().CreateWithRequestID(ctx, os.Getenv("MOCKARTY_SPACE_ID"), "SDK example", json.RawMessage(`{"version":1}`), requestID)
+		project, err = client.CloudSharedProjects().Create(ctx, os.Getenv("MOCKARTY_SPACE_ID"), "SDK example", json.RawMessage(`{"version":1}`), requestID)
 	}
 	if err != nil {
 		panic(err)
