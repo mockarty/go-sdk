@@ -15,6 +15,9 @@ func TestCloudWebhooksLifecycleAndOneTimeRotation(t *testing.T) {
 	var calls int
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		if r.Header.Get("Authorization") != "Bearer session-token" || r.Header.Get("X-API-Key") != "" {
+			t.Fatalf("credential headers: %#v", r.Header)
+		}
 		if got := r.URL.Query().Get("workspace_id"); got != "space-a" {
 			t.Fatalf("workspace_id = %q", got)
 		}

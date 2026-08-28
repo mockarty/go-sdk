@@ -73,7 +73,7 @@ func (a *CloudEntitlementsAPI) Get(ctx context.Context, spaceID string) (*CloudE
 	}
 	values := url.Values{"space_id": []string{spaceID}}
 	var out CloudEntitlementProjection
-	err := a.client.do(ctx, http.MethodGet,
+	err := a.client.do(a.client.cloudContext(ctx), http.MethodGet,
 		"/api/v1/cloud/entitlements?"+values.Encode(), nil, &out)
 	return &out, err
 }

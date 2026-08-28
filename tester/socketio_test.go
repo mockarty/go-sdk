@@ -101,7 +101,7 @@ func TestSocketIOEmitEcho(t *testing.T) {
 		Connect().
 		Emit("echo", map[string]any{"n": 1}).
 		Emit("greet", "World").
-		Collect(2 * time.Second).
+		Collect(2*time.Second).
 		ExpectConnected().
 		ExpectEvent("echo").
 		ExpectEvent("greeting").
@@ -126,7 +126,7 @@ func TestSocketIONamespace(t *testing.T) {
 		Connect().
 		Namespace("/admin").
 		Emit("echo", "ns-payload").
-		Collect(2 * time.Second).
+		Collect(2*time.Second).
 		ExpectConnected().
 		ExpectEvent("echo").
 		ExpectEventArgContains("echo", "ns-payload")

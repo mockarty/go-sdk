@@ -13,7 +13,7 @@ func TestCloudSharedProjectsCRUDUsesPublicCloudProxy(t *testing.T) {
 	var calls []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, r.Method+" "+r.URL.RequestURI())
-		if r.Header.Get("X-API-Key") != "mk_test" || r.Header.Get("Authorization") != "" {
+		if r.Header.Get("X-API-Key") != "" || r.Header.Get("Authorization") != "Bearer mk_test" {
 			t.Fatalf("credential headers=%v", r.Header)
 		}
 		if r.Method == http.MethodDelete {

@@ -71,7 +71,7 @@ func main() {
 	t.SocketIO(socketURL).
 		Connect().
 		Emit("greet", "World").
-		Collect(2 * time.Second).
+		Collect(2*time.Second).
 		ExpectConnected().
 		ExpectEvent("greeting").
 		ExpectEventJSONPath("greeting", "$.msg", "hello World")

@@ -50,11 +50,11 @@ func main() {
 				Labels:      []string{"smoke", "auth"},
 			},
 			{
-				FullName:    "auth.login::test_locked_account",
-				Name:        "Locked account is rejected",
-				Suite:       "auth",
-				SourceRef:   "tests/auth/test_login.py:31",
-				Labels:      []string{"auth"},
+				FullName:  "auth.login::test_locked_account",
+				Name:      "Locked account is rejected",
+				Suite:     "auth",
+				SourceRef: "tests/auth/test_login.py:31",
+				Labels:    []string{"auth"},
 			},
 		},
 	}

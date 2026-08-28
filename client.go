@@ -28,6 +28,14 @@ func withRequestHeaders(ctx context.Context, headers map[string]string) context.
 	return context.WithValue(ctx, requestHeadersContextKey{}, headers)
 }
 
+func (c *Client) cloudContext(ctx context.Context) context.Context {
+	headers := map[string]string{headerAPIKey: ""}
+	if c.apiKey != "" {
+		headers["Authorization"] = "Bearer " + c.apiKey
+	}
+	return withRequestHeaders(ctx, headers)
+}
+
 // Client is the Mockarty API client.
 // Create one using NewClient and reuse it across goroutines.
 type Client struct {
@@ -440,15 +448,20 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 			req.Header.Set("Content-Type", contentType)
 		}
 		req.Header.Set("Accept", "application/json")
+		suppressAPIKey := false
 		if headers, ok := ctx.Value(requestHeadersContextKey{}).(map[string]string); ok {
 			for name, value := range headers {
+				if strings.EqualFold(name, headerAPIKey) && value == "" {
+					suppressAPIKey = true
+					continue
+				}
 				if value != "" {
 					req.Header.Set(name, value)
 				}
 			}
 		}
 
-		if c.apiKey != "" {
+		if c.apiKey != "" && !suppressAPIKey {
 			req.Header.Set(headerAPIKey, c.apiKey)
 		}
 

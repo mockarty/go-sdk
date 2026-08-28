@@ -46,7 +46,10 @@ type CloudWebhookCredential struct {
 }
 
 func (a *CloudWebhooksAPI) cloudContext(ctx context.Context, idempotencyKey string) context.Context {
-	headers := map[string]string{}
+	headers := map[string]string{headerAPIKey: ""}
+	if a.client.apiKey != "" {
+		headers["Authorization"] = "Bearer " + a.client.apiKey
+	}
 	if idempotencyKey != "" {
 		headers["Idempotency-Key"] = idempotencyKey
 	}

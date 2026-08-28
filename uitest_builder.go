@@ -81,14 +81,18 @@ func (t *UITest) Reload() *UITest             { return t.add(UIAction{Type: "rel
 
 // --- interactions -------------------------------------------------------
 
-func (t *UITest) Click(sel string) *UITest       { return t.add(UIAction{Type: "click", Selector: sel}) }
-func (t *UITest) DoubleClick(sel string) *UITest { return t.add(UIAction{Type: "dblclick", Selector: sel}) }
-func (t *UITest) RightClick(sel string) *UITest  { return t.add(UIAction{Type: "rightclick", Selector: sel}) }
-func (t *UITest) Hover(sel string) *UITest       { return t.add(UIAction{Type: "hover", Selector: sel}) }
-func (t *UITest) Focus(sel string) *UITest       { return t.add(UIAction{Type: "focus", Selector: sel}) }
-func (t *UITest) Check(sel string) *UITest       { return t.add(UIAction{Type: "check", Selector: sel}) }
-func (t *UITest) Uncheck(sel string) *UITest     { return t.add(UIAction{Type: "uncheck", Selector: sel}) }
-func (t *UITest) Clear(sel string) *UITest       { return t.add(UIAction{Type: "clear", Selector: sel}) }
+func (t *UITest) Click(sel string) *UITest { return t.add(UIAction{Type: "click", Selector: sel}) }
+func (t *UITest) DoubleClick(sel string) *UITest {
+	return t.add(UIAction{Type: "dblclick", Selector: sel})
+}
+func (t *UITest) RightClick(sel string) *UITest {
+	return t.add(UIAction{Type: "rightclick", Selector: sel})
+}
+func (t *UITest) Hover(sel string) *UITest   { return t.add(UIAction{Type: "hover", Selector: sel}) }
+func (t *UITest) Focus(sel string) *UITest   { return t.add(UIAction{Type: "focus", Selector: sel}) }
+func (t *UITest) Check(sel string) *UITest   { return t.add(UIAction{Type: "check", Selector: sel}) }
+func (t *UITest) Uncheck(sel string) *UITest { return t.add(UIAction{Type: "uncheck", Selector: sel}) }
+func (t *UITest) Clear(sel string) *UITest   { return t.add(UIAction{Type: "clear", Selector: sel}) }
 func (t *UITest) ScrollIntoView(sel string) *UITest {
 	return t.add(UIAction{Type: "scrollIntoView", Selector: sel})
 }
@@ -151,8 +155,8 @@ func (t *UITest) AssertTitle(substr string) *UITest {
 
 // --- misc ---------------------------------------------------------------
 
-func (t *UITest) WaitFor(sel string) *UITest    { return t.add(UIAction{Type: "waitFor", Selector: sel}) }
-func (t *UITest) Screenshot() *UITest           { return t.add(UIAction{Type: "screenshot"}) }
+func (t *UITest) WaitFor(sel string) *UITest { return t.add(UIAction{Type: "waitFor", Selector: sel}) }
+func (t *UITest) Screenshot() *UITest        { return t.add(UIAction{Type: "screenshot"}) }
 func (t *UITest) VisualCheck(sel string) *UITest {
 	return t.add(UIAction{Type: "visualCheck", Selector: sel})
 }

@@ -311,4 +311,3 @@ func FuzzParseMessagePactDoc(f *testing.F) {
 		_, _ = parseMessagePactDoc(raw)
 	})
 }
-

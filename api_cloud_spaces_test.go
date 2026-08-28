@@ -15,6 +15,9 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 	var paths []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.Method+" "+r.URL.RequestURI())
+		if r.Header.Get("Authorization") != "Bearer cloud-token" || r.Header.Get("X-API-Key") != "" {
+			t.Fatalf("credential headers: %#v", r.Header)
+		}
 		if r.Method != http.MethodGet {
 			if r.Header.Get("Idempotency-Key") != "retry-1" || r.Header.Get("If-Match") != `"space-s1-r7"` {
 				t.Fatalf("mutation headers: %#v", r.Header)

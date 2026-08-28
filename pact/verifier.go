@@ -237,7 +237,7 @@ func (v *Verifier) PublishResults(ctx context.Context, consumer, provider, versi
 		return errors.New("pact: PublishResults requires a result")
 	}
 	payload := map[string]any{
-		"success":           res.OK(),
+		"success":                    res.OK(),
 		"providerApplicationVersion": v.providerVersion,
 		"verifiedBy": map[string]any{
 			"implementation": "mockarty-go-sdk",

@@ -101,7 +101,10 @@ type CloudSpaceInvitePreview struct {
 }
 
 func (a *CloudSpacesAPI) requestContext(ctx context.Context, etag, idempotencyKey string) context.Context {
-	headers := map[string]string{}
+	headers := map[string]string{headerAPIKey: ""}
+	if a.client.apiKey != "" {
+		headers["Authorization"] = "Bearer " + a.client.apiKey
+	}
 	if etag != "" {
 		headers["If-Match"] = etag
 	}

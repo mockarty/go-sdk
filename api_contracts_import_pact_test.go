@@ -50,8 +50,8 @@ func TestParsePactMeta(t *testing.T) {
 			wantVersion: "4.0",
 		},
 		{
-			name: "missing consumer rejected",
-			pact: `{"provider":{"name":"P"},"interactions":[]}`,
+			name:    "missing consumer rejected",
+			pact:    `{"provider":{"name":"P"},"interactions":[]}`,
 			wantErr: true,
 		},
 		{

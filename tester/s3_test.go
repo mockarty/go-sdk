@@ -14,7 +14,7 @@ import (
 
 // fakeS3 is an in-memory S3Client — no real endpoint required.
 type fakeS3 struct {
-	objects map[string]fakeObj // key "bucket/key"
+	objects  map[string]fakeObj // key "bucket/key"
 	forceErr error
 }
 

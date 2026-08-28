@@ -52,7 +52,7 @@ func (a *CloudSharedProjectsAPI) List(ctx context.Context, spaceID, cursor strin
 		query.Set("cursor", cursor)
 	}
 	var out CloudSharedProjectPage
-	err = a.client.do(ctx, http.MethodGet, path+"?"+query.Encode(), nil, &out)
+	err = a.client.do(a.client.cloudContext(ctx), http.MethodGet, path+"?"+query.Encode(), nil, &out)
 	return &out, err
 }
 
@@ -62,7 +62,7 @@ func (a *CloudSharedProjectsAPI) Get(ctx context.Context, spaceID, projectID str
 		return nil, err
 	}
 	var out CloudSharedProject
-	err = a.client.do(ctx, http.MethodGet, path, nil, &out)
+	err = a.client.do(a.client.cloudContext(ctx), http.MethodGet, path, nil, &out)
 	return &out, err
 }
 
@@ -72,7 +72,7 @@ func (a *CloudSharedProjectsAPI) Create(ctx context.Context, spaceID, name strin
 		return nil, err
 	}
 	var out CloudSharedProject
-	err = a.client.do(ctx, http.MethodPost, path, map[string]any{"name": name, "body": body}, &out)
+	err = a.client.do(a.client.cloudContext(ctx), http.MethodPost, path, map[string]any{"name": name, "body": body}, &out)
 	return &out, err
 }
 
@@ -82,7 +82,7 @@ func (a *CloudSharedProjectsAPI) Update(ctx context.Context, spaceID string, pro
 		return nil, err
 	}
 	var out CloudSharedProject
-	err = a.client.do(ctx, http.MethodPut, path, map[string]any{"name": project.Name, "body": project.Body, "revision": project.Revision}, &out)
+	err = a.client.do(a.client.cloudContext(ctx), http.MethodPut, path, map[string]any{"name": project.Name, "body": project.Body, "revision": project.Revision}, &out)
 	return &out, err
 }
 
@@ -94,5 +94,5 @@ func (a *CloudSharedProjectsAPI) Delete(ctx context.Context, spaceID, projectID 
 	if revision < 1 {
 		return fmt.Errorf("mockarty: revision must be positive")
 	}
-	return a.client.do(ctx, http.MethodDelete, path+"?revision="+strconv.FormatInt(revision, 10), nil, nil)
+	return a.client.do(a.client.cloudContext(ctx), http.MethodDelete, path+"?revision="+strconv.FormatInt(revision, 10), nil, nil)
 }

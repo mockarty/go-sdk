@@ -122,10 +122,14 @@ func NewBrokerClient(opts ...BrokerOption) (*BrokerClient, error) {
 //
 // pact:           the JSON bytes (typically from PactWriter / Pact.JSON())
 // consumerVersion: the consumer application version this pact
-//                  describes — usually a git SHA or semver tag. The
-//                  broker uses (consumer, version) as the unique key.
+//
+//	describes — usually a git SHA or semver tag. The
+//	broker uses (consumer, version) as the unique key.
+//
 // branch:          optional consumer branch name (Pactflow feature).
-//                  Pass "" to skip.
+//
+//	Pass "" to skip.
+//
 // tags:            optional list of tags (e.g. ["prod", "release"]).
 //
 // On success the broker returns 200/201 with a Hal+JSON envelope —
