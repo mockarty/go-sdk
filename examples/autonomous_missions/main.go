@@ -35,6 +35,15 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("mission=%s status=%s created=%t\n", started.Mission.ID, started.Mission.Status, started.Created)
+	if os.Getenv("MOCKARTY_EXAMPLE_ANSWER") != "" {
+		answered, answerErr := api.Answer(ctx, started.Mission.ID, mockarty.MissionAnswerRequest{
+			Answer: os.Getenv("MOCKARTY_EXAMPLE_ANSWER"), IdempotencyKey: "autonomous-missions-example-answer",
+		})
+		if answerErr != nil {
+			log.Fatal(answerErr)
+		}
+		fmt.Printf("answer receipt=%s outcome=%s\n", answered.Control.ID, answered.Control.Outcome)
+	}
 	if os.Getenv("MOCKARTY_EXAMPLE_CANCEL") == "1" {
 		cancelled, cancelErr := api.Cancel(ctx, started.Mission.ID, mockarty.MissionCancelRequest{
 			Reason: "example run no longer needed", IdempotencyKey: "autonomous-missions-example-cancel",

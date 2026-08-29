@@ -109,6 +109,13 @@ type MissionCancelRequest struct {
 	IdempotencyKey string `json:"idempotencyKey,omitempty"`
 }
 
+// MissionAnswerRequest is the durable answer accepted while a mission waits
+// for human input. Reuse IdempotencyKey after a lost response.
+type MissionAnswerRequest struct {
+	Answer         string `json:"answer"`
+	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+}
+
 // MissionControlReceipt is the public, restart-stable control projection.
 type MissionControlReceipt struct {
 	CreatedAt        time.Time  `json:"createdAt"`
@@ -121,7 +128,7 @@ type MissionControlReceipt struct {
 	Action           string     `json:"action"`
 	Phase            string     `json:"phase"`
 	Outcome          string     `json:"outcome"`
-	Reason           string     `json:"reason"`
+	Reason           string     `json:"reason,omitempty"`
 	Resolution       string     `json:"resolution,omitempty"`
 	ResolvedBy       string     `json:"resolvedBy,omitempty"`
 	ResolutionReason string     `json:"resolutionReason,omitempty"`
@@ -318,6 +325,31 @@ func (a *AutonomousMissionsAPI) Cancel(ctx context.Context, missionID string, re
 	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
 	var out MissionControlResponse
 	path := "/api/v1/missions/" + url.PathEscape(missionID) + "/cancel"
+	if err := a.client.do(ctx, http.MethodPost, path, req, &out); err != nil {
+		return MissionControlResponse{}, err
+	}
+	if out.Mission.Chain == nil {
+		out.Mission.Chain = []map[string]any{}
+	}
+	if out.ExecutionBindings == nil {
+		out.ExecutionBindings = []MissionExecutionBinding{}
+	}
+	return out, nil
+}
+
+// Answer durably supplies the input requested by a unified mission.
+func (a *AutonomousMissionsAPI) Answer(ctx context.Context, missionID string, req MissionAnswerRequest) (MissionControlResponse, error) {
+	missionID = strings.TrimSpace(missionID)
+	req.Answer = strings.TrimSpace(req.Answer)
+	req.IdempotencyKey = strings.TrimSpace(req.IdempotencyKey)
+	if missionID == "" {
+		return MissionControlResponse{}, fmt.Errorf("mockarty: mission answer: mission id is required")
+	}
+	if req.Answer == "" {
+		return MissionControlResponse{}, fmt.Errorf("mockarty: mission answer: answer is required")
+	}
+	var out MissionControlResponse
+	path := "/api/v1/missions/" + url.PathEscape(missionID) + "/answer"
 	if err := a.client.do(ctx, http.MethodPost, path, req, &out); err != nil {
 		return MissionControlResponse{}, err
 	}

@@ -151,6 +151,18 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 				"executionBindingsAvailable": true,
 				"executionBindings":          []map[string]any{{"id": "binding-1", "nodeId": "m-unified", "externalId": "runner-1", "kind": "runner_task", "state": "cancel_acknowledged", "graphRevision": 2, "generation": 1, "cancelEpoch": 3}},
 			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/missions/m-unified/answer":
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["answer"] != "use sandbox account" || body["idempotencyKey"] != "answer-1" {
+				t.Fatalf("answer body = %#v", body)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "queued", "chain": []map[string]any{}},
+				"control": map[string]any{"id": "control-2", "missionId": "m-unified", "idempotencyKey": "answer-1", "action": "answer", "phase": "committed", "outcome": "applied", "createdAt": "2026-08-27T00:00:00Z", "updatedAt": "2026-08-27T00:00:01Z"},
+			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -179,8 +191,14 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 		cancelled.ExecutionBindings[0].State != "cancel_acknowledged" {
 		t.Fatalf("cancel = %+v err=%v", cancelled, err)
 	}
-	if calls != 3 {
-		t.Fatalf("calls=%d, want 3", calls)
+	answered, err := api.Answer(ctx, started.Mission.ID, MissionAnswerRequest{
+		Answer: " use sandbox account ", IdempotencyKey: " answer-1 ",
+	})
+	if err != nil || answered.Control.Action != "answer" || answered.Control.Reason != "" {
+		t.Fatalf("answer = %+v err=%v", answered, err)
+	}
+	if calls != 4 {
+		t.Fatalf("calls=%d, want 4", calls)
 	}
 }
 
@@ -211,6 +229,9 @@ func TestAutonomousMissionsUnifiedValidationBeforeNetwork(t *testing.T) {
 	}
 	if _, err := api.Cancel(ctx, " ", MissionCancelRequest{}); err == nil {
 		t.Fatal("empty cancel mission id accepted")
+	}
+	if _, err := api.Answer(ctx, "m-1", MissionAnswerRequest{}); err == nil {
+		t.Fatal("empty mission answer accepted")
 	}
 	if calls != 0 {
 		t.Fatalf("validation issued %d network calls", calls)
