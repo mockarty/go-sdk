@@ -91,6 +91,7 @@ type Client struct {
 	cloudEntitlementsAPI   *CloudEntitlementsAPI
 	cloudSharedProjectsAPI *CloudSharedProjectsAPI
 	cloudOAuthProvidersAPI *CloudOAuthProvidersAPI
+	cloudRiskAPI           *CloudRiskAPI
 	cloudIdentityAPI       *CloudIdentityAPI
 	autonomousMissionsAPI  *AutonomousMissionsAPI
 	workflowDefinitionsAPI *WorkflowDefinitionsAPI
@@ -174,6 +175,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
 	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
 	c.cloudOAuthProvidersAPI = &CloudOAuthProvidersAPI{client: c}
+	c.cloudRiskAPI = &CloudRiskAPI{client: c}
 	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
@@ -227,6 +229,9 @@ func (c *Client) CloudSharedProjects() *CloudSharedProjectsAPI { return c.cloudS
 
 // CloudOAuthProviders returns the operator-only cabinet sign-in provider API.
 func (c *Client) CloudOAuthProviders() *CloudOAuthProvidersAPI { return c.cloudOAuthProvidersAPI }
+
+// CloudRisk returns the operator-only risk case and enforcement API.
+func (c *Client) CloudRisk() *CloudRiskAPI { return c.cloudRiskAPI }
 
 // CloudIdentity returns the Cloud account sign-in-method and step-up API.
 func (c *Client) CloudIdentity() *CloudIdentityAPI { return c.cloudIdentityAPI }
