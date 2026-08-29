@@ -103,18 +103,26 @@ type CoderMissionStartRequest struct {
 }
 
 type CoderMission struct {
-	ID             string         `json:"id"`
-	Namespace      string         `json:"namespace"`
-	Goal           string         `json:"goal"`
-	RepoURL        string         `json:"repoUrl"`
-	Status         string         `json:"status"`
-	Error          string         `json:"error,omitempty"`
-	DeployTarget   string         `json:"deployTarget,omitempty"`
-	AcceptedCommit string         `json:"acceptedCommit,omitempty"`
-	Approval       string         `json:"approval,omitempty"`
-	DeployResult   map[string]any `json:"deployResult,omitempty"`
-	UnverifiedJobs int            `json:"unverifiedJobs,omitempty"`
+	ID              string         `json:"id"`
+	Namespace       string         `json:"namespace"`
+	Goal            string         `json:"goal"`
+	RepoURL         string         `json:"repoUrl"`
+	Status          string         `json:"status"`
+	Error           string         `json:"error,omitempty"`
+	DeployTarget    string         `json:"deployTarget,omitempty"`
+	AcceptedCommit  string         `json:"acceptedCommit,omitempty"`
+	Approval        string         `json:"approval,omitempty"`
+	DeployResult    map[string]any `json:"deployResult,omitempty"`
+	DeployStopState string         `json:"deployStopState,omitempty"`
+	UnverifiedJobs  int            `json:"unverifiedJobs,omitempty"`
 }
+
+type CoderDeployReconciliationOutcome string
+
+const (
+	CoderDeployApplied    CoderDeployReconciliationOutcome = "applied"
+	CoderDeployNotApplied CoderDeployReconciliationOutcome = "not_applied"
+)
 
 type CoderMissionList struct {
 	Missions []CoderMission `json:"missions"`
@@ -177,5 +185,17 @@ func (a *CoderDeliveryAPI) ApproveMission(ctx context.Context, missionID string,
 	}
 	var out CoderMission
 	err := a.client.do(ctx, http.MethodPost, a.path("missions/"+url.PathEscape(missionID)+"/approve", ""), map[string]bool{"approve": approve}, &out)
+	return &out, err
+}
+
+func (a *CoderDeliveryAPI) ReconcileDeploy(ctx context.Context, missionID string, outcome CoderDeployReconciliationOutcome) (*CoderMission, error) {
+	if strings.TrimSpace(missionID) == "" {
+		return nil, fmt.Errorf("mockarty: coder mission id is required")
+	}
+	if outcome != CoderDeployApplied && outcome != CoderDeployNotApplied {
+		return nil, fmt.Errorf("mockarty: coder deployment outcome must be applied or not_applied")
+	}
+	var out CoderMission
+	err := a.client.do(ctx, http.MethodPost, a.path("missions/"+url.PathEscape(missionID)+"/deploy-outcome", ""), map[string]CoderDeployReconciliationOutcome{"outcome": outcome}, &out)
 	return &out, err
 }

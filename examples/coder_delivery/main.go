@@ -19,4 +19,11 @@ func main() {
 		panic(err)
 	}
 	fmt.Println(mission.ID, mission.Status)
+	if outcome := os.Getenv("CODER_DEPLOY_RECONCILIATION"); outcome != "" {
+		mission, err = client.CoderDelivery().ReconcileDeploy(context.Background(), mission.ID, mockarty.CoderDeployReconciliationOutcome(outcome))
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("reconciled", mission.DeployStopState)
+	}
 }
