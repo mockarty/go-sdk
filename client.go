@@ -94,6 +94,7 @@ type Client struct {
 	deliveryPolicyAPI      *DeliveryPolicyAPI
 	llmSecurityAPI         *LLMSecurityAPI
 	pageAnalyzerAPI        *PageAnalyzerAPI
+	mediaDeliveryAPI       *MediaDeliveryAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -172,6 +173,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.deliveryPolicyAPI = &DeliveryPolicyAPI{client: c}
 	c.llmSecurityAPI = &LLMSecurityAPI{client: c}
 	c.pageAnalyzerAPI = &PageAnalyzerAPI{client: c}
+	c.mediaDeliveryAPI = &MediaDeliveryAPI{client: c}
 
 	return c
 }
@@ -222,6 +224,9 @@ func (c *Client) CoderDelivery() *CoderDeliveryAPI { return c.coderDeliveryAPI }
 
 // DeliveryPolicy returns the administrator environment-policy API.
 func (c *Client) DeliveryPolicy() *DeliveryPolicyAPI { return c.deliveryPolicyAPI }
+
+// MediaDelivery returns the operator reconciliation API for fenced media jobs.
+func (c *Client) MediaDelivery() *MediaDeliveryAPI { return c.mediaDeliveryAPI }
 
 // LLMSecurity returns the layered prompt-security management API.
 func (c *Client) LLMSecurity() *LLMSecurityAPI { return c.llmSecurityAPI }
