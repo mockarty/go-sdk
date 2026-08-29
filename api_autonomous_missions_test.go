@@ -146,8 +146,10 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 				t.Fatalf("cancel body = %#v", body)
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "canceled", "chain": []map[string]any{}},
-				"control": map[string]any{"id": "control-1", "missionId": "m-unified", "idempotencyKey": "cancel-1", "action": "cancel", "phase": "committed", "outcome": "applied", "reason": "release withdrawn", "createdAt": "2026-08-27T00:00:00Z", "updatedAt": "2026-08-27T00:00:01Z"},
+				"mission":                    map[string]any{"id": "m-unified", "namespace": "team-a", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "canceled", "chain": []map[string]any{}},
+				"control":                    map[string]any{"id": "control-1", "missionId": "m-unified", "idempotencyKey": "cancel-1", "action": "cancel", "phase": "committed", "outcome": "applied", "reason": "release withdrawn", "createdAt": "2026-08-27T00:00:00Z", "updatedAt": "2026-08-27T00:00:01Z"},
+				"executionBindingsAvailable": true,
+				"executionBindings":          []map[string]any{{"id": "binding-1", "nodeId": "m-unified", "externalId": "runner-1", "kind": "runner_task", "state": "cancel_acknowledged", "graphRevision": 2, "generation": 1, "cancelEpoch": 3}},
 			})
 		default:
 			http.NotFound(w, r)
@@ -172,7 +174,9 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 		Reason: " release withdrawn ", IdempotencyKey: " cancel-1 ",
 	})
 	if err != nil || cancelled.Control.Reason != "release withdrawn" ||
-		cancelled.Control.IdempotencyKey != "cancel-1" || cancelled.Mission.Status != "canceled" {
+		cancelled.Control.IdempotencyKey != "cancel-1" || cancelled.Mission.Status != "canceled" ||
+		!cancelled.ExecutionBindingsAvailable || len(cancelled.ExecutionBindings) != 1 ||
+		cancelled.ExecutionBindings[0].State != "cancel_acknowledged" {
 		t.Fatalf("cancel = %+v err=%v", cancelled, err)
 	}
 	if calls != 3 {

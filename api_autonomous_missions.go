@@ -127,12 +127,31 @@ type MissionControlReceipt struct {
 	ResolutionReason string     `json:"resolutionReason,omitempty"`
 }
 
+// MissionExecutionBinding is the public, durable cancellation evidence for one
+// exact child execution. Cluster lease and fencing internals are intentionally
+// not part of this projection.
+type MissionExecutionBinding struct {
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	ID            string    `json:"id"`
+	NodeID        string    `json:"nodeId"`
+	ExternalID    string    `json:"externalId"`
+	Kind          string    `json:"kind"`
+	State         string    `json:"state"`
+	GraphRevision int64     `json:"graphRevision"`
+	Generation    int64     `json:"generation"`
+	CancelEpoch   int64     `json:"cancelEpoch,omitempty"`
+	DeliveryCount int       `json:"deliveryCount,omitempty"`
+}
+
 // MissionControlResponse returns the current mission and its durable receipt.
 type MissionControlResponse struct {
-	Error   map[string]any        `json:"error,omitempty"`
-	Mission UnifiedMission        `json:"mission"`
-	Control MissionControlReceipt `json:"control"`
-	Pending bool                  `json:"pending,omitempty"`
+	Error                      map[string]any            `json:"error,omitempty"`
+	ExecutionBindings          []MissionExecutionBinding `json:"executionBindings"`
+	Mission                    UnifiedMission            `json:"mission"`
+	Control                    MissionControlReceipt     `json:"control"`
+	ExecutionBindingsAvailable bool                      `json:"executionBindingsAvailable"`
+	Pending                    bool                      `json:"pending,omitempty"`
 }
 
 // AutonomousMissionBudgetHint is the wire budget accepted by mission intake.
@@ -304,6 +323,9 @@ func (a *AutonomousMissionsAPI) Cancel(ctx context.Context, missionID string, re
 	}
 	if out.Mission.Chain == nil {
 		out.Mission.Chain = []map[string]any{}
+	}
+	if out.ExecutionBindings == nil {
+		out.ExecutionBindings = []MissionExecutionBinding{}
 	}
 	return out, nil
 }

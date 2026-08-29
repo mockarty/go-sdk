@@ -44,5 +44,8 @@ func main() {
 		}
 		fmt.Printf("cancel receipt=%s outcome=%s reason=%s\n",
 			cancelled.Control.ID, cancelled.Control.Outcome, cancelled.Control.Reason)
+		for _, binding := range cancelled.ExecutionBindings {
+			fmt.Printf("child=%s kind=%s state=%s\n", binding.ExternalID, binding.Kind, binding.State)
+		}
 	}
 }
