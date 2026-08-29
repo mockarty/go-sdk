@@ -23,7 +23,10 @@ import (
 // sensible default namespace + token.
 func newTestClient(t *testing.T, srv *httptest.Server) *Client {
 	t.Helper()
-	c, err := NewClient(srv.URL, "team-alpha", "tok-abc", WithTimeout(2*time.Second))
+	// Each parallel httptest server must own its transport. Server.Close calls
+	// CloseIdleConnections on http.DefaultTransport and would otherwise abort
+	// an in-flight dial belonging to a neighbouring parallel test.
+	c, err := NewClient(srv.URL, "team-alpha", "tok-abc", WithHTTPClient(srv.Client()), WithTimeout(2*time.Second))
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
@@ -188,7 +191,7 @@ func TestCreateRun_namespaceURLEscaping(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, err := NewClient(srv.URL, "team alpha/beta", "tok")
+	c, err := NewClient(srv.URL, "team alpha/beta", "tok", WithHTTPClient(srv.Client()))
 	if err != nil {
 		t.Fatal(err)
 	}
