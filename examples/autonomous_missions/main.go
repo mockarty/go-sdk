@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/mockarty/mockarty-go"
 )
@@ -24,13 +25,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	started, err := api.Start(ctx, mockarty.MissionStartRequest{
+	request := mockarty.MissionStartRequest{
 		Goal:                   "Take the checkout release to production quality and provide evidence",
 		ProductID:              productID,
 		Autonomy:               "auto",
 		BudgetTokensTotal:      100000,
 		ExpectedSettingsDigest: settings.SettingsDigest,
-	})
+	}
+	if targetDigest := os.Getenv("MOCKARTY_TARGET_DIGEST"); targetDigest != "" {
+		targetRevision, parseErr := strconv.ParseInt(os.Getenv("MOCKARTY_TARGET_REVISION"), 10, 64)
+		if parseErr != nil {
+			log.Fatal("MOCKARTY_TARGET_REVISION must be an integer when MOCKARTY_TARGET_DIGEST is set")
+		}
+		request.Targets = []mockarty.MissionRevisionReference{{
+			Kind: "repo", ID: os.Getenv("MOCKARTY_TARGET_ID"), Revision: targetRevision, Digest: targetDigest,
+		}}
+	}
+	started, err := api.Start(ctx, request)
 	if err != nil {
 		log.Fatal(err)
 	}

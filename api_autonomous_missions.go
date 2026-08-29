@@ -20,6 +20,15 @@ type AutonomousMissionsAPI struct{ client *Client }
 
 var missionSettingsDigestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
+// MissionRevisionReference pins one target or artifact to the exact revision
+// and content digest observed before mission admission.
+type MissionRevisionReference struct {
+	Kind     string `json:"kind"`
+	ID       string `json:"id"`
+	Digest   string `json:"digest"`
+	Revision int64  `json:"revision"`
+}
+
 // MissionEffectiveSettingsOptions selects the layered policy preview used for a
 // unified mission start. A zero RunWindowMinutes means no mission override.
 type MissionEffectiveSettingsOptions struct {
@@ -52,47 +61,50 @@ type MissionEffectiveSettings struct {
 // and Chain are compatibility overrides; omit them to let Mockarty plan the
 // required capability graph from Goal.
 type MissionStartRequest struct {
-	Data                   map[string]any `json:"data,omitempty"`
-	Namespace              string         `json:"namespace,omitempty"`
-	ProductID              string         `json:"productId,omitempty"`
-	Subject                string         `json:"subject,omitempty"`
-	Kind                   string         `json:"kind,omitempty"`
-	Goal                   string         `json:"goal"`
-	Autonomy               string         `json:"autonomy,omitempty"`
-	OriginRef              string         `json:"originRef,omitempty"`
-	ExpectedSettingsDigest string         `json:"expectedSettingsDigest,omitempty"`
-	Chain                  []string       `json:"chain,omitempty"`
-	BudgetTokensTotal      int64          `json:"budgetTokensTotal,omitempty"`
-	BudgetTokensPerDay     int64          `json:"budgetTokensPerDay,omitempty"`
-	BudgetUSDCap           float64        `json:"budgetUsdCap,omitempty"`
+	Data                   map[string]any             `json:"data,omitempty"`
+	Namespace              string                     `json:"namespace,omitempty"`
+	ProductID              string                     `json:"productId,omitempty"`
+	Subject                string                     `json:"subject,omitempty"`
+	Kind                   string                     `json:"kind,omitempty"`
+	Goal                   string                     `json:"goal"`
+	Autonomy               string                     `json:"autonomy,omitempty"`
+	OriginRef              string                     `json:"originRef,omitempty"`
+	ExpectedSettingsDigest string                     `json:"expectedSettingsDigest,omitempty"`
+	Targets                []MissionRevisionReference `json:"targets,omitempty"`
+	Artifacts              []MissionRevisionReference `json:"artifacts,omitempty"`
+	Chain                  []string                   `json:"chain,omitempty"`
+	BudgetTokensTotal      int64                      `json:"budgetTokensTotal,omitempty"`
+	BudgetTokensPerDay     int64                      `json:"budgetTokensPerDay,omitempty"`
+	BudgetUSDCap           float64                    `json:"budgetUsdCap,omitempty"`
 }
 
 // UnifiedMission is the stable mission projection returned by the unified ledger.
 // Step maps preserve additive component-specific fields from newer servers.
 type UnifiedMission struct {
-	CreatedAt          time.Time        `json:"createdAt"`
-	UpdatedAt          time.Time        `json:"updatedAt"`
-	ClosedAt           *time.Time       `json:"closedAt,omitempty"`
-	Data               map[string]any   `json:"data,omitempty"`
-	ID                 string           `json:"id"`
-	Namespace          string           `json:"namespace"`
-	ProductID          string           `json:"productId,omitempty"`
-	Subject            string           `json:"subject,omitempty"`
-	Kind               string           `json:"kind"`
-	Goal               string           `json:"goal"`
-	Autonomy           string           `json:"autonomy,omitempty"`
-	CreatedBy          string           `json:"createdBy,omitempty"`
-	ClosedBy           string           `json:"closedBy,omitempty"`
-	ClosedReason       string           `json:"closedReason,omitempty"`
-	Origin             string           `json:"origin"`
-	OriginRef          string           `json:"originRef,omitempty"`
-	Status             string           `json:"status"`
-	Chain              []map[string]any `json:"chain"`
-	BudgetTokensTotal  int64            `json:"budgetTokensTotal"`
-	BudgetTokensPerDay int64            `json:"budgetTokensPerDay"`
-	SpentTokens        int64            `json:"spentTokens"`
-	BudgetUSDCap       float64          `json:"budgetUsdCap"`
-	StepCount          int              `json:"stepCount"`
+	CreatedAt          time.Time                  `json:"createdAt"`
+	UpdatedAt          time.Time                  `json:"updatedAt"`
+	ClosedAt           *time.Time                 `json:"closedAt,omitempty"`
+	Data               map[string]any             `json:"data,omitempty"`
+	ID                 string                     `json:"id"`
+	Namespace          string                     `json:"namespace"`
+	ProductID          string                     `json:"productId,omitempty"`
+	Subject            string                     `json:"subject,omitempty"`
+	Kind               string                     `json:"kind"`
+	Goal               string                     `json:"goal"`
+	Autonomy           string                     `json:"autonomy,omitempty"`
+	CreatedBy          string                     `json:"createdBy,omitempty"`
+	ClosedBy           string                     `json:"closedBy,omitempty"`
+	ClosedReason       string                     `json:"closedReason,omitempty"`
+	Origin             string                     `json:"origin"`
+	OriginRef          string                     `json:"originRef,omitempty"`
+	Status             string                     `json:"status"`
+	Pins               []MissionRevisionReference `json:"pins,omitempty"`
+	Chain              []map[string]any           `json:"chain"`
+	BudgetTokensTotal  int64                      `json:"budgetTokensTotal"`
+	BudgetTokensPerDay int64                      `json:"budgetTokensPerDay"`
+	SpentTokens        int64                      `json:"spentTokens"`
+	BudgetUSDCap       float64                    `json:"budgetUsdCap"`
+	StepCount          int                        `json:"stepCount"`
 }
 
 // MissionStartResponse reports whether a physical mission was created. A false

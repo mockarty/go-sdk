@@ -126,6 +126,10 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 			if body["goal"] != "ship checkout" || body["productId"] != "product/checkout" || body["expectedSettingsDigest"] != digest {
 				t.Fatalf("start body = %#v", body)
 			}
+			targets, ok := body["targets"].([]any)
+			if !ok || len(targets) != 1 || targets[0].(map[string]any)["revision"] != float64(41) {
+				t.Fatalf("start targets = %#v", body["targets"])
+			}
 			if _, present := body["kind"]; present {
 				t.Fatalf("goal-first start sent executor kind: %#v", body)
 			}
@@ -135,7 +139,7 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"created": true,
-				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "productId": "product/checkout", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "queued", "chain": []map[string]any{}},
+				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "productId": "product/checkout", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "queued", "pins": []map[string]any{{"kind": "repo", "id": "gitlab/mockarty", "revision": 41, "digest": digest}}, "chain": []map[string]any{}},
 			})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/missions/m-unified/cancel":
 			var body map[string]any
@@ -175,12 +179,18 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 	if err != nil || settings.SettingsDigest != digest || len(settings.Settings) != 1 || !settings.Settings[0].RuntimeApplied {
 		t.Fatalf("effective settings = %+v err=%v", settings, err)
 	}
-	started, err := api.Start(ctx, MissionStartRequest{Goal: " ship checkout ", ProductID: "product/checkout", ExpectedSettingsDigest: digest})
+	started, err := api.Start(ctx, MissionStartRequest{
+		Goal: " ship checkout ", ProductID: "product/checkout", ExpectedSettingsDigest: digest,
+		Targets: []MissionRevisionReference{{Kind: "repo", ID: "gitlab/mockarty", Revision: 41, Digest: digest}},
+	})
 	if err != nil || !started.Created || started.Mission.ID != "m-unified" {
 		t.Fatalf("start = %+v err=%v", started, err)
 	}
 	if started.Mission.Chain == nil {
 		t.Fatal("start response chain must be non-nil")
+	}
+	if len(started.Mission.Pins) != 1 || started.Mission.Pins[0].Revision != 41 {
+		t.Fatalf("start response pins = %#v", started.Mission.Pins)
 	}
 	cancelled, err := api.Cancel(ctx, started.Mission.ID, MissionCancelRequest{
 		Reason: " release withdrawn ", IdempotencyKey: " cancel-1 ",
