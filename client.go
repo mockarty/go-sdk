@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"time"
 )
@@ -90,6 +91,7 @@ type Client struct {
 	cloudEntitlementsAPI   *CloudEntitlementsAPI
 	cloudSharedProjectsAPI *CloudSharedProjectsAPI
 	cloudOAuthProvidersAPI *CloudOAuthProvidersAPI
+	cloudIdentityAPI       *CloudIdentityAPI
 	autonomousMissionsAPI  *AutonomousMissionsAPI
 	workflowDefinitionsAPI *WorkflowDefinitionsAPI
 	coderDeliveryAPI       *CoderDeliveryAPI
@@ -110,12 +112,14 @@ type Client struct {
 // eagerly here so the accessor methods do not race on lazy assignment.
 func NewClient(baseURL string, opts ...Option) *Client {
 	baseURL = strings.TrimRight(baseURL, "/")
+	jar, _ := cookiejar.New(nil)
 
 	c := &Client{
 		baseURL:   baseURL,
 		namespace: defaultNamespace,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
+			Jar:     jar,
 		},
 		logger: slog.Default(),
 	}
@@ -170,6 +174,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
 	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
 	c.cloudOAuthProvidersAPI = &CloudOAuthProvidersAPI{client: c}
+	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
@@ -222,6 +227,9 @@ func (c *Client) CloudSharedProjects() *CloudSharedProjectsAPI { return c.cloudS
 
 // CloudOAuthProviders returns the operator-only cabinet sign-in provider API.
 func (c *Client) CloudOAuthProviders() *CloudOAuthProvidersAPI { return c.cloudOAuthProvidersAPI }
+
+// CloudIdentity returns the Cloud account sign-in-method and step-up API.
+func (c *Client) CloudIdentity() *CloudIdentityAPI { return c.cloudIdentityAPI }
 
 // AutonomousMissions returns the API used to submit and supervise autonomous
 // testing missions.
