@@ -5,9 +5,12 @@ package mockarty
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -15,18 +18,18 @@ import (
 type CloudRiskAPI struct{ client *Client }
 
 type CloudRiskCase struct {
-	OpenedAt         time.Time  `json:"opened_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	ResolvedAt       *time.Time `json:"resolved_at,omitempty"`
-	ID               string     `json:"id"`
-	SignalType       string     `json:"signal_type"`
-	ScopeType        string     `json:"scope_type"`
-	EnforcementKind  string     `json:"enforcement_kind"`
-	Status           string     `json:"status"`
-	Severity         string     `json:"severity"`
-	ReasonCode       string     `json:"reason_code"`
-	Decision         string     `json:"decision"`
-	Revision         int64      `json:"revision"`
+	OpenedAt        time.Time  `json:"opened_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	ResolvedAt      *time.Time `json:"resolved_at,omitempty"`
+	ID              string     `json:"id"`
+	SignalType      string     `json:"signal_type"`
+	ScopeType       string     `json:"scope_type"`
+	EnforcementKind string     `json:"enforcement_kind"`
+	Status          string     `json:"status"`
+	Severity        string     `json:"severity"`
+	ReasonCode      string     `json:"reason_code"`
+	Decision        string     `json:"decision"`
+	Revision        int64      `json:"revision"`
 }
 
 type CloudRiskEvent struct {
@@ -87,6 +90,7 @@ func (a *CloudRiskAPI) GetCase(ctx context.Context, caseID string) (*CloudRiskCa
 }
 
 func (a *CloudRiskAPI) ReleaseEnforcement(ctx context.Context, caseID, enforcementID string, revision int64, reason string) (*CloudRiskEnforcement, error) {
+	reason = strings.TrimSpace(reason)
 	if caseID == "" || enforcementID == "" || revision < 1 || !utf8.ValidString(reason) ||
 		utf8.RuneCountInString(reason) < 3 || utf8.RuneCountInString(reason) > 512 {
 		return nil, fmt.Errorf("mockarty: case id, enforcement id, positive revision, and release reason are required")
@@ -94,6 +98,8 @@ func (a *CloudRiskAPI) ReleaseEnforcement(ctx context.Context, caseID, enforceme
 	var out struct {
 		Enforcement CloudRiskEnforcement `json:"enforcement"`
 	}
+	digest := sha256.Sum256([]byte(caseID + "\x00" + enforcementID + "\x00" + strconv.FormatInt(revision, 10) + "\x00" + reason))
+	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": "risk-release:" + hex.EncodeToString(digest[:])})
 	err := a.client.do(ctx, "POST", "/api/v1/cloud/operator/risk/cases/"+url.PathEscape(caseID)+
 		"/enforcements/"+url.PathEscape(enforcementID)+"/release", map[string]any{"revision": revision, "reason": reason}, &out)
 	return &out.Enforcement, err

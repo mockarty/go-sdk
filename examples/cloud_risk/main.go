@@ -15,4 +15,6 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("open risk cases: %d\n", len(cases))
+	// ReleaseEnforcement automatically uses a stable idempotency key, so an
+	// exact retry after a lost response cannot release twice.
 }

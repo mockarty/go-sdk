@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 func TestCloudRiskOperatorContract(t *testing.T) {
 	var releaseBody map[string]any
+	var releaseIdempotency string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/v1/cloud/operator/risk/cases":
@@ -20,6 +22,7 @@ func TestCloudRiskOperatorContract(t *testing.T) {
 		case "/api/v1/cloud/operator/risk/cases/case-1":
 			_, _ = w.Write([]byte(`{"case":{"id":"case-1"},"events":[],"enforcements":[{"id":"enf-1","revision":2}]}`))
 		case "/api/v1/cloud/operator/risk/cases/case-1/enforcements/enf-1/release":
+			releaseIdempotency = r.Header.Get("Idempotency-Key")
 			if err := json.NewDecoder(r.Body).Decode(&releaseBody); err != nil {
 				t.Error(err)
 			}
@@ -39,7 +42,7 @@ func TestCloudRiskOperatorContract(t *testing.T) {
 		t.Fatalf("detail=%#v err=%v", detail, err)
 	}
 	released, err := api.ReleaseEnforcement(context.Background(), "case-1", "enf-1", 2, "customer verified")
-	if err != nil || released.Status != "released" || releaseBody["revision"] != float64(2) {
+	if err != nil || released.Status != "released" || releaseBody["revision"] != float64(2) || !strings.HasPrefix(releaseIdempotency, "risk-release:") {
 		t.Fatalf("released=%#v body=%#v err=%v", released, releaseBody, err)
 	}
 }
