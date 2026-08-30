@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/cookiejar"
 	"strings"
 	"time"
 )
@@ -85,9 +86,13 @@ type Client struct {
 	experienceAPI          *ExperienceAPI
 	economicsAPI           *EconomicsAPI
 	cloudWebhooksAPI       *CloudWebhooksAPI
+	cloudInstancesAPI      *CloudInstancesAPI
 	cloudSpacesAPI         *CloudSpacesAPI
 	cloudEntitlementsAPI   *CloudEntitlementsAPI
 	cloudSharedProjectsAPI *CloudSharedProjectsAPI
+	cloudOAuthProvidersAPI *CloudOAuthProvidersAPI
+	cloudRiskAPI           *CloudRiskAPI
+	cloudIdentityAPI       *CloudIdentityAPI
 	autonomousMissionsAPI  *AutonomousMissionsAPI
 	workflowDefinitionsAPI *WorkflowDefinitionsAPI
 	coderDeliveryAPI       *CoderDeliveryAPI
@@ -109,12 +114,14 @@ type Client struct {
 // eagerly here so the accessor methods do not race on lazy assignment.
 func NewClient(baseURL string, opts ...Option) *Client {
 	baseURL = strings.TrimRight(baseURL, "/")
+	jar, _ := cookiejar.New(nil)
 
 	c := &Client{
 		baseURL:   baseURL,
 		namespace: defaultNamespace,
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
+			Jar:     jar,
 		},
 		logger: slog.Default(),
 	}
@@ -164,9 +171,13 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.experienceAPI = &ExperienceAPI{client: c}
 	c.economicsAPI = &EconomicsAPI{client: c}
 	c.cloudWebhooksAPI = &CloudWebhooksAPI{client: c}
+	c.cloudInstancesAPI = &CloudInstancesAPI{client: c}
 	c.cloudSpacesAPI = &CloudSpacesAPI{client: c}
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
 	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
+	c.cloudOAuthProvidersAPI = &CloudOAuthProvidersAPI{client: c}
+	c.cloudRiskAPI = &CloudRiskAPI{client: c}
+	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
@@ -206,6 +217,9 @@ func (c *Client) WorkflowDefinitions() *WorkflowDefinitionsAPI { return c.workfl
 // CloudWebhooks returns the curated Cloud webhook lifecycle API.
 func (c *Client) CloudWebhooks() *CloudWebhooksAPI { return c.cloudWebhooksAPI }
 
+// CloudInstances returns the dedicated Cloud contour lifecycle API.
+func (c *Client) CloudInstances() *CloudInstancesAPI { return c.cloudInstancesAPI }
+
 // CloudSpaces returns the explicit Space collaboration API.
 func (c *Client) CloudSpaces() *CloudSpacesAPI { return c.cloudSpacesAPI }
 
@@ -214,6 +228,15 @@ func (c *Client) CloudEntitlements() *CloudEntitlementsAPI { return c.cloudEntit
 
 // CloudSharedProjects returns the public Shared SaaS project CRUD API.
 func (c *Client) CloudSharedProjects() *CloudSharedProjectsAPI { return c.cloudSharedProjectsAPI }
+
+// CloudOAuthProviders returns the operator-only cabinet sign-in provider API.
+func (c *Client) CloudOAuthProviders() *CloudOAuthProvidersAPI { return c.cloudOAuthProvidersAPI }
+
+// CloudRisk returns the operator-only risk case and enforcement API.
+func (c *Client) CloudRisk() *CloudRiskAPI { return c.cloudRiskAPI }
+
+// CloudIdentity returns the Cloud account sign-in-method and step-up API.
+func (c *Client) CloudIdentity() *CloudIdentityAPI { return c.cloudIdentityAPI }
 
 // AutonomousMissions returns the API used to submit and supervise autonomous
 // testing missions.
