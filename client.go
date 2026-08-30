@@ -100,6 +100,7 @@ type Client struct {
 	cloudConnectorsAPI      *CloudConnectorsAPI
 	cloudOAuthProvidersAPI  *CloudOAuthProvidersAPI
 	cloudRiskAPI            *CloudRiskAPI
+	cloudRefundsAPI         *CloudRefundsAPI
 	cloudIdentityAPI        *CloudIdentityAPI
 	autonomousMissionsAPI   *AutonomousMissionsAPI
 	workflowDefinitionsAPI  *WorkflowDefinitionsAPI
@@ -187,6 +188,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudConnectorsAPI = &CloudConnectorsAPI{client: c}
 	c.cloudOAuthProvidersAPI = &CloudOAuthProvidersAPI{client: c}
 	c.cloudRiskAPI = &CloudRiskAPI{client: c}
+	c.cloudRefundsAPI = &CloudRefundsAPI{client: c}
 	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
@@ -248,6 +250,9 @@ func (c *Client) CloudOAuthProviders() *CloudOAuthProvidersAPI { return c.cloudO
 
 // CloudRisk returns the operator-only risk case and enforcement API.
 func (c *Client) CloudRisk() *CloudRiskAPI { return c.cloudRiskAPI }
+
+// CloudRefunds returns the operator-only durable refund recovery API.
+func (c *Client) CloudRefunds() *CloudRefundsAPI { return c.cloudRefundsAPI }
 
 // CloudIdentity returns the Cloud account sign-in-method and step-up API.
 func (c *Client) CloudIdentity() *CloudIdentityAPI { return c.cloudIdentityAPI }
