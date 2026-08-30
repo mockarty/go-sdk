@@ -20,6 +20,17 @@ func main() {
 	api := client.AutonomousMissions()
 	ctx := context.Background()
 	productID := os.Getenv("MOCKARTY_PRODUCT_ID")
+	if archiveMissionID := os.Getenv("MOCKARTY_ARCHIVE_MISSION_ID"); archiveMissionID != "" {
+		archive, archiveErr := api.ExportArchive(ctx, archiveMissionID)
+		if archiveErr != nil {
+			log.Fatal(archiveErr)
+		}
+		restored, restoreErr := api.RestoreArchive(ctx, archive)
+		if restoreErr != nil {
+			log.Fatal(restoreErr)
+		}
+		fmt.Printf("archive=%s mission=%s created=%t\n", archive.Digest, restored.ID, restored.Created)
+	}
 
 	settings, err := api.GetEffectiveSettings(ctx, mockarty.MissionEffectiveSettingsOptions{ProductID: productID})
 	if err != nil {

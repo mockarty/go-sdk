@@ -5,6 +5,7 @@ package mockarty
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -171,6 +172,21 @@ type MissionControlResponse struct {
 	Control                    MissionControlReceipt     `json:"control"`
 	ExecutionBindingsAvailable bool                      `json:"executionBindingsAvailable"`
 	Pending                    bool                      `json:"pending,omitempty"`
+}
+
+// MissionArchiveEnvelope is the portable digest-bound Mission, immutable
+// Brief, and complete journal returned by ExportArchive.
+type MissionArchiveEnvelope struct {
+	Digest  string          `json:"digest"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+// MissionArchiveRestoreResponse distinguishes a physical restore from an
+// exact idempotent replay of an archive already present in the namespace.
+type MissionArchiveRestoreResponse struct {
+	ID      string `json:"id"`
+	Digest  string `json:"digest"`
+	Created bool   `json:"created"`
 }
 
 // AutonomousMissionBudgetHint is the wire budget accepted by mission intake.
@@ -372,6 +388,48 @@ func (a *AutonomousMissionsAPI) Answer(ctx context.Context, missionID string, re
 		out.ExecutionBindings = []MissionExecutionBinding{}
 	}
 	return out, nil
+}
+
+// ExportArchive exports one at-rest mission with its immutable Brief and
+// complete journal. Active missions are rejected by the server.
+func (a *AutonomousMissionsAPI) ExportArchive(ctx context.Context, missionID string) (MissionArchiveEnvelope, error) {
+	missionID = strings.TrimSpace(missionID)
+	if missionID == "" {
+		return MissionArchiveEnvelope{}, fmt.Errorf("mockarty: mission archive export: mission id is required")
+	}
+	var out MissionArchiveEnvelope
+	path := "/api/v1/missions/" + url.PathEscape(missionID) + "/archive"
+	if err := a.client.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return MissionArchiveEnvelope{}, err
+	}
+	if err := validateMissionArchiveEnvelope(out); err != nil {
+		return MissionArchiveEnvelope{}, fmt.Errorf("mockarty: mission archive export: %w", err)
+	}
+	return out, nil
+}
+
+// RestoreArchive atomically restores a Mission archive into its original
+// namespace. Exact replay returns Created=false.
+func (a *AutonomousMissionsAPI) RestoreArchive(ctx context.Context, archive MissionArchiveEnvelope) (MissionArchiveRestoreResponse, error) {
+	if err := validateMissionArchiveEnvelope(archive); err != nil {
+		return MissionArchiveRestoreResponse{}, fmt.Errorf("mockarty: mission archive restore: %w", err)
+	}
+	var out MissionArchiveRestoreResponse
+	if err := a.client.do(ctx, http.MethodPost, "/api/v1/missions/archive", archive, &out); err != nil {
+		return MissionArchiveRestoreResponse{}, err
+	}
+	return out, nil
+}
+
+func validateMissionArchiveEnvelope(archive MissionArchiveEnvelope) error {
+	archive.Digest = strings.TrimSpace(archive.Digest)
+	if !missionSettingsDigestPattern.MatchString(archive.Digest) {
+		return fmt.Errorf("digest must be canonical sha256")
+	}
+	if len(archive.Payload) == 0 || !json.Valid(archive.Payload) {
+		return fmt.Errorf("payload must be valid JSON")
+	}
+	return nil
 }
 
 func (a *AutonomousMissionsAPI) List(ctx context.Context, status string, limit int) (AutonomousMissionListResponse, error) {

@@ -167,6 +167,20 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 				"mission": map[string]any{"id": "m-unified", "namespace": "team-a", "kind": "testing", "goal": "ship checkout", "origin": "ui", "status": "queued", "chain": []map[string]any{}},
 				"control": map[string]any{"id": "control-2", "missionId": "m-unified", "idempotencyKey": "answer-1", "action": "answer", "phase": "committed", "outcome": "applied", "createdAt": "2026-08-27T00:00:00Z", "updatedAt": "2026-08-27T00:00:01Z"},
 			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/missions/m-unified/archive":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"digest": digest, "payload": map[string]any{"schema_version": "mockarty.mission-archive/v1"},
+			})
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/missions/archive":
+			var body MissionArchiveEnvelope
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Digest != digest || len(body.Payload) == 0 {
+				t.Fatalf("archive restore body = %#v", body)
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "m-unified", "digest": digest, "created": true})
 		default:
 			http.NotFound(w, r)
 		}
@@ -207,8 +221,16 @@ func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 	if err != nil || answered.Control.Action != "answer" || answered.Control.Reason != "" {
 		t.Fatalf("answer = %+v err=%v", answered, err)
 	}
-	if calls != 4 {
-		t.Fatalf("calls=%d, want 4", calls)
+	archive, err := api.ExportArchive(ctx, started.Mission.ID)
+	if err != nil || archive.Digest != digest || len(archive.Payload) == 0 {
+		t.Fatalf("archive = %+v err=%v", archive, err)
+	}
+	restored, err := api.RestoreArchive(ctx, archive)
+	if err != nil || !restored.Created || restored.ID != started.Mission.ID {
+		t.Fatalf("restore = %+v err=%v", restored, err)
+	}
+	if calls != 6 {
+		t.Fatalf("calls=%d, want 6", calls)
 	}
 }
 
@@ -242,6 +264,12 @@ func TestAutonomousMissionsUnifiedValidationBeforeNetwork(t *testing.T) {
 	}
 	if _, err := api.Answer(ctx, "m-1", MissionAnswerRequest{}); err == nil {
 		t.Fatal("empty mission answer accepted")
+	}
+	if _, err := api.ExportArchive(ctx, " "); err == nil {
+		t.Fatal("empty archive mission id accepted")
+	}
+	if _, err := api.RestoreArchive(ctx, MissionArchiveEnvelope{}); err == nil {
+		t.Fatal("empty archive envelope accepted")
 	}
 	if calls != 0 {
 		t.Fatalf("validation issued %d network calls", calls)
