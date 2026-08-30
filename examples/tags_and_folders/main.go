@@ -255,9 +255,12 @@ func main() {
 	fmt.Println("\n--- List Mocks by Tag ---")
 
 	list, err := client.Mocks().List(ctx, &mockarty.ListMocksOptions{
-		Namespace: "sandbox",
-		Tags:      []string{"critical"},
-		Limit:     50,
+		Namespace:  "sandbox",
+		Tags:       []string{"critical"},
+		FolderID:   crudFolder.ID,
+		Protocol:   "http",
+		Limit:      50,
+		OnlyActive: true,
 	})
 	if err != nil {
 		fmt.Printf("List by tag returned: %v\n", err)

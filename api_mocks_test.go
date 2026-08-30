@@ -237,11 +237,14 @@ func TestMockAPI_List(t *testing.T) {
 		{
 			name: "with namespace and tags",
 			opts: &ListMocksOptions{
-				Namespace: "production",
-				Tags:      []string{"users", "v2"},
-				Search:    "test",
-				Offset:    10,
-				Limit:     20,
+				Namespace:  "production",
+				Tags:       []string{"users", "v2"},
+				Search:     "test",
+				FolderID:   "folder-1",
+				Protocol:   "grpc",
+				Offset:     10,
+				Limit:      20,
+				OnlyActive: true,
 			},
 			serverResp: `{"items":[{"id":"mock-1"},{"id":"mock-2"}],"total":50}`,
 		},
@@ -273,6 +276,15 @@ func TestMockAPI_List(t *testing.T) {
 				}
 				if tt.opts.Search != "" && !strings.Contains(gotPath, "search="+tt.opts.Search) {
 					t.Errorf("expected search in query, got path: %s", gotPath)
+				}
+				if tt.opts.FolderID != "" && !strings.Contains(gotPath, "folderId="+tt.opts.FolderID) {
+					t.Errorf("expected folderId in query, got path: %s", gotPath)
+				}
+				if tt.opts.Protocol != "" && !strings.Contains(gotPath, "protocol="+tt.opts.Protocol) {
+					t.Errorf("expected protocol in query, got path: %s", gotPath)
+				}
+				if tt.opts.OnlyActive && !strings.Contains(gotPath, "onlyActive=true") {
+					t.Errorf("expected onlyActive in query, got path: %s", gotPath)
 				}
 			}
 		})

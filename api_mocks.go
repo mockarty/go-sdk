@@ -18,11 +18,14 @@ type MockAPI struct {
 
 // ListMocksOptions configures the List request.
 type ListMocksOptions struct {
-	Namespace string
-	Tags      []string
-	Search    string
-	Offset    int
-	Limit     int
+	Namespace  string
+	Tags       []string
+	Search     string
+	FolderID   string
+	Protocol   string
+	Offset     int
+	Limit      int
+	OnlyActive bool
 }
 
 // LogsOptions configures the Logs request.
@@ -100,6 +103,15 @@ func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListRe
 		}
 		if opts.Search != "" {
 			params.Set("search", opts.Search)
+		}
+		if opts.FolderID != "" {
+			params.Set("folderId", opts.FolderID)
+		}
+		if opts.Protocol != "" {
+			params.Set("protocol", opts.Protocol)
+		}
+		if opts.OnlyActive {
+			params.Set("onlyActive", "true")
 		}
 		if opts.Offset > 0 {
 			offset = opts.Offset
