@@ -12,7 +12,7 @@ import (
 
 func TestCloudRefundsListRefundsDecodesRedactedOperatorProjection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.RequestURI() != "/api/v1/cloud/operator/payments" {
+		if r.Method != http.MethodGet || r.URL.RequestURI() != "/api/v1/cloud/operator/refunds" {
 			t.Fatalf("request = %s %s", r.Method, r.URL.RequestURI())
 		}
 		_, _ = w.Write([]byte(`{"payments":[{"operation_id":"payment-ignored"}],"refunds":[{"operation_id":"refund-1","generation":4,"status":"operator_required","amount_minor":1500,"currency":"RUB","provider":"yookassa"}],"total":1,"refund_total":1,"request_id":"req-list-1"}`))

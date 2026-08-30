@@ -66,15 +66,15 @@ func (a *CloudRefundsAPI) ListRefunds(ctx context.Context) ([]CloudRefundInciden
 	var out struct {
 		Refunds []CloudRefundIncident `json:"refunds"`
 	}
-	if err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/payments", nil, &out); err != nil {
+	if err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/refunds", nil, &out); err != nil {
 		return nil, err
 	}
 	if out.Refunds == nil {
-		return nil, fmt.Errorf("mockarty: operator payments response is missing refunds")
+		return nil, fmt.Errorf("mockarty: operator refunds response is missing refunds")
 	}
 	for _, refund := range out.Refunds {
 		if !validCloudRefundIncident(refund) {
-			return nil, fmt.Errorf("mockarty: operator payments response contains an invalid refund projection")
+			return nil, fmt.Errorf("mockarty: operator refunds response contains an invalid refund projection")
 		}
 	}
 	return out.Refunds, nil
