@@ -13,6 +13,9 @@ func TestCloudConnectorsWriteOnlySecretLifecycle(t *testing.T) {
 	var requests []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests = append(requests, r.Method+" "+r.URL.Path)
+		if r.Header.Get("Authorization") != "Bearer operator-session" || r.Header.Get(headerAPIKey) != "" {
+			t.Fatalf("operator auth headers Authorization=%q X-API-Key=%q", r.Header.Get("Authorization"), r.Header.Get(headerAPIKey))
+		}
 		if r.Method != http.MethodGet && r.Header.Get("Idempotency-Key") == "" {
 			t.Fatal("missing Idempotency-Key")
 		}
@@ -33,7 +36,7 @@ func TestCloudConnectorsWriteOnlySecretLifecycle(t *testing.T) {
 		}
 	}))
 	t.Cleanup(server.Close)
-	api := NewClient(server.URL).CloudConnectors()
+	api := NewClient(server.URL, WithAPIKey("operator-session")).CloudConnectors()
 	items, err := api.List(context.Background())
 	if err != nil || len(items) != 1 {
 		t.Fatalf("list=(%+v,%v)", items, err)

@@ -57,7 +57,7 @@ func (a *CloudOAuthProvidersAPI) List(ctx context.Context) ([]CloudOAuthProvider
 	var out struct {
 		Providers []CloudOAuthProvider `json:"providers"`
 	}
-	err := a.client.do(ctx, "GET", "/api/v1/cloud/operator/oauth/providers", nil, &out)
+	err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/oauth/providers", nil, &out)
 	return out.Providers, err
 }
 
@@ -73,7 +73,7 @@ func (a *CloudOAuthProvidersAPI) Update(ctx context.Context, provider string, up
 		return nil, fmt.Errorf("mockarty: client secret and clear secret are mutually exclusive")
 	}
 	headers := map[string]string{"Idempotency-Key": idempotencyKey}
-	ctx = withRequestHeaders(ctx, headers)
+	ctx = a.client.cloudContextWithHeaders(ctx, headers)
 	var out CloudOAuthProvider
 	err = a.client.do(ctx, "PUT", "/api/v1/cloud/operator/oauth/providers/"+url.PathEscape(provider), request, &out)
 	return &out, err

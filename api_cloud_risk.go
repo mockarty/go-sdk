@@ -76,7 +76,7 @@ func (a *CloudRiskAPI) ListCases(ctx context.Context, status string, limit int) 
 	var out struct {
 		Cases []CloudRiskCase `json:"cases"`
 	}
-	err := a.client.do(ctx, "GET", "/api/v1/cloud/operator/risk/cases?"+query.Encode(), nil, &out)
+	err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/risk/cases?"+query.Encode(), nil, &out)
 	return out.Cases, err
 }
 
@@ -85,7 +85,7 @@ func (a *CloudRiskAPI) GetCase(ctx context.Context, caseID string) (*CloudRiskCa
 		return nil, fmt.Errorf("mockarty: case id is required")
 	}
 	var out CloudRiskCaseDetail
-	err := a.client.do(ctx, "GET", "/api/v1/cloud/operator/risk/cases/"+url.PathEscape(caseID), nil, &out)
+	err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/risk/cases/"+url.PathEscape(caseID), nil, &out)
 	return &out, err
 }
 
@@ -99,7 +99,7 @@ func (a *CloudRiskAPI) ReleaseEnforcement(ctx context.Context, caseID, enforceme
 		Enforcement CloudRiskEnforcement `json:"enforcement"`
 	}
 	digest := sha256.Sum256([]byte(caseID + "\x00" + enforcementID + "\x00" + strconv.FormatInt(revision, 10) + "\x00" + reason))
-	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": "risk-release:" + hex.EncodeToString(digest[:])})
+	ctx = a.client.cloudContextWithHeaders(ctx, map[string]string{"Idempotency-Key": "risk-release:" + hex.EncodeToString(digest[:])})
 	err := a.client.do(ctx, "POST", "/api/v1/cloud/operator/risk/cases/"+url.PathEscape(caseID)+
 		"/enforcements/"+url.PathEscape(enforcementID)+"/release", map[string]any{"revision": revision, "reason": reason}, &out)
 	return &out.Enforcement, err

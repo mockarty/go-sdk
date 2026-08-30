@@ -30,9 +30,16 @@ func withRequestHeaders(ctx context.Context, headers map[string]string) context.
 }
 
 func (c *Client) cloudContext(ctx context.Context) context.Context {
+	return c.cloudContextWithHeaders(ctx, nil)
+}
+
+func (c *Client) cloudContextWithHeaders(ctx context.Context, extra map[string]string) context.Context {
 	headers := map[string]string{headerAPIKey: ""}
 	if c.apiKey != "" {
 		headers["Authorization"] = "Bearer " + c.apiKey
+	}
+	for name, value := range extra {
+		headers[name] = value
 	}
 	return withRequestHeaders(ctx, headers)
 }

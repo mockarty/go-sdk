@@ -71,7 +71,7 @@ func (a *CloudConnectorsAPI) List(ctx context.Context) ([]CloudConnector, error)
 	var out struct {
 		Connectors []CloudConnector `json:"connectors"`
 	}
-	err := a.client.do(ctx, "GET", "/api/v1/cloud/operator/connectors", nil, &out)
+	err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/connectors", nil, &out)
 	return out.Connectors, err
 }
 
@@ -83,7 +83,7 @@ func (a *CloudConnectorsAPI) Update(ctx context.Context, kind, provider, slot st
 	if update.Config == nil || update.ExpectedRevision < 1 || strings.TrimSpace(idempotencyKey) == "" {
 		return nil, fmt.Errorf("mockarty: config, positive expected revision, and idempotency key are required")
 	}
-	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
+	ctx = a.client.cloudContextWithHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
 	var out CloudConnector
 	err = a.client.do(ctx, "PUT", path, update, &out)
 	return &out, err
@@ -97,7 +97,7 @@ func (a *CloudConnectorsAPI) Test(ctx context.Context, kind, provider, slot, ide
 	if strings.TrimSpace(idempotencyKey) == "" {
 		return nil, fmt.Errorf("mockarty: idempotency key is required")
 	}
-	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
+	ctx = a.client.cloudContextWithHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
 	var out CloudConnectorTestResult
 	err = a.client.do(ctx, "POST", path+"/test", map[string]any{}, &out)
 	return &out, err
@@ -108,6 +108,6 @@ func (a *CloudConnectorsAPI) Revoke(ctx context.Context, versionID, idempotencyK
 	if versionID == "" || strings.TrimSpace(idempotencyKey) == "" {
 		return fmt.Errorf("mockarty: version id and idempotency key are required")
 	}
-	ctx = withRequestHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
+	ctx = a.client.cloudContextWithHeaders(ctx, map[string]string{"Idempotency-Key": idempotencyKey})
 	return a.client.do(ctx, "POST", "/api/v1/cloud/operator/connector-versions/"+url.PathEscape(versionID)+"/revoke", map[string]any{}, nil)
 }
