@@ -53,6 +53,33 @@ type CloudRefundResolution struct {
 	Replayed  bool                `json:"replayed,omitempty"`
 }
 
+func validCloudRefundIncident(incident CloudRefundIncident) bool {
+	return incident.OperationID != "" && incident.Generation >= 0 && incident.Status != "" &&
+		incident.AmountMinor >= 0 && incident.Currency != "" && incident.Provider != ""
+}
+
+// ListRefunds returns the redacted, actionable refund projection from the
+// operator commerce ledger. The caller needs the exact operator:commerce:write
+// token scope (or an interactive operator session). Payment records sharing the
+// transport envelope are deliberately ignored.
+func (a *CloudRefundsAPI) ListRefunds(ctx context.Context) ([]CloudRefundIncident, error) {
+	var out struct {
+		Refunds []CloudRefundIncident `json:"refunds"`
+	}
+	if err := a.client.do(a.client.cloudContext(ctx), "GET", "/api/v1/cloud/operator/payments", nil, &out); err != nil {
+		return nil, err
+	}
+	if out.Refunds == nil {
+		return nil, fmt.Errorf("mockarty: operator payments response is missing refunds")
+	}
+	for _, refund := range out.Refunds {
+		if !validCloudRefundIncident(refund) {
+			return nil, fmt.Errorf("mockarty: operator payments response contains an invalid refund projection")
+		}
+	}
+	return out.Refunds, nil
+}
+
 var (
 	cloudRefundReasonPattern      = regexp.MustCompile(`^[a-z0-9._:-]{2,64}$`)
 	cloudRefundIdempotencyPattern = regexp.MustCompile(`^[A-Za-z0-9._:/@-]{1,128}$`)
