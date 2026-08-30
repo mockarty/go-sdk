@@ -56,58 +56,59 @@ type Client struct {
 	retryDelay time.Duration
 
 	// Sub-API singletons, all eagerly initialized in NewClient.
-	mockAPI                *MockAPI
-	namespaceAPI           *NamespaceAPI
-	storeAPI               *StoreAPI
-	collectionAPI          *CollectionAPI
-	perfAPI                *PerfAPI
-	healthAPI              *HealthAPI
-	generatorAPI           *GeneratorAPI
-	fuzzingAPI             *FuzzingAPI
-	contractAPI            *ContractAPI
-	recorderAPI            *RecorderAPI
-	templateAPI            *TemplateAPI
-	importAPI              *ImportAPI
-	testRunAPI             *TestRunAPI
-	tagAPI                 *TagAPI
-	uiTestAPI              *UITestAPI
-	gitSyncAPI             *GitSyncAPI
-	folderAPI              *FolderAPI
-	undefinedAPI           *UndefinedAPI
-	statsAPI               *StatsAPI
-	agentTaskAPI           *AgentTaskAPI
-	issueTrackerAPI        *IssueTrackerAPI
-	mcpAPI                 *MCPAPI
-	namespaceSettingsAPI   *NamespaceSettingsAPI
-	proxyAPI               *ProxyAPI
-	environmentAPI         *EnvironmentAPI
-	chaosAPI               *ChaosAPI
-	testPlansAPI           *TestPlansAPI
-	entitySearchAPI        *EntitySearchAPI
-	secretsAPI             *SecretsAPI
-	promptsAPI             *PromptsAPI
-	meAPI                  *MeAPI
-	externalRunsAPI        *ExternalRunsAPI
-	flowRunsAPI            *FlowRunsAPI
-	discoveryAPI           *DiscoveryAPI
-	experienceAPI          *ExperienceAPI
-	economicsAPI           *EconomicsAPI
-	cloudWebhooksAPI       *CloudWebhooksAPI
-	cloudInstancesAPI      *CloudInstancesAPI
-	cloudSpacesAPI         *CloudSpacesAPI
-	cloudEntitlementsAPI   *CloudEntitlementsAPI
-	cloudSharedProjectsAPI *CloudSharedProjectsAPI
-	cloudConnectorsAPI     *CloudConnectorsAPI
-	cloudOAuthProvidersAPI *CloudOAuthProvidersAPI
-	cloudRiskAPI           *CloudRiskAPI
-	cloudIdentityAPI       *CloudIdentityAPI
-	autonomousMissionsAPI  *AutonomousMissionsAPI
-	workflowDefinitionsAPI *WorkflowDefinitionsAPI
-	coderDeliveryAPI       *CoderDeliveryAPI
-	deliveryPolicyAPI      *DeliveryPolicyAPI
-	llmSecurityAPI         *LLMSecurityAPI
-	pageAnalyzerAPI        *PageAnalyzerAPI
-	mediaDeliveryAPI       *MediaDeliveryAPI
+	mockAPI                 *MockAPI
+	namespaceAPI            *NamespaceAPI
+	storeAPI                *StoreAPI
+	collectionAPI           *CollectionAPI
+	perfAPI                 *PerfAPI
+	healthAPI               *HealthAPI
+	generatorAPI            *GeneratorAPI
+	fuzzingAPI              *FuzzingAPI
+	contractAPI             *ContractAPI
+	recorderAPI             *RecorderAPI
+	templateAPI             *TemplateAPI
+	importAPI               *ImportAPI
+	testRunAPI              *TestRunAPI
+	tagAPI                  *TagAPI
+	uiTestAPI               *UITestAPI
+	gitSyncAPI              *GitSyncAPI
+	folderAPI               *FolderAPI
+	undefinedAPI            *UndefinedAPI
+	statsAPI                *StatsAPI
+	agentTaskAPI            *AgentTaskAPI
+	issueTrackerAPI         *IssueTrackerAPI
+	mcpAPI                  *MCPAPI
+	namespaceSettingsAPI    *NamespaceSettingsAPI
+	proxyAPI                *ProxyAPI
+	environmentAPI          *EnvironmentAPI
+	chaosAPI                *ChaosAPI
+	testPlansAPI            *TestPlansAPI
+	entitySearchAPI         *EntitySearchAPI
+	secretsAPI              *SecretsAPI
+	promptsAPI              *PromptsAPI
+	meAPI                   *MeAPI
+	externalRunsAPI         *ExternalRunsAPI
+	flowRunsAPI             *FlowRunsAPI
+	discoveryAPI            *DiscoveryAPI
+	experienceAPI           *ExperienceAPI
+	economicsAPI            *EconomicsAPI
+	cloudWebhooksAPI        *CloudWebhooksAPI
+	cloudInstancesAPI       *CloudInstancesAPI
+	cloudSpacesAPI          *CloudSpacesAPI
+	cloudEntitlementsAPI    *CloudEntitlementsAPI
+	cloudSharedProjectsAPI  *CloudSharedProjectsAPI
+	cloudConnectorsAPI      *CloudConnectorsAPI
+	cloudOAuthProvidersAPI  *CloudOAuthProvidersAPI
+	cloudRiskAPI            *CloudRiskAPI
+	cloudIdentityAPI        *CloudIdentityAPI
+	autonomousMissionsAPI   *AutonomousMissionsAPI
+	workflowDefinitionsAPI  *WorkflowDefinitionsAPI
+	coderDeliveryAPI        *CoderDeliveryAPI
+	deliveryPolicyAPI       *DeliveryPolicyAPI
+	llmSecurityAPI          *LLMSecurityAPI
+	pageAnalyzerAPI         *PageAnalyzerAPI
+	mediaDeliveryAPI        *MediaDeliveryAPI
+	effectReconciliationAPI *EffectReconciliationAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -194,6 +195,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.llmSecurityAPI = &LLMSecurityAPI{client: c}
 	c.pageAnalyzerAPI = &PageAnalyzerAPI{client: c}
 	c.mediaDeliveryAPI = &MediaDeliveryAPI{client: c}
+	c.effectReconciliationAPI = &EffectReconciliationAPI{client: c}
 
 	return c
 }
@@ -262,6 +264,9 @@ func (c *Client) DeliveryPolicy() *DeliveryPolicyAPI { return c.deliveryPolicyAP
 
 // MediaDelivery returns the operator reconciliation API for fenced media jobs.
 func (c *Client) MediaDelivery() *MediaDeliveryAPI { return c.mediaDeliveryAPI }
+
+// EffectReconciliation returns the admin queue for unresolved external effects.
+func (c *Client) EffectReconciliation() *EffectReconciliationAPI { return c.effectReconciliationAPI }
 
 // LLMSecurity returns the layered prompt-security management API.
 func (c *Client) LLMSecurity() *LLMSecurityAPI { return c.llmSecurityAPI }
