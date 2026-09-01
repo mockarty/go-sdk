@@ -81,3 +81,74 @@ func TestExternalRunsLifecycle_NamespaceRequired(t *testing.T) {
 		t.Fatalf("expected namespace-required error, got %v", err)
 	}
 }
+
+func TestExternalRunsLifecycle_FencedMutations(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		base := "/api/v1/namespaces/sandbox/tcm/external-runs/lifecycle/run-1"
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == base+"/steps":
+			if got := r.Header.Get("If-Match"); got != `"7"` {
+				t.Fatalf("append steps If-Match = %q, want quoted revision", got)
+			}
+			_ = json.NewEncoder(w).Encode(LifecycleRun{ID: "run-1", Status: "running", Revision: 8})
+		case r.Method == http.MethodPost && r.URL.Path == base+"/attachments":
+			if got := r.Header.Get("If-Match"); got != `"8"` {
+				t.Fatalf("upload attachment If-Match = %q, want quoted revision", got)
+			}
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				t.Fatalf("parse multipart: %v", err)
+			}
+			file, header, err := r.FormFile("file")
+			if err != nil {
+				t.Fatalf("multipart file: %v", err)
+			}
+			defer file.Close()
+			data, _ := io.ReadAll(file)
+			if header.Filename != "evidence.txt" || string(data) != "measured" {
+				t.Fatalf("multipart attachment = %q %q", header.Filename, data)
+			}
+			_ = json.NewEncoder(w).Encode(LifecycleRun{ID: "run-1", Status: "running", Revision: 9})
+		case r.Method == http.MethodPost && r.URL.Path == base+"/finish":
+			if got := r.Header.Get("If-Match"); got != `"9"` {
+				t.Fatalf("finish If-Match = %q, want quoted revision", got)
+			}
+			_ = json.NewEncoder(w).Encode(LifecycleRun{ID: "run-1", Status: "passed", Revision: 11})
+		default:
+			http.Error(w, "unexpected "+r.Method+" "+r.URL.Path, http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	api := NewClient(srv.URL, WithNamespace("sandbox")).ExternalRuns()
+	ctx := context.Background()
+	run, err := api.AppendStepsAtRevision(ctx, "", "run-1", 7, []LifecycleStep{{StepKey: "s1", Status: "passed"}})
+	if err != nil || run.Revision != 8 {
+		t.Fatalf("AppendStepsAtRevision: %+v, %v", run, err)
+	}
+	run, err = api.UploadAttachmentAtRevision(ctx, "", "run-1", 8, "evidence.txt", []byte("measured"))
+	if err != nil || run.Revision != 9 {
+		t.Fatalf("UploadAttachmentAtRevision: %+v, %v", run, err)
+	}
+	run, err = api.FinishRunAtRevision(ctx, "", "run-1", 9, FinishRunRequest{Status: "passed"})
+	if err != nil || run.Revision != 11 || run.Status != "passed" {
+		t.Fatalf("FinishRunAtRevision: %+v, %v", run, err)
+	}
+}
+
+func TestExternalRunsLifecycle_RejectsUnsafeAttachmentNameBeforeNetwork(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		requests++
+	}))
+	defer srv.Close()
+
+	api := NewClient(srv.URL, WithNamespace("sandbox")).ExternalRuns()
+	for _, name := range []string{"", "evidence\r\nX-Injected: true"} {
+		if _, err := api.UploadAttachment(context.Background(), "", "run-1", name, nil); err == nil {
+			t.Fatalf("UploadAttachment(%q) accepted unsafe name", name)
+		}
+	}
+	if requests != 0 {
+		t.Fatalf("unsafe attachment name sent %d requests", requests)
+	}
+}

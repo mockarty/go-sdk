@@ -45,12 +45,13 @@ func main() {
 		{StepKey: "cart", Name: "add to cart", Status: "passed", DurationMS: 80},
 		{StepKey: "pay", Name: "pay", Status: "failed", Message: "gateway 500", DurationMS: 210},
 	} {
-		if _, err := er.AppendSteps(ctx, "", run.ID, []mockarty.LifecycleStep{step}); err != nil {
+		run, err = er.AppendStepsAtRevision(ctx, "", run.ID, run.Revision, []mockarty.LifecycleStep{step})
+		if err != nil {
 			log.Fatalf("append step %s: %v", step.StepKey, err)
 		}
 	}
 
-	fin, err := er.FinishRun(ctx, "", run.ID, mockarty.FinishRunRequest{
+	fin, err := er.FinishRunAtRevision(ctx, "", run.ID, run.Revision, mockarty.FinishRunRequest{
 		Status: "failed", Summary: "payment gateway returned 500",
 	})
 	if err != nil {
