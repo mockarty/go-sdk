@@ -160,6 +160,26 @@ func (a *CloudSpacesAPI) Get(ctx context.Context, spaceID string) (*CloudSpace, 
 	return &out.Space, err
 }
 
+// Rename changes only the user-visible Space name and requires both revision
+// and idempotency fencing for exact retries.
+func (a *CloudSpacesAPI) Rename(ctx context.Context, spaceID, name, etag, key string) (*CloudSpace, error) {
+	if err := requireCloudSpaceMutation(etag, key); err != nil {
+		return nil, err
+	}
+	path, err := cloudSpacePath(spaceID)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(name) == "" {
+		return nil, fmt.Errorf("mockarty: Space name is required")
+	}
+	var out struct {
+		Space CloudSpace `json:"space"`
+	}
+	err = a.client.do(a.requestContext(ctx, etag, key), http.MethodPatch, path, map[string]string{"name": name}, &out)
+	return &out.Space, err
+}
+
 func (a *CloudSpacesAPI) ListMembers(ctx context.Context, spaceID, cursor string, limit int) (*CloudSpaceMemberPage, error) {
 	path, err := cloudSpacePath(spaceID)
 	if err != nil {

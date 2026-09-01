@@ -102,6 +102,8 @@ type Client struct {
 	cloudRiskAPI            *CloudRiskAPI
 	cloudRefundsAPI         *CloudRefundsAPI
 	cloudIdentityAPI        *CloudIdentityAPI
+	cloudCustomerAPI        *CloudCustomerAPI
+	cloudOperationsAPI      *CloudOperationsAPI
 	autonomousMissionsAPI   *AutonomousMissionsAPI
 	workflowDefinitionsAPI  *WorkflowDefinitionsAPI
 	coderDeliveryAPI        *CoderDeliveryAPI
@@ -190,6 +192,8 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudRiskAPI = &CloudRiskAPI{client: c}
 	c.cloudRefundsAPI = &CloudRefundsAPI{client: c}
 	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
+	c.cloudCustomerAPI = &CloudCustomerAPI{client: c}
+	c.cloudOperationsAPI = &CloudOperationsAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
@@ -256,6 +260,12 @@ func (c *Client) CloudRefunds() *CloudRefundsAPI { return c.cloudRefundsAPI }
 
 // CloudIdentity returns the Cloud account sign-in-method and step-up API.
 func (c *Client) CloudIdentity() *CloudIdentityAPI { return c.cloudIdentityAPI }
+
+// CloudCustomer returns customer-authorized loyalty, support and appeal APIs.
+func (c *Client) CloudCustomer() *CloudCustomerAPI { return c.cloudCustomerAPI }
+
+// CloudOperations returns least-privilege operator support and analytics APIs.
+func (c *Client) CloudOperations() *CloudOperationsAPI { return c.cloudOperationsAPI }
 
 // AutonomousMissions returns the API used to submit and supervise autonomous
 // testing missions.
