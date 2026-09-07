@@ -19,6 +19,7 @@ func main() {
 		panic(err)
 	}
 	fmt.Println(mission.ID, mission.Status)
+	fmt.Println("independent AQC receipts", len(mission.AQCEvidence), "merge status", mission.MRMergeStatus, "repair attempts", mission.DeployRepairAttempts)
 	if os.Getenv("CODER_ADD_GO_CHECK") == "1" {
 		mission, err = client.CoderDelivery().AddToMission(context.Background(), mission.ID, mockarty.CoderMissionAddRequest{
 			Tasks: []mockarty.CoderSubTask{{Prompt: "Run and fix the Go unit suite", RequiredChecks: []mockarty.CoderRequiredCheck{{Name: "Go unit tests", Args: []string{"go", "test", "./..."}}}}},

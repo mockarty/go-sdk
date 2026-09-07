@@ -94,3 +94,19 @@ func TestCoderDeliveryReconcileDeployRejectsImplicitOutcome(t *testing.T) {
 		t.Fatal("observability query without expression accepted")
 	}
 }
+
+func TestCoderMissionDecodesIndependentAcceptanceAndDeliveryEvidence(t *testing.T) {
+	var mission CoderMission
+	err := json.Unmarshal([]byte(`{
+		"id":"m1","namespace":"team-a","goal":"ship","repoUrl":"https://git.example/app.git","status":"done",
+		"aqcEvidence":[{"runId":"aqc-1","namespace":"team-a","missionId":"m1","jobId":"m1-t1","branch":"coder/m1-t1","commit":"0123456789abcdef0123456789abcdef01234567","status":"green","attempt":1,"engines":["mockarty.testing.ui"],"evidence":[{"kind":"ui-run","id":"ui-1","engine":"mockarty.testing.ui"}]}],
+		"mrUrl":"https://git.example/mr/7","mrNumber":7,"mrMergeStatus":"merged","mrMergedCommit":"abcdef0123456789abcdef0123456789abcdef01","deployRepairAttempts":1
+	}`), &mission)
+	if err != nil {
+		t.Fatalf("decode mission: %v", err)
+	}
+	if len(mission.AQCEvidence) != 1 || mission.AQCEvidence[0].Branch != "coder/m1-t1" ||
+		mission.MRNumber != 7 || mission.MRMergeStatus != "merged" || mission.DeployRepairAttempts != 1 {
+		t.Fatalf("mission evidence fields were lost: %+v", mission)
+	}
+}

@@ -144,20 +144,52 @@ type CoderMissionCheckEvidence struct {
 	ExitCode     int       `json:"exitCode"`
 }
 
+type CoderAcceptanceArtifact struct {
+	Kind    string `json:"kind"`
+	ID      string `json:"id"`
+	Engine  string `json:"engine"`
+	URL     string `json:"url,omitempty"`
+	Surface string `json:"surface,omitempty"`
+}
+
+type CoderAcceptanceReceipt struct {
+	ObservedAt time.Time                 `json:"observedAt"`
+	RunID      string                    `json:"runId"`
+	Namespace  string                    `json:"namespace"`
+	MissionID  string                    `json:"missionId"`
+	JobID      string                    `json:"jobId"`
+	Branch     string                    `json:"branch"`
+	Commit     string                    `json:"commit"`
+	Status     string                    `json:"status"`
+	Engines    []string                  `json:"engines"`
+	Evidence   []CoderAcceptanceArtifact `json:"evidence"`
+	Attempt    int                       `json:"attempt"`
+}
+
 type CoderMission struct {
-	Checks          []CoderMissionCheckEvidence `json:"checks,omitempty"`
-	ID              string                      `json:"id"`
-	Namespace       string                      `json:"namespace"`
-	Goal            string                      `json:"goal"`
-	RepoURL         string                      `json:"repoUrl"`
-	Status          string                      `json:"status"`
-	Error           string                      `json:"error,omitempty"`
-	DeployTarget    string                      `json:"deployTarget,omitempty"`
-	AcceptedCommit  string                      `json:"acceptedCommit,omitempty"`
-	Approval        string                      `json:"approval,omitempty"`
-	DeployResult    map[string]any              `json:"deployResult,omitempty"`
-	DeployStopState string                      `json:"deployStopState,omitempty"`
-	UnverifiedJobs  int                         `json:"unverifiedJobs,omitempty"`
+	Checks               []CoderMissionCheckEvidence `json:"checks,omitempty"`
+	AQCEvidence          []CoderAcceptanceReceipt    `json:"aqcEvidence,omitempty"`
+	ID                   string                      `json:"id"`
+	Namespace            string                      `json:"namespace"`
+	Goal                 string                      `json:"goal"`
+	RepoURL              string                      `json:"repoUrl"`
+	Status               string                      `json:"status"`
+	Error                string                      `json:"error,omitempty"`
+	DeployTarget         string                      `json:"deployTarget,omitempty"`
+	AcceptedCommit       string                      `json:"acceptedCommit,omitempty"`
+	Approval             string                      `json:"approval,omitempty"`
+	DeployResult         map[string]any              `json:"deployResult,omitempty"`
+	DeployStopState      string                      `json:"deployStopState,omitempty"`
+	MRURL                string                      `json:"mrUrl,omitempty"`
+	MRError              string                      `json:"mrError,omitempty"`
+	MRTargetBranch       string                      `json:"mrTargetBranch,omitempty"`
+	MRHeadCommit         string                      `json:"mrHeadCommit,omitempty"`
+	MRMergedCommit       string                      `json:"mrMergedCommit,omitempty"`
+	MRMergeStatus        string                      `json:"mrMergeStatus,omitempty"`
+	MRNumber             int                         `json:"mrNumber,omitempty"`
+	DeployRepairAttempts int                         `json:"deployRepairAttempts,omitempty"`
+	UnverifiedJobs       int                         `json:"unverifiedJobs,omitempty"`
+	MRConflict           bool                        `json:"mrConflict,omitempty"`
 }
 
 type CoderDeployReconciliationOutcome string
