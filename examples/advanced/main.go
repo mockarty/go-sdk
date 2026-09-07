@@ -31,6 +31,9 @@ func main() {
 		mockarty.WithAPIKey("your-api-key"),
 		mockarty.WithNamespace("sandbox"),
 	)
+	if protocols, err := client.Mocks().ListPluginProtocols(ctx, "sandbox"); err == nil {
+		fmt.Printf("Active plugin protocols: %d\n", protocols.Count)
+	}
 
 	// -----------------------------------------------------------------------
 	// 1. Chain mocks — E-commerce order workflow

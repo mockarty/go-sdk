@@ -34,6 +34,28 @@ type LogsOptions struct {
 	Offset int
 }
 
+// PluginProtocol describes one active plugin-supplied wire codec. The host
+// serves it through the unified listener and routes decoded messages to
+// ordinary Socket mocks using ServerName.
+type PluginProtocol struct {
+	Key          string `json:"key"`
+	Name         string `json:"name"`
+	Description  string `json:"description,omitempty"`
+	Transport    string `json:"transport"`
+	Magic        string `json:"magic"`
+	PluginID     string `json:"pluginId"`
+	MockProtocol string `json:"mockProtocol"`
+	ServerName   string `json:"serverName"`
+}
+
+// PluginProtocolCatalogue is returned by ListPluginProtocols.
+type PluginProtocolCatalogue struct {
+	Protocols []PluginProtocol `json:"protocols"`
+	Listener  string           `json:"listener"`
+	Usage     string           `json:"usage"`
+	Count     int              `json:"count"`
+}
+
 // CreateOption tunes a Create call. Use CreateNew or Overwrite to resolve a
 // duplicate-entity (HTTP 409) conflict when a similar mock already exists
 // (same endpoint, possibly different conditions).
@@ -132,6 +154,23 @@ func (a *MockAPI) List(ctx context.Context, opts *ListMocksOptions) (*MockListRe
 	}
 
 	var resp MockListResponse
+	if err := a.client.do(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// ListPluginProtocols lists plugin-supplied protocol codecs active in the
+// requested namespace. An empty namespace uses the client's default.
+func (a *MockAPI) ListPluginProtocols(ctx context.Context, namespace string) (*PluginProtocolCatalogue, error) {
+	if namespace == "" {
+		namespace = a.client.namespace
+	}
+	path := "/api/v1/plugin-protocols"
+	if namespace != "" {
+		path += "?namespace=" + url.QueryEscape(namespace)
+	}
+	var resp PluginProtocolCatalogue
 	if err := a.client.do(ctx, "GET", path, nil, &resp); err != nil {
 		return nil, err
 	}

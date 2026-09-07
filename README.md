@@ -105,6 +105,9 @@ err := client.Mocks().BatchRestore(ctx, ids)
 // Logs and versions
 logs, err := client.Mocks().Logs(ctx, "mock-id", &mockarty.LogsOptions{Limit: 50})
 versions, err := client.Mocks().GetChain(ctx, "chain-id")
+
+// Active plugin-supplied wire codecs for this namespace.
+protocols, err := client.Mocks().ListPluginProtocols(ctx, "production")
 ```
 
 ### Namespaces
