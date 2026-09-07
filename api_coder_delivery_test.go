@@ -37,6 +37,19 @@ func TestCoderDeliveryCanonicalRoutesAndApproval(t *testing.T) {
 				t.Fatalf("add body=%+v", body)
 			}
 		}
+		if r.URL.Path == "/api/v1/observability/sources" {
+			_, _ = w.Write([]byte(`{"contractVersion":"mockarty.observability-query/v1","sources":[]}`))
+			return
+		}
+		if r.URL.Path == "/api/v1/observability/query" {
+			var body CoderObservabilityQuery
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.Source != "prometheus" || body.Correlation.MissionID != "m1" {
+				t.Fatalf("observability body=%+v", body)
+			}
+			_, _ = w.Write([]byte(`{"contractVersion":"mockarty.observability-query/v1","result":{"evidenceDigest":"sha256:test"}}`))
+			return
+		}
 		if r.URL.Path == "/api/v1/coder/delivery-config" {
 			_, _ = w.Write([]byte(`{"namespace":"team-a","infraNotes":"keep","quality":"thorough","missionSettings":{"guard_policy":"warn"},"ci":{"system":"gitlab"},"registry":{"url":"registry.test"},"gitops":{"repoUrl":"https://git.test/ops"},"policy":{"approverNotify":"ops"},"intake":{"projectIds":["p1"]}}`))
 			return
@@ -57,8 +70,15 @@ func TestCoderDeliveryCanonicalRoutesAndApproval(t *testing.T) {
 		Prompt: "add a test", RequiredChecks: []CoderRequiredCheck{{Name: "unit", Args: []string{"go", "test", "./..."}}},
 	}}})
 	_, _ = api.ReconcileDeploy(ctx, "m1", CoderDeployNotApplied)
-	if len(paths) != 9 {
+	_, _ = api.ObservabilitySources(ctx)
+	_, _ = api.QueryObservability(ctx, CoderObservabilityQuery{Source: "prometheus", Expression: "up", Correlation: CoderObservabilityCorrelation{MissionID: "m1"}})
+	if len(paths) != 11 {
 		t.Fatalf("paths=%v", paths)
+	}
+	for _, path := range paths[len(paths)-2:] {
+		if path != "GET /api/v1/observability/sources?namespace=team-a" && path != "POST /api/v1/observability/query?namespace=team-a" {
+			t.Fatalf("observability request escaped namespace: %s", path)
+		}
 	}
 	if putConfig.InfraNotes != "keep" || putConfig.Quality != "thorough" || putConfig.MissionSettings["guard_policy"] != "warn" || putConfig.CI.System != "gitlab" || putConfig.Registry.URL != "registry.test" || putConfig.GitOps.RepoURL == "" || putConfig.Policy.ApproverNotify != "ops" || len(putConfig.Intake.ProjectIDs) != 1 {
 		t.Fatalf("full-replace delivery config lost fields: %+v", putConfig)
@@ -69,5 +89,8 @@ func TestCoderDeliveryReconcileDeployRejectsImplicitOutcome(t *testing.T) {
 	api := NewClient("http://127.0.0.1:1", WithNamespace("team-a")).CoderDelivery()
 	if _, err := api.ReconcileDeploy(context.Background(), "m1", ""); err == nil {
 		t.Fatal("empty deployment outcome accepted")
+	}
+	if _, err := api.QueryObservability(context.Background(), CoderObservabilityQuery{Source: "prometheus"}); err == nil {
+		t.Fatal("observability query without expression accepted")
 	}
 }

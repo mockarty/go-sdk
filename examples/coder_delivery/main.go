@@ -35,4 +35,11 @@ func main() {
 		}
 		fmt.Println("reconciled", mission.DeployStopState)
 	}
+	if os.Getenv("CODER_OBSERVE") == "1" {
+		sources, err := client.CoderDelivery().ObservabilitySources(context.Background())
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("observability sources", len(sources.Sources))
+	}
 }
