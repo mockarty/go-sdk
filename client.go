@@ -106,6 +106,7 @@ type Client struct {
 	cloudOperationsAPI      *CloudOperationsAPI
 	autonomousMissionsAPI   *AutonomousMissionsAPI
 	workflowDefinitionsAPI  *WorkflowDefinitionsAPI
+	connectionAuthorityAPI  *ConnectionAuthorityAPI
 	coderDeliveryAPI        *CoderDeliveryAPI
 	deliveryPolicyAPI       *DeliveryPolicyAPI
 	llmSecurityAPI          *LLMSecurityAPI
@@ -196,6 +197,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudOperationsAPI = &CloudOperationsAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
+	c.connectionAuthorityAPI = &ConnectionAuthorityAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
 	c.deliveryPolicyAPI = &DeliveryPolicyAPI{client: c}
 	c.llmSecurityAPI = &LLMSecurityAPI{client: c}
@@ -230,6 +232,9 @@ func (c *Client) Economics() *EconomicsAPI { return c.economicsAPI }
 
 // WorkflowDefinitions returns the versioned workflow authoring API.
 func (c *Client) WorkflowDefinitions() *WorkflowDefinitionsAPI { return c.workflowDefinitionsAPI }
+
+// Connections returns the namespace-scoped immutable Connection Authority API.
+func (c *Client) Connections() *ConnectionAuthorityAPI { return c.connectionAuthorityAPI }
 
 // CloudWebhooks returns the curated Cloud webhook lifecycle API.
 func (c *Client) CloudWebhooks() *CloudWebhooksAPI { return c.cloudWebhooksAPI }
