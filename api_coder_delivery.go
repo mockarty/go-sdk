@@ -102,19 +102,62 @@ type CoderMissionStartRequest struct {
 	Analyze      bool     `json:"analyze,omitempty"`
 }
 
+type CoderRequiredCheck struct {
+	Name           string   `json:"name"`
+	Args           []string `json:"args"`
+	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+}
+
+type CoderVerifyDirective struct {
+	Engine string `json:"engine"`
+	Ref    string `json:"ref,omitempty"`
+	Target string `json:"target,omitempty"`
+	Note   string `json:"note,omitempty"`
+}
+
+type CoderSubTask struct {
+	Selector       map[string]string      `json:"selector,omitempty"`
+	Title          string                 `json:"title,omitempty"`
+	Prompt         string                 `json:"prompt"`
+	Path           string                 `json:"path,omitempty"`
+	Executor       string                 `json:"executor,omitempty"`
+	AgentName      string                 `json:"agentName,omitempty"`
+	SkillID        string                 `json:"skillId,omitempty"`
+	Verify         []CoderVerifyDirective `json:"verify,omitempty"`
+	RequiredChecks []CoderRequiredCheck   `json:"requiredChecks,omitempty"`
+}
+
+type CoderMissionAddRequest struct {
+	Tasks   []CoderSubTask `json:"tasks,omitempty"`
+	Prompts []string       `json:"prompts,omitempty"`
+}
+
+type CoderMissionCheckEvidence struct {
+	StartedAt    time.Time `json:"startedAt"`
+	FinishedAt   time.Time `json:"finishedAt"`
+	Args         []string  `json:"args"`
+	JobID        string    `json:"jobId"`
+	Name         string    `json:"name"`
+	Outcome      string    `json:"outcome"`
+	OutputDigest string    `json:"outputDigest,omitempty"`
+	Detail       string    `json:"detail,omitempty"`
+	ExitCode     int       `json:"exitCode"`
+}
+
 type CoderMission struct {
-	ID              string         `json:"id"`
-	Namespace       string         `json:"namespace"`
-	Goal            string         `json:"goal"`
-	RepoURL         string         `json:"repoUrl"`
-	Status          string         `json:"status"`
-	Error           string         `json:"error,omitempty"`
-	DeployTarget    string         `json:"deployTarget,omitempty"`
-	AcceptedCommit  string         `json:"acceptedCommit,omitempty"`
-	Approval        string         `json:"approval,omitempty"`
-	DeployResult    map[string]any `json:"deployResult,omitempty"`
-	DeployStopState string         `json:"deployStopState,omitempty"`
-	UnverifiedJobs  int            `json:"unverifiedJobs,omitempty"`
+	Checks          []CoderMissionCheckEvidence `json:"checks,omitempty"`
+	ID              string                      `json:"id"`
+	Namespace       string                      `json:"namespace"`
+	Goal            string                      `json:"goal"`
+	RepoURL         string                      `json:"repoUrl"`
+	Status          string                      `json:"status"`
+	Error           string                      `json:"error,omitempty"`
+	DeployTarget    string                      `json:"deployTarget,omitempty"`
+	AcceptedCommit  string                      `json:"acceptedCommit,omitempty"`
+	Approval        string                      `json:"approval,omitempty"`
+	DeployResult    map[string]any              `json:"deployResult,omitempty"`
+	DeployStopState string                      `json:"deployStopState,omitempty"`
+	UnverifiedJobs  int                         `json:"unverifiedJobs,omitempty"`
 }
 
 type CoderDeployReconciliationOutcome string
@@ -185,6 +228,19 @@ func (a *CoderDeliveryAPI) ApproveMission(ctx context.Context, missionID string,
 	}
 	var out CoderMission
 	err := a.client.do(ctx, http.MethodPost, a.path("missions/"+url.PathEscape(missionID)+"/approve", ""), map[string]bool{"approve": approve}, &out)
+	return &out, err
+}
+
+// AddToMission appends runner or specialist sub-tasks to a live mission.
+func (a *CoderDeliveryAPI) AddToMission(ctx context.Context, missionID string, request CoderMissionAddRequest) (*CoderMission, error) {
+	if strings.TrimSpace(missionID) == "" {
+		return nil, fmt.Errorf("mockarty: coder mission id is required")
+	}
+	if len(request.Tasks) == 0 && len(request.Prompts) == 0 {
+		return nil, fmt.Errorf("mockarty: at least one coder task or prompt is required")
+	}
+	var out CoderMission
+	err := a.client.do(ctx, http.MethodPost, a.path("missions/"+url.PathEscape(missionID)+"/add", ""), request, &out)
 	return &out, err
 }
 

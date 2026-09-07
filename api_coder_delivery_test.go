@@ -30,6 +30,13 @@ func TestCoderDeliveryCanonicalRoutesAndApproval(t *testing.T) {
 				t.Fatalf("reconciliation body=%v", body)
 			}
 		}
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/coder/missions/m1/add" {
+			var body CoderMissionAddRequest
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if len(body.Tasks) != 1 || len(body.Tasks[0].RequiredChecks) != 1 || body.Tasks[0].RequiredChecks[0].Args[0] != "go" {
+				t.Fatalf("add body=%+v", body)
+			}
+		}
 		if r.URL.Path == "/api/v1/coder/delivery-config" {
 			_, _ = w.Write([]byte(`{"namespace":"team-a","infraNotes":"keep","quality":"thorough","missionSettings":{"guard_policy":"warn"},"ci":{"system":"gitlab"},"registry":{"url":"registry.test"},"gitops":{"repoUrl":"https://git.test/ops"},"policy":{"approverNotify":"ops"},"intake":{"projectIds":["p1"]}}`))
 			return
@@ -46,8 +53,11 @@ func TestCoderDeliveryCanonicalRoutesAndApproval(t *testing.T) {
 	_, _ = api.ListMissions(ctx)
 	_, _ = api.GetMission(ctx, "m1")
 	_, _ = api.ApproveMission(ctx, "m1", true)
+	_, _ = api.AddToMission(ctx, "m1", CoderMissionAddRequest{Tasks: []CoderSubTask{{
+		Prompt: "add a test", RequiredChecks: []CoderRequiredCheck{{Name: "unit", Args: []string{"go", "test", "./..."}}},
+	}}})
 	_, _ = api.ReconcileDeploy(ctx, "m1", CoderDeployNotApplied)
-	if len(paths) != 8 {
+	if len(paths) != 9 {
 		t.Fatalf("paths=%v", paths)
 	}
 	if putConfig.InfraNotes != "keep" || putConfig.Quality != "thorough" || putConfig.MissionSettings["guard_policy"] != "warn" || putConfig.CI.System != "gitlab" || putConfig.Registry.URL != "registry.test" || putConfig.GitOps.RepoURL == "" || putConfig.Policy.ApproverNotify != "ops" || len(putConfig.Intake.ProjectIDs) != 1 {
