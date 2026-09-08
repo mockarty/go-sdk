@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	mockarty "github.com/mockarty/mockarty-go"
 )
@@ -12,6 +13,14 @@ func main() {
 	client := mockarty.NewClient(os.Getenv("MOCKARTY_BASE_URL"),
 		mockarty.WithAPIKey(os.Getenv("MOCKARTY_API_KEY")),
 		mockarty.WithNamespace(os.Getenv("MOCKARTY_NAMESPACE")))
+	if os.Getenv("MISSION_PRODUCT_ID") != "" {
+		// Text originals in one mission must total at most 64 KiB.
+		material, err := client.CoderDelivery().UploadMissionMaterial(context.Background(), os.Getenv("MOCKARTY_NAMESPACE"), os.Getenv("MISSION_PRODUCT_ID"), "design.txt", "text/plain", strings.NewReader("Palette: navy and cream. Keep accessible contrast."))
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Use this reference in POST /api/v1/missions artifacts:", material.Reference)
+	}
 	mission, err := client.CoderDelivery().StartMission(context.Background(), mockarty.CoderMissionStartRequest{
 		Goal: "Deploy the accepted commit", RepoURL: os.Getenv("CODER_REPO_URL"), DeployTarget: "staging",
 	})
