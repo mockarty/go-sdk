@@ -446,6 +446,8 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 	return c.doRawCT(ctx, method, path, body, "application/json")
 }
 
+type nonReplayableRequestKey struct{}
+
 // doRawCT is doRaw with an explicit request Content-Type. Multipart uploads
 // (TCM attachments) need "multipart/form-data; boundary=..." rather than JSON.
 //
@@ -454,6 +456,9 @@ func (c *Client) doRaw(ctx context.Context, method, path string, body any) (io.R
 // re-JSON-marshalled on retry (the previous code double-encoded []byte uploads
 // and would have JSON-marshalled an already-consumed io.Reader).
 func (c *Client) doRawCT(ctx context.Context, method, path string, body any, contentType string) (io.ReadCloser, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("mockarty: context is required")
+	}
 	url := c.baseURL + path
 
 	hasBody := body != nil
@@ -478,6 +483,11 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 	}
 
 	attempts := 1 + c.maxRetries
+	if nonReplayable, _ := ctx.Value(nonReplayableRequestKey{}).(bool); nonReplayable {
+		// An ambiguous failure may follow a committed mutation. Only the
+		// operation that owns idempotency semantics can opt out of replay.
+		attempts = 1
+	}
 	delay := c.retryDelay
 
 	var lastErr error

@@ -43,6 +43,10 @@ type MissionMaterialUpload struct {
 
 // UploadMissionMaterial preserves an original for a mission's artifacts references.
 func (a *CoderDeliveryAPI) UploadMissionMaterial(ctx context.Context, namespace, productID, filename, mediaType string, body io.Reader) (*MissionMaterialUpload, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("mockarty: context is required")
+	}
+	ctx = context.WithValue(ctx, nonReplayableRequestKey{}, true)
 	if strings.TrimSpace(namespace) == "" {
 		namespace = a.client.namespace
 	}

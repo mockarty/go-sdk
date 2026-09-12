@@ -265,6 +265,10 @@ func (a *CoderDeliveryAPI) ApproveMission(ctx context.Context, missionID string,
 
 // AddToMission appends runner or specialist sub-tasks to a live mission.
 func (a *CoderDeliveryAPI) AddToMission(ctx context.Context, missionID string, request CoderMissionAddRequest) (*CoderMission, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("mockarty: context is required")
+	}
+	ctx = context.WithValue(ctx, nonReplayableRequestKey{}, true)
 	if strings.TrimSpace(missionID) == "" {
 		return nil, fmt.Errorf("mockarty: coder mission id is required")
 	}
