@@ -6,8 +6,34 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
+
+func TestUploadMissionMaterialRejectsUnsupportedNamesAndTypesBeforeHTTP(t *testing.T) {
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		_, _ = w.Write([]byte(`{"reference":{"id":"unexpected"}}`))
+	}))
+	defer server.Close()
+	api := NewClient(server.URL).CoderDelivery()
+	for _, tc := range []struct{ name, media string }{
+		{"a.svg", "image/svg+xml"}, {"a.bmp", "image/bmp"}, {"a.zip", "application/zip"},
+		{"a.txt", "text/plain; broken"}, {"../a.txt", "text/plain"}, {`dir\a.txt`, "text/plain"},
+		{" a.txt", "text/plain"}, {"a\x00.txt", "text/plain"}, {"a\u0085.txt", "text/plain"},
+		{"..", "text/plain"}, {strings.Repeat("я", 65), "text/plain"}, {string([]byte{0xff}), "text/plain"},
+	} {
+		t.Run(tc.name+"/"+tc.media, func(t *testing.T) {
+			if _, err := api.UploadMissionMaterial(context.Background(), "team", "p", tc.name, tc.media, strings.NewReader("content")); err == nil {
+				t.Fatal("unsupported material accepted")
+			}
+		})
+	}
+	if requests.Load() != 0 {
+		t.Fatalf("invalid material caused %d HTTP requests", requests.Load())
+	}
+}
 
 func TestUploadMissionMaterial(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +58,17 @@ func TestUploadMissionMaterial(t *testing.T) {
 	result, err := NewClient(server.URL, WithNamespace("team")).CoderDelivery().UploadMissionMaterial(context.Background(), "", "product & one", "design.txt", "", strings.NewReader("design"))
 	if err != nil || result.Reference.ID != "mat1" || result.Reference.Revision != 1 {
 		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestUploadMissionMaterialAcceptsUTF8NameBoundaryAndMediaParameters(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"reference":{"id":"material"}}`))
+	}))
+	defer server.Close()
+	_, err := NewClient(server.URL).CoderDelivery().UploadMissionMaterial(context.Background(), "team", "p", strings.Repeat("я", 64), "text/plain; charset=utf-8", strings.NewReader(strings.Repeat("a", 64*1024)))
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

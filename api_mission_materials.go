@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 type MissionMaterialReference struct {
@@ -58,8 +60,20 @@ func (a *CoderDeliveryAPI) UploadMissionMaterial(ctx context.Context, namespace,
 			return nil, fmt.Errorf("unknown material type; specify mediaType")
 		}
 	}
-	if strings.TrimSpace(productID) == "" || strings.TrimSpace(filename) == "" || body == nil || strings.ContainsAny(mediaType, "\r\n") {
+	if strings.TrimSpace(productID) == "" || !validMissionMaterialFilename(filename) || body == nil || strings.ContainsAny(mediaType, "\r\n") {
 		return nil, fmt.Errorf("product, filename and valid material content are required")
+	}
+	mediaBase, _, err := mime.ParseMediaType(mediaType)
+	if err != nil {
+		return nil, fmt.Errorf("invalid mission material media type")
+	}
+	binary := false
+	switch mediaBase {
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf":
+		binary = true
+	case "text/plain", "text/markdown", "text/css", "text/javascript", "application/json", "application/yaml", "application/xml", "text/html":
+	default:
+		return nil, fmt.Errorf("unsupported mission material media type")
 	}
 	data, err := io.ReadAll(io.LimitReader(body, 16*1024*1024+1))
 	if err != nil {
@@ -68,8 +82,7 @@ func (a *CoderDeliveryAPI) UploadMissionMaterial(ctx context.Context, namespace,
 	if len(data) == 0 || len(data) > 16*1024*1024 {
 		return nil, fmt.Errorf("mission material must be nonempty and at most 16 MiB")
 	}
-	mediaBase, _, _ := mime.ParseMediaType(mediaType)
-	if !strings.HasPrefix(mediaBase, "image/") && mediaBase != "application/pdf" && len(data) > 64*1024 {
+	if !binary && len(data) > 64*1024 {
 		return nil, fmt.Errorf("text mission materials must be at most 64 KiB combined")
 	}
 	var buf bytes.Buffer
@@ -100,4 +113,10 @@ func (a *CoderDeliveryAPI) UploadMissionMaterial(ctx context.Context, namespace,
 		return nil, err
 	}
 	return &result, nil
+}
+
+func validMissionMaterialFilename(name string) bool {
+	return name != "" && len(name) <= 128 && utf8.ValidString(name) &&
+		name == strings.TrimSpace(name) && !strings.ContainsAny(name, "/\\") &&
+		strings.IndexFunc(name, unicode.IsControl) < 0 && name != "." && name != ".."
 }

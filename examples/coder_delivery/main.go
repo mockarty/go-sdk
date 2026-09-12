@@ -15,6 +15,8 @@ func main() {
 		mockarty.WithNamespace(os.Getenv("MOCKARTY_NAMESPACE")))
 	if os.Getenv("MISSION_PRODUCT_ID") != "" {
 		// Text originals in one mission must total at most 64 KiB.
+		// Use a leaf filename (no path), at most 128 UTF-8 bytes. Supported
+		// binary formats are PNG, JPEG, WebP, GIF and PDF; SVG is not accepted.
 		material, err := client.CoderDelivery().UploadMissionMaterial(context.Background(), os.Getenv("MOCKARTY_NAMESPACE"), os.Getenv("MISSION_PRODUCT_ID"), "design.txt", "text/plain", strings.NewReader("Palette: navy and cream. Keep accessible contrast."))
 		if err != nil {
 			panic(err)
