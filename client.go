@@ -113,6 +113,7 @@ type Client struct {
 	pageAnalyzerAPI         *PageAnalyzerAPI
 	mediaDeliveryAPI        *MediaDeliveryAPI
 	effectReconciliationAPI *EffectReconciliationAPI
+	delegatedCredentialsAPI *DelegatedCredentialsAPI
 }
 
 // NewClient creates a new Mockarty API client.
@@ -195,6 +196,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudIdentityAPI = &CloudIdentityAPI{client: c}
 	c.cloudCustomerAPI = &CloudCustomerAPI{client: c}
 	c.cloudOperationsAPI = &CloudOperationsAPI{client: c}
+	c.delegatedCredentialsAPI = &DelegatedCredentialsAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.connectionAuthorityAPI = &ConnectionAuthorityAPI{client: c}
@@ -290,6 +292,12 @@ func (c *Client) EffectReconciliation() *EffectReconciliationAPI { return c.effe
 
 // LLMSecurity returns the layered prompt-security management API.
 func (c *Client) LLMSecurity() *LLMSecurityAPI { return c.llmSecurityAPI }
+
+// DelegatedCredentials returns the project-scoped delegated-credential
+// lifecycle: credentials whose namespace set, action set and expiry the
+// HOLDER cannot widen. Use this for work shared with a contractor, a CI job
+// or an MCP client instead of handing over an API key.
+func (c *Client) DelegatedCredentials() *DelegatedCredentialsAPI { return c.delegatedCredentialsAPI }
 
 // BaseURL returns the configured base URL.
 func (c *Client) BaseURL() string { return c.baseURL }
