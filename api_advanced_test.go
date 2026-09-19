@@ -1329,3 +1329,45 @@ func TestClient_NewSubAPISingletons(t *testing.T) {
 		t.Error("Environments() should return the same instance")
 	}
 }
+
+// ExportSpec runs the generators the other way: mocks → document. The test pins
+// the two things a caller can get wrong from the signature alone — that the body
+// carries the format and the filters, and that the warnings reach the caller
+// instead of being folded away.
+func TestGeneratorAPI_ExportSpec(t *testing.T) {
+	var gotBody SpecExportRequest
+	_, client := newTestServer(t, map[string]http.HandlerFunc{
+		"POST /api/v1/generators/spec": func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotBody)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"format":"openapi","spec":{"openapi":"3.0.3"},"warnings":[{"mockId":"scripted","reason":"built by a script"}],"stats":{"considered":2,"exported":2,"skipped":0,"paths":1}}`))
+		},
+	})
+
+	resp, err := client.Generator().ExportSpec(context.Background(), &SpecExportRequest{
+		Format: "openapi",
+		Tags:   []string{"orders"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotBody.Format != "openapi" {
+		t.Errorf("format not sent: %+v", gotBody)
+	}
+	if gotBody.Namespace == "" {
+		t.Error("the client's namespace must be filled in — an export with no namespace describes nothing")
+	}
+	if len(gotBody.Tags) != 1 || gotBody.Tags[0] != "orders" {
+		t.Errorf("tag filter not sent: %+v", gotBody.Tags)
+	}
+	if resp.Spec["openapi"] != "3.0.3" {
+		t.Errorf("the document did not come back: %+v", resp.Spec)
+	}
+	if len(resp.Warnings) != 1 || resp.Warnings[0].MockID != "scripted" || resp.Warnings[0].Reason == "" {
+		t.Errorf("warnings must reach the caller with their reason: %+v", resp.Warnings)
+	}
+	if resp.Stats.Exported != 2 || resp.Stats.Paths != 1 {
+		t.Errorf("stats did not come back: %+v", resp.Stats)
+	}
+}

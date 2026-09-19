@@ -7,6 +7,7 @@
 //   - Preview mocks from an OpenAPI spec (dry-run)
 //   - Generate mocks from an OpenAPI spec
 //   - Generate from other formats (WSDL, Proto, GraphQL, HAR)
+//   - Export the other way: build a specification FROM the mocks already there
 package main
 
 import (
@@ -176,6 +177,36 @@ func main() {
 		// Clean up
 		for _, m := range inlineResult.Mocks {
 			_ = client.Mocks().Delete(ctx, m.ID)
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Export the other way: mocks → specification
+	//
+	// Every call above turns a document INTO mocks. This one reads the mocks the
+	// namespace already has and writes a document other tools consume — the way a
+	// contour built by hand reaches a partner or a client generator.
+	// -----------------------------------------------------------------------
+	fmt.Println("\n--- Export a specification from the mocks ---")
+
+	export, err := client.Generator().ExportSpec(ctx, &mockarty.SpecExportRequest{
+		Format: "openapi",
+		Title:  "Checkout contour",
+	})
+	if err != nil {
+		fmt.Printf("Export returned: %v\n", err)
+	} else {
+		fmt.Printf("Exported %d mock(s) into %d path(s)\n",
+			export.Stats.Exported, export.Stats.Paths)
+		// The warnings are the part a caller must not skip: they name the mocks
+		// the document could NOT express (a script-built response, a oneOf
+		// rotation, a proxy) instead of turning them into examples the product
+		// never returns.
+		for _, w := range export.Warnings {
+			fmt.Printf("  ! %s (%s): %s\n", w.MockID, w.Route, w.Reason)
+		}
+		if doc, ok := export.Spec["openapi"]; ok {
+			fmt.Printf("  document version: %v\n", doc)
 		}
 	}
 
