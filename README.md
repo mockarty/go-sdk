@@ -192,6 +192,7 @@ it := client.IssueTracker()
 iss, _ := it.CreateIssue(ctx, "", mockarty.Issue{"projectId": pid, "type": "bug", "title": "500 on /pay"})
 _, _ = it.AddComment(ctx, "", iss["id"].(string), "repro attached")
 _, _ = it.MoveIssue(ctx, "", iss["id"].(string), "in_progress", "")
+_, _ = it.UpdateIssue(ctx, "", iss["id"].(string), mockarty.Issue{"type": "task"}) // filed as the wrong type? change it
 next, _ := it.NextIssue(ctx, "", map[string]string{"assigneeId": me})
 ```
 
