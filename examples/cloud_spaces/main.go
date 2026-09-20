@@ -21,6 +21,15 @@ func main() {
 		fmt.Printf("%s %s role=%s members=%d pending=%d revision=%d\n",
 			space.ID, space.Name, space.Role, space.Usage.AcceptedHumans, space.Usage.PendingInvites, space.Revision)
 	}
+	if teamSpaceID := os.Getenv("MOCKARTY_TEAM_AUDIT_SPACE_ID"); teamSpaceID != "" {
+		audit, err := client.CloudSpaces().ListTeamAudit(context.Background(), teamSpaceID,
+			os.Getenv("MOCKARTY_TEAM_AUDIT_BEFORE_ID"), 50)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("team=%s events=%d chain_ok=%t has_more=%t next_before_id=%s\n",
+			audit.TeamID, len(audit.Records), audit.ChainOK, audit.HasMore, audit.NextBeforeID)
+	}
 	if token := os.Getenv("MOCKARTY_INVITE_TOKEN"); token != "" {
 		preview, err := client.CloudSpaces().PreviewInvite(context.Background(), token)
 		if err != nil {

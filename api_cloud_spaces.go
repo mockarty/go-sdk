@@ -170,6 +170,31 @@ type CloudTeamMemberInviteRequest struct {
 	Role    string `json:"role,omitempty"`
 }
 
+// CloudTeamAuditRecord is a redacted account or Space event. Audit payloads,
+// session events and network identifiers are never exposed by this API.
+type CloudTeamAuditRecord struct {
+	OccurredAt  time.Time `json:"occurred_at"`
+	ScopeID     string    `json:"scope_id"`
+	ScopeKind   string    `json:"scope_kind"`
+	ScopeName   string    `json:"scope_name,omitempty"`
+	ActorUserID string    `json:"actor_user_id,omitempty"`
+	Action      string    `json:"action"`
+	TargetType  string    `json:"target_type"`
+	TargetID    string    `json:"target_id,omitempty"`
+	ID          int64     `json:"id"`
+}
+
+type CloudTeamAuditPage struct {
+	Records       []CloudTeamAuditRecord `json:"records"`
+	TeamID        string                 `json:"team_id"`
+	NextBeforeID  string                 `json:"next_before_id"`
+	BrokenScopeID string                 `json:"broken_scope_id"`
+	RequestID     string                 `json:"request_id"`
+	BrokenAt      int64                  `json:"broken_at"`
+	HasMore       bool                   `json:"has_more"`
+	ChainOK       bool                   `json:"chain_ok"`
+}
+
 func (a *CloudSpacesAPI) requestContext(ctx context.Context, etag, idempotencyKey string) context.Context {
 	headers := map[string]string{headerAPIKey: ""}
 	if a.client.apiKey != "" {
@@ -242,6 +267,34 @@ func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*Clo
 	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet,
 		"/api/v1/cloud/organization?space_id="+url.QueryEscape(spaceID), nil, &out)
 	return &out.Organization, err
+}
+
+// ListTeamAudit reads a Team-wide, newest-first audit page through an explicit
+// Team Space. The caller needs an active Seat and owner or billing-manager role.
+// Pass the returned NextBeforeID unchanged to fetch the next page; limit zero
+// uses the server default of 50.
+func (a *CloudSpacesAPI) ListTeamAudit(ctx context.Context, spaceID, beforeID string, limit int) (*CloudTeamAuditPage, error) {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return nil, err
+	}
+	if limit < 0 || limit > 200 {
+		return nil, fmt.Errorf("mockarty: Team audit limit must be between 1 and 200, or zero for the default")
+	}
+	values := url.Values{"space_id": {spaceID}}
+	if beforeID != "" {
+		parsed, err := strconv.ParseInt(beforeID, 10, 64)
+		if err != nil || parsed < 1 {
+			return nil, fmt.Errorf("mockarty: Team audit before id must be a positive decimal event id")
+		}
+		values.Set("before_id", beforeID)
+	}
+	if limit > 0 {
+		values.Set("limit", strconv.Itoa(limit))
+	}
+	var out CloudTeamAuditPage
+	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet,
+		"/api/v1/cloud/team/audit?"+values.Encode(), nil, &out)
+	return &out, err
 }
 
 // CreateTeamSpace adds a Space to an already active paid Team. Reuse the same
