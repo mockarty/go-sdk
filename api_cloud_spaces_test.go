@@ -82,6 +82,28 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 	}
 }
 
+func TestCloudSpacesRevokeTeamInviteUsesSelectedAccountAndStableKey(t *testing.T) {
+	var gotPath, gotKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method=%s", r.Method)
+		}
+		gotPath, gotKey = r.URL.RequestURI(), r.Header.Get("Idempotency-Key")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	api := NewClient(srv.URL, WithAPIKey("cloud-token")).CloudSpaces()
+	if err := api.RevokeTeamInvite(context.Background(), "space-id", "invite-id", "same-retry-key"); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v1/cloud/team/invites/invite-id?space_id=space-id" || gotKey != "same-retry-key" {
+		t.Fatalf("Team revocation path=%q key=%q", gotPath, gotKey)
+	}
+	if err := api.RevokeTeamInvite(context.Background(), "space-id", "invite-id", ""); err == nil {
+		t.Fatal("Team revocation without idempotency key reached the network")
+	}
+}
+
 func TestCloudSpacesNonPositiveLimitUsesServerDefault(t *testing.T) {
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

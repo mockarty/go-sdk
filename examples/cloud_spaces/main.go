@@ -47,6 +47,16 @@ func main() {
 		fmt.Printf("account=%s kind=%s occupied=%d/%d pending=%d\n", organization.AccountID,
 			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
 	}
+	if inviteID := os.Getenv("MOCKARTY_TEAM_INVITE_ID"); inviteID != "" {
+		key := os.Getenv("MOCKARTY_IDEMPOTENCY_KEY")
+		if key == "" {
+			panic("set MOCKARTY_IDEMPOTENCY_KEY and preserve it for an exact retry")
+		}
+		if err := client.CloudSpaces().RevokeTeamInvite(context.Background(), space.ID, inviteID, key); err != nil {
+			panic(err)
+		}
+		fmt.Println("Team invitation revoked")
+	}
 	members, err := client.CloudSpaces().ListMembers(context.Background(), space.ID, "", 25)
 	if err != nil {
 		panic(err)

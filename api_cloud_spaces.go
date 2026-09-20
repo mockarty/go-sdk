@@ -221,6 +221,19 @@ func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*Clo
 	return &out.Organization, err
 }
 
+// RevokeTeamInvite releases one pending Team Seat reservation. The idempotency
+// key must be reused when retrying an uncertain response.
+func (a *CloudSpacesAPI) RevokeTeamInvite(ctx context.Context, spaceID, inviteID, key string) error {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(inviteID) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: Team invite id and idempotency key are required")
+	}
+	path := "/api/v1/cloud/team/invites/" + url.PathEscape(inviteID) + "?space_id=" + url.QueryEscape(spaceID)
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodDelete, path, nil, nil)
+}
+
 // Rename changes only the user-visible Space name and requires both revision
 // and idempotency fencing for exact retries.
 func (a *CloudSpacesAPI) Rename(ctx context.Context, spaceID, name, etag, key string) (*CloudSpace, error) {
