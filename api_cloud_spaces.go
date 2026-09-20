@@ -100,6 +100,45 @@ type CloudSpaceInvitePreview struct {
 	ETag   string           `json:"etag"`
 }
 
+type CloudOrganizationSpace struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Slug       string `json:"slug"`
+	Plan       string `json:"plan"`
+	SeatsUsed  int    `json:"seats_used"`
+	SeatsTotal int    `json:"seats_total"`
+}
+
+type CloudOrganizationMember struct {
+	CooldownUntil  *time.Time `json:"cooldown_until,omitempty"`
+	AffiliatedAt   time.Time  `json:"affiliated_at"`
+	UserID         string     `json:"user_id"`
+	Email          string     `json:"email"`
+	Status         string     `json:"status"`
+	Role           string     `json:"role,omitempty"`
+	SpendAuthority bool       `json:"spend_authority"`
+}
+
+type CloudOrganizationLimits struct {
+	People           int `json:"people"`
+	SpaceMemberships int `json:"space_memberships"`
+	Concurrency      int `json:"concurrency"`
+}
+
+type CloudOrganization struct {
+	Spaces        []CloudOrganizationSpace  `json:"spaces"`
+	Members       []CloudOrganizationMember `json:"members"`
+	AccountID     string                    `json:"account_id"`
+	AccountKind   string                    `json:"account_kind"`
+	Status        string                    `json:"status"`
+	PlanKind      string                    `json:"plan_kind"`
+	Limits        CloudOrganizationLimits   `json:"limits"`
+	SeatsAssigned int                       `json:"seats_assigned"`
+	SeatsReserved int                       `json:"seats_reserved"`
+	SeatsUsed     int                       `json:"seats_used"`
+	SeatsTotal    int                       `json:"seats_total"`
+}
+
 func (a *CloudSpacesAPI) requestContext(ctx context.Context, etag, idempotencyKey string) context.Context {
 	headers := map[string]string{headerAPIKey: ""}
 	if a.client.apiKey != "" {
@@ -158,6 +197,20 @@ func (a *CloudSpacesAPI) Get(ctx context.Context, spaceID string) (*CloudSpace, 
 	}
 	err = a.client.do(a.requestContext(ctx, "", ""), http.MethodGet, path, nil, &out)
 	return &out.Space, err
+}
+
+// Organization reads the billing account of an explicit Space. Only that
+// account's owner can see its members, Seats and other Spaces.
+func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*CloudOrganization, error) {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return nil, err
+	}
+	var out struct {
+		Organization CloudOrganization `json:"organization"`
+	}
+	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet,
+		"/api/v1/cloud/organization?space_id="+url.QueryEscape(spaceID), nil, &out)
+	return &out.Organization, err
 }
 
 // Rename changes only the user-visible Space name and requires both revision

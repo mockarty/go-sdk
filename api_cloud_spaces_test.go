@@ -24,7 +24,7 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "organization": map[string]any{"account_id": "a1", "account_kind": "team", "seats_used": 2, "seats_reserved": 1}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
 	}))
 	defer srv.Close()
 
@@ -35,6 +35,9 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 	}
 	if _, err := api.Get(ctx, "s1"); err != nil {
 		t.Fatal(err)
+	}
+	if organization, err := api.Organization(ctx, "s1"); err != nil || organization.AccountKind != "team" || organization.SeatsReserved != 1 {
+		t.Fatalf("organization=%+v err=%v", organization, err)
 	}
 	if _, err := api.ListMembers(ctx, "s1", "", 25); err != nil {
 		t.Fatal(err)
@@ -63,7 +66,8 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 
 	wants := []string{
 		"GET /api/v1/cloud/spaces?cursor=cursor-a&limit=25",
-		"GET /api/v1/cloud/spaces/s1", "GET /api/v1/cloud/spaces/s1/members?limit=25",
+		"GET /api/v1/cloud/spaces/s1", "GET /api/v1/cloud/organization?space_id=s1",
+		"GET /api/v1/cloud/spaces/s1/members?limit=25",
 		"GET /api/v1/cloud/spaces/s1/invites?limit=25", "GET /api/v1/cloud/invites/token%2Fone",
 		"POST /api/v1/cloud/spaces/s1/invites", "DELETE /api/v1/cloud/spaces/s1/invites/i1", "POST /api/v1/cloud/invites/token%2Fone/accept",
 		"PATCH /api/v1/cloud/spaces/s1/members/u1", "DELETE /api/v1/cloud/spaces/s1/members/u1",
