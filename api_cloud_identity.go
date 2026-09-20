@@ -32,6 +32,51 @@ type CloudStepUpResult struct {
 	Action    string    `json:"action"`
 }
 
+// CloudEmailChangeResult reports which mailbox must be confirmed next. An
+// account's existing sign-in address remains valid until the final proof.
+type CloudEmailChangeResult struct {
+	Status    string `json:"status"`
+	Stage     string `json:"stage,omitempty"`
+	NewEmail  string `json:"new_email,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+}
+
+type CloudEmailChangeRequest struct {
+	NewEmail        string `json:"new_email"`
+	CurrentPassword string `json:"current_password,omitempty"`
+	TOTPCode        string `json:"totp_code,omitempty"`
+}
+
+func (a *CloudIdentityAPI) RequestEmailChange(ctx context.Context, request CloudEmailChangeRequest) (*CloudEmailChangeResult, error) {
+	if request.NewEmail == "" {
+		return nil, fmt.Errorf("mockarty: new email is required")
+	}
+	var out CloudEmailChangeResult
+	err := a.client.do(a.client.cloudContext(ctx), "PATCH", "/api/v1/cloud/email", request, &out)
+	return &out, err
+}
+
+func (a *CloudIdentityAPI) AuthorizeCurrentEmail(ctx context.Context, token string) (*CloudEmailChangeResult, error) {
+	return a.consumeEmailChangeProof(ctx, "/api/v1/cloud/auth/email/change/authorize", token)
+}
+
+func (a *CloudIdentityAPI) ConfirmNewEmail(ctx context.Context, token string) (*CloudEmailChangeResult, error) {
+	return a.consumeEmailChangeProof(ctx, "/api/v1/cloud/auth/email/change/confirm", token)
+}
+
+func (a *CloudIdentityAPI) consumeEmailChangeProof(ctx context.Context, path, token string) (*CloudEmailChangeResult, error) {
+	if token == "" {
+		return nil, fmt.Errorf("mockarty: email confirmation token is required")
+	}
+	var out CloudEmailChangeResult
+	err := a.client.do(a.client.cloudContext(ctx), "POST", path, map[string]string{"token": token}, &out)
+	return &out, err
+}
+
+func (a *CloudIdentityAPI) CancelEmailChange(ctx context.Context) error {
+	return a.client.do(a.client.cloudContext(ctx), "DELETE", "/api/v1/cloud/email/pending", nil, nil)
+}
+
 func (a *CloudIdentityAPI) List(ctx context.Context) ([]CloudOAuthIdentity, error) {
 	var out struct {
 		Identities []CloudOAuthIdentity `json:"identities"`

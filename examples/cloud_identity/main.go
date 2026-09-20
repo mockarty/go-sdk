@@ -15,4 +15,13 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("linked sign-in methods: %d", len(identities))
+	// Email changes require a Cloud cabinet session and two distinct mailbox
+	// proofs. A password alone never completes the change.
+	if address := os.Getenv("MOCKARTY_NEW_EMAIL"); address != "" {
+		result, err := client.CloudIdentity().RequestEmailChange(context.Background(), mockarty.CloudEmailChangeRequest{NewEmail: address})
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("email change stage: %s", result.Stage)
+	}
 }
