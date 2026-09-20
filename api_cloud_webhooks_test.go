@@ -25,6 +25,9 @@ func TestCloudWebhooksLifecycleAndOneTimeRotation(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/cloud/webhooks":
 			_ = json.NewEncoder(w).Encode(map[string]any{"webhooks": []map[string]any{{"id": "hook-1"}}})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/cloud/webhooks":
+			if got := r.Header.Get("Idempotency-Key"); got != "create-retry-1" {
+				t.Fatalf("create Idempotency-Key = %q", got)
+			}
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			if body["name"] != "Build events" || body["url"] != "https://hooks.example/events" {
@@ -57,7 +60,7 @@ func TestCloudWebhooksLifecycleAndOneTimeRotation(t *testing.T) {
 	if hooks, err := api.List(ctx, "space-a"); err != nil || len(hooks) != 1 {
 		t.Fatalf("list = %+v err=%v", hooks, err)
 	}
-	if created, err := api.Create(ctx, "space-a", "Build events", "https://hooks.example/events", []string{"instance.created"}); err != nil || created.Secret != "whsec_once" {
+	if created, err := api.CreateWithIdempotencyKey(ctx, "space-a", "Build events", "https://hooks.example/events", []string{"instance.created"}, "create-retry-1"); err != nil || created.Secret != "whsec_once" {
 		t.Fatalf("create = %+v err=%v", created, err)
 	}
 	if rotated, err := api.RotateSecret(ctx, "space-a", "hook-1", "retry-1"); err != nil || rotated.Secret != "whsec_rotated" {

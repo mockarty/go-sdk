@@ -8,14 +8,16 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	mockarty "github.com/mockarty/mockarty-go"
 )
 
 func main() {
 	client := mockarty.NewClient(os.Getenv("MOCKARTY_CLOUD_URL"), mockarty.WithAPIKey(os.Getenv("MOCKARTY_CLOUD_TOKEN")))
-	credential, err := client.CloudWebhooks().Create(
+	requestID := uuid.NewString() // Keep this value if retrying an ambiguous response.
+	credential, err := client.CloudWebhooks().CreateWithIdempotencyKey(
 		context.Background(), os.Getenv("MOCKARTY_WORKSPACE_ID"), "Build events",
-		"https://hooks.example.com/mockarty", []string{"instance.created", "instance.running"},
+		"https://hooks.example.com/mockarty", []string{"instance.created", "instance.running"}, requestID,
 	)
 	if err != nil {
 		panic(err)

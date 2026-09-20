@@ -69,8 +69,14 @@ func (a *CloudWebhooksAPI) List(ctx context.Context, workspaceID string) ([]Clou
 }
 
 func (a *CloudWebhooksAPI) Create(ctx context.Context, workspaceID, name, targetURL string, events []string) (*CloudWebhookCredential, error) {
+	return a.CreateWithIdempotencyKey(ctx, workspaceID, name, targetURL, events, "")
+}
+
+// CreateWithIdempotencyKey returns the same signing secret when an ambiguous
+// create is retried with the same key and unchanged request.
+func (a *CloudWebhooksAPI) CreateWithIdempotencyKey(ctx context.Context, workspaceID, name, targetURL string, events []string, idempotencyKey string) (*CloudWebhookCredential, error) {
 	var out CloudWebhookCredential
-	err := a.client.do(a.cloudContext(ctx, ""), "POST", "/api/v1/cloud/webhooks?"+cloudWorkspaceQuery(workspaceID), map[string]any{
+	err := a.client.do(a.cloudContext(ctx, idempotencyKey), "POST", "/api/v1/cloud/webhooks?"+cloudWorkspaceQuery(workspaceID), map[string]any{
 		"name": name, "url": targetURL, "events": events,
 	}, &out)
 	return &out, err
