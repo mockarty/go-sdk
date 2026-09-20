@@ -24,7 +24,7 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "organization": map[string]any{"account_id": "a1", "account_kind": "team", "seats_used": 2, "seats_reserved": 1}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "organization": map[string]any{"account_id": "a1", "account_kind": "team", "seats_used": 2, "seats_reserved": 1, "pending_invites": []any{map[string]any{"id": "ti1", "email": "new@example.test", "role": "member", "expires_at": "2027-01-01T00:00:00Z"}}}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
 	}))
 	defer srv.Close()
 
@@ -36,7 +36,7 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 	if _, err := api.Get(ctx, "s1"); err != nil {
 		t.Fatal(err)
 	}
-	if organization, err := api.Organization(ctx, "s1"); err != nil || organization.AccountKind != "team" || organization.SeatsReserved != 1 {
+	if organization, err := api.Organization(ctx, "s1"); err != nil || organization.AccountKind != "team" || organization.SeatsReserved != 1 || len(organization.PendingInvites) != 1 || organization.PendingInvites[0].Email != "new@example.test" {
 		t.Fatalf("organization=%+v err=%v", organization, err)
 	}
 	if _, err := api.ListMembers(ctx, "s1", "", 25); err != nil {

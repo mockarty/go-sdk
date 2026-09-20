@@ -44,8 +44,8 @@ func main() {
 		panic(err)
 	}
 	if organization, err := client.CloudSpaces().Organization(context.Background(), space.ID); err == nil {
-		fmt.Printf("account=%s kind=%s occupied=%d/%d\n", organization.AccountID,
-			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal)
+		fmt.Printf("account=%s kind=%s occupied=%d/%d pending=%d\n", organization.AccountID,
+			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
 	}
 	members, err := client.CloudSpaces().ListMembers(context.Background(), space.ID, "", 25)
 	if err != nil {

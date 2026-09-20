@@ -125,18 +125,26 @@ type CloudOrganizationLimits struct {
 	Concurrency      int `json:"concurrency"`
 }
 
+type CloudOrganizationInvite struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"`
+}
+
 type CloudOrganization struct {
-	Spaces        []CloudOrganizationSpace  `json:"spaces"`
-	Members       []CloudOrganizationMember `json:"members"`
-	AccountID     string                    `json:"account_id"`
-	AccountKind   string                    `json:"account_kind"`
-	Status        string                    `json:"status"`
-	PlanKind      string                    `json:"plan_kind"`
-	Limits        CloudOrganizationLimits   `json:"limits"`
-	SeatsAssigned int                       `json:"seats_assigned"`
-	SeatsReserved int                       `json:"seats_reserved"`
-	SeatsUsed     int                       `json:"seats_used"`
-	SeatsTotal    int                       `json:"seats_total"`
+	Spaces         []CloudOrganizationSpace  `json:"spaces"`
+	Members        []CloudOrganizationMember `json:"members"`
+	PendingInvites []CloudOrganizationInvite `json:"pending_invites"`
+	AccountID      string                    `json:"account_id"`
+	AccountKind    string                    `json:"account_kind"`
+	Status         string                    `json:"status"`
+	PlanKind       string                    `json:"plan_kind"`
+	Limits         CloudOrganizationLimits   `json:"limits"`
+	SeatsAssigned  int                       `json:"seats_assigned"`
+	SeatsReserved  int                       `json:"seats_reserved"`
+	SeatsUsed      int                       `json:"seats_used"`
+	SeatsTotal     int                       `json:"seats_total"`
 }
 
 func (a *CloudSpacesAPI) requestContext(ctx context.Context, etag, idempotencyKey string) context.Context {
