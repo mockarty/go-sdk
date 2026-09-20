@@ -147,6 +147,29 @@ type CloudOrganization struct {
 	SeatsTotal     int                       `json:"seats_total"`
 }
 
+// CloudTeamSpaceRequest creates a collaborative Space under an existing paid
+// Team. Audience is "team" for all active Seat holders or "restricted" for an
+// explicit Space ACL.
+type CloudTeamSpaceRequest struct {
+	TeamID   string `json:"team_id"`
+	Name     string `json:"name"`
+	Slug     string `json:"slug,omitempty"`
+	Audience string `json:"audience"`
+}
+
+type CloudTeamSpaceCreated struct {
+	SpaceID   string `json:"space_id"`
+	TeamID    string `json:"team_id"`
+	RequestID string `json:"request_id"`
+	Replayed  bool   `json:"replayed,omitempty"`
+}
+
+type CloudTeamMemberInviteRequest struct {
+	SpaceID string `json:"space_id"`
+	Email   string `json:"email"`
+	Role    string `json:"role,omitempty"`
+}
+
 func (a *CloudSpacesAPI) requestContext(ctx context.Context, etag, idempotencyKey string) context.Context {
 	headers := map[string]string{headerAPIKey: ""}
 	if a.client.apiKey != "" {
@@ -219,6 +242,32 @@ func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*Clo
 	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet,
 		"/api/v1/cloud/organization?space_id="+url.QueryEscape(spaceID), nil, &out)
 	return &out.Organization, err
+}
+
+// CreateTeamSpace adds a Space to an already active paid Team. Reuse the same
+// idempotency key when retrying an uncertain response.
+func (a *CloudSpacesAPI) CreateTeamSpace(ctx context.Context, request CloudTeamSpaceRequest, key string) (*CloudTeamSpaceCreated, error) {
+	if strings.TrimSpace(request.TeamID) == "" || strings.TrimSpace(request.Name) == "" ||
+		(request.Audience != "team" && request.Audience != "restricted") || strings.TrimSpace(key) == "" {
+		return nil, fmt.Errorf("mockarty: Team id, Space name, audience and idempotency key are required")
+	}
+	var out CloudTeamSpaceCreated
+	err := a.client.do(a.requestContext(ctx, "", key), http.MethodPost,
+		"/api/v1/cloud/team/spaces", request, &out)
+	return &out, err
+}
+
+// InviteTeamMember reserves a paid Seat and sends the invitation. The server
+// acknowledges without exposing the invitation token to the caller.
+func (a *CloudSpacesAPI) InviteTeamMember(ctx context.Context, request CloudTeamMemberInviteRequest, key string) error {
+	if strings.TrimSpace(request.SpaceID) == "" || strings.TrimSpace(request.Email) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: Team Space id, recipient email and idempotency key are required")
+	}
+	if request.Role != "member" && request.Role != "admin" && request.Role != "billing_manager" {
+		return fmt.Errorf("mockarty: Team role must be member, admin or billing_manager")
+	}
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodPost,
+		"/api/v1/cloud/team/invites", request, nil)
 }
 
 // RevokeTeamInvite releases one pending Team Seat reservation. The idempotency

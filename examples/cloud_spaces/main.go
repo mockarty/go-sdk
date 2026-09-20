@@ -46,6 +46,25 @@ func main() {
 	if organization, err := client.CloudSpaces().Organization(context.Background(), space.ID); err == nil {
 		fmt.Printf("account=%s kind=%s occupied=%d/%d pending=%d\n", organization.AccountID,
 			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
+		if organization.AccountKind == "team" {
+			if name := os.Getenv("MOCKARTY_TEAM_SPACE_NAME"); name != "" {
+				created, err := client.CloudSpaces().CreateTeamSpace(context.Background(), mockarty.CloudTeamSpaceRequest{
+					TeamID: organization.AccountID, Name: name, Audience: "team",
+				}, os.Getenv("MOCKARTY_TEAM_SPACE_KEY"))
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("created_team_space=%s\n", created.SpaceID)
+			}
+			if email := os.Getenv("MOCKARTY_TEAM_MEMBER_EMAIL"); email != "" {
+				if err := client.CloudSpaces().InviteTeamMember(context.Background(), mockarty.CloudTeamMemberInviteRequest{
+					SpaceID: space.ID, Email: email, Role: "member",
+				}, os.Getenv("MOCKARTY_TEAM_INVITE_KEY")); err != nil {
+					panic(err)
+				}
+				fmt.Println("Team invitation queued")
+			}
+		}
 	}
 	if inviteID := os.Getenv("MOCKARTY_TEAM_INVITE_ID"); inviteID != "" {
 		key := os.Getenv("MOCKARTY_IDEMPOTENCY_KEY")
