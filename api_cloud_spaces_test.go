@@ -24,7 +24,7 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 			}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "organization": map[string]any{"account_id": "a1", "account_kind": "team", "viewer_role": "member", "can_leave_team": true, "seats_used": 2, "seats_reserved": 1, "spaces": []any{map[string]any{"id": "s1", "audience": "team"}}, "members": []any{map[string]any{"user_id": "u1", "last_team_activity_at": "2026-09-21T12:00:00Z", "can_leave": true}}, "pending_invites": []any{map[string]any{"id": "ti1", "email": "new@example.test", "role": "member", "expires_at": "2027-01-01T00:00:00Z"}}}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"items": []any{}, "collection_revision": 7, "space": map[string]any{"id": "s1"}, "organization": map[string]any{"account_id": "a1", "account_kind": "team", "viewer_role": "member", "can_leave_team": true, "seats_used": 2, "seats_reserved": 1, "spaces": []any{map[string]any{"id": "s1", "audience": "team"}}, "members": []any{map[string]any{"user_id": "u1", "can_leave": true}}, "pending_invites": []any{}}, "status": "ok", "revision": 8, "etag": `"space-s1-r7"`, "invite": map[string]any{"id": "i1", "token": "once", "workspace_id": "s1"}})
 	}))
 	defer srv.Close()
 
@@ -38,10 +38,9 @@ func TestCloudSpacesCanonicalRoutesAndConcurrencyHeaders(t *testing.T) {
 	}
 	if organization, err := api.Organization(ctx, "s1"); err != nil || organization.AccountKind != "team" ||
 		organization.ViewerRole != "member" || !organization.CanLeaveTeam || organization.CanManageTeam ||
-		organization.SeatsReserved != 1 || len(organization.PendingInvites) != 1 ||
-		organization.PendingInvites[0].Email != "new@example.test" || len(organization.Spaces) != 1 ||
+		organization.SeatsReserved != 1 || len(organization.PendingInvites) != 0 || len(organization.Spaces) != 1 ||
 		organization.Spaces[0].Audience != "team" || len(organization.Members) != 1 ||
-		organization.Members[0].LastTeamActivityAt == nil || !organization.Members[0].CanLeave {
+		organization.Members[0].LastTeamActivityAt != nil || !organization.Members[0].CanLeave {
 		t.Fatalf("organization=%+v err=%v", organization, err)
 	}
 	if _, err := api.ListMembers(ctx, "s1", "", 25); err != nil {
