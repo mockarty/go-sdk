@@ -148,6 +148,7 @@ type CloudOrganization struct {
 	SyncStorage    *CloudOrganizationSyncStorage `json:"sync_storage,omitempty"`
 	AccountID      string                        `json:"account_id"`
 	AccountKind    string                        `json:"account_kind"`
+	ViewerRole     string                        `json:"viewer_role,omitempty"`
 	Status         string                        `json:"status"`
 	PlanKind       string                        `json:"plan_kind"`
 	Limits         CloudOrganizationLimits       `json:"limits"`

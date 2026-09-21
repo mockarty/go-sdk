@@ -53,8 +53,8 @@ func main() {
 		panic(err)
 	}
 	if organization, err := client.CloudSpaces().Organization(context.Background(), space.ID); err == nil {
-		fmt.Printf("account=%s kind=%s occupied=%d/%d pending=%d\n", organization.AccountID,
-			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
+		fmt.Printf("account=%s kind=%s viewer_role=%s occupied=%d/%d pending=%d\n", organization.AccountID,
+			organization.AccountKind, organization.ViewerRole, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
 		if storage := organization.SyncStorage; storage != nil {
 			if storage.Reconciled {
 				fmt.Printf("team_sync_storage_bytes=%d/%d per_space_limit_bytes=%d\n",
@@ -71,7 +71,7 @@ func main() {
 				}
 				fmt.Println("Team member removed")
 			}
-			if successorID := os.Getenv("MOCKARTY_TEAM_SUCCESSOR_ID"); successorID != "" {
+			if successorID := os.Getenv("MOCKARTY_TEAM_SUCCESSOR_ID"); successorID != "" && organization.ViewerRole == "owner" {
 				if err := client.CloudSpaces().TransferTeamOwner(context.Background(), space.ID, successorID,
 					os.Getenv("MOCKARTY_TEAM_OWNER_TRANSFER_KEY")); err != nil {
 					panic(err)
