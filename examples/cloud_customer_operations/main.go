@@ -16,6 +16,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// Mock stock and run allowances belong to this Space's host BillingAccount.
 	fmt.Printf("selected Space quota: %#v\n", quota)
 
 	redemptions, err := client.CloudCustomer().ListLoyaltyRedemptions(ctx, spaceID, "", 25)

@@ -26,9 +26,10 @@ type CloudSupportOpenRequest struct {
 	Message        string `json:"message"`
 }
 
-// GetQuota reads the current Personal Space quota when no Space ID is given,
-// or the selected Space's host-account flow allowance when one is given.
-// The other quota rows retain their own counting scopes.
+// GetQuota reads the current Personal Space quota when no Space ID is given.
+// A selected Space uses its host account for mock stock, monthly flow and
+// daily fuzz/performance starts. Personal Space capacity always uses the
+// caller's Personal billing account, even when a Team Space is selected.
 func (a *CloudCustomerAPI) GetQuota(ctx context.Context, spaceIDs ...string) (map[string]any, error) {
 	if len(spaceIDs) > 1 {
 		return nil, fmt.Errorf("mockarty: provide at most one Space ID")
