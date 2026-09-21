@@ -175,6 +175,17 @@ type CloudTeamSpaceCreated struct {
 	Replayed  bool   `json:"replayed,omitempty"`
 }
 
+// CloudTeamTransitionPreview is an authenticated estimate for the named
+// invitation recipient. Acceptance recalculates the credit from current money.
+type CloudTeamTransitionPreview struct {
+	Status               string `json:"status"`
+	Reason               string `json:"reason,omitempty"`
+	TeamPayerKind        string `json:"team_payer_kind"`
+	PersonalGrantAfter   string `json:"personal_grant_after"`
+	Currency             string `json:"currency,omitempty"`
+	EstimatedCreditMinor int64  `json:"estimated_credit_minor,omitempty"`
+}
+
 type CloudTeamMemberInviteRequest struct {
 	SpaceID string `json:"space_id"`
 	Email   string `json:"email"`
@@ -422,6 +433,23 @@ func (a *CloudSpacesAPI) PreviewInvite(ctx context.Context, token string) (*Clou
 	var out CloudSpaceInvitePreview
 	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet, "/api/v1/cloud/invites/"+url.PathEscape(token), nil, &out)
 	return &out, err
+}
+
+// PreviewTeamTransition reads the recipient's own estimated Personal Pro
+// credit before a separate Team invitation is accepted.
+func (a *CloudSpacesAPI) PreviewTeamTransition(ctx context.Context, token string) (*CloudTeamTransitionPreview, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, fmt.Errorf("mockarty: Team invite token is required")
+	}
+	var out struct {
+		Transition CloudTeamTransitionPreview `json:"transition"`
+	}
+	err := a.client.do(a.requestContext(ctx, "", ""), http.MethodGet,
+		"/api/v1/cloud/team/invite-links/"+url.PathEscape(token)+"/transition", nil, &out)
+	if err != nil {
+		return nil, err
+	}
+	return &out.Transition, nil
 }
 
 func (a *CloudSpacesAPI) CreateInvite(ctx context.Context, spaceID string, request CloudSpaceInviteRequest, etag, key string) (*CloudSpaceMutation, error) {

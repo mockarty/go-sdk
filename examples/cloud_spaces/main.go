@@ -30,6 +30,14 @@ func main() {
 		fmt.Printf("team=%s events=%d chain_ok=%t has_more=%t next_before_id=%s\n",
 			audit.TeamID, len(audit.Records), audit.ChainOK, audit.HasMore, audit.NextBeforeID)
 	}
+	if token := os.Getenv("MOCKARTY_TEAM_INVITE_TOKEN"); token != "" {
+		transition, err := client.CloudSpaces().PreviewTeamTransition(context.Background(), token)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("team_transition=%s estimated_credit_minor=%d currency=%s\n",
+			transition.Status, transition.EstimatedCreditMinor, transition.Currency)
+	}
 	if token := os.Getenv("MOCKARTY_INVITE_TOKEN"); token != "" {
 		preview, err := client.CloudSpaces().PreviewInvite(context.Background(), token)
 		if err != nil {
