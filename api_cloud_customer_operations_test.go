@@ -23,6 +23,8 @@ func TestCloudCustomerAndOperationsCanonicalRoutes(t *testing.T) {
 
 	client := NewClient(server.URL, WithAPIKey("cloud-token"))
 	ctx := context.Background()
+	_, _ = client.CloudCustomer().GetQuota(ctx)
+	_, _ = client.CloudCustomer().GetQuota(ctx, "space/1")
 	_, _ = client.CloudCustomer().ListLoyaltyRedemptions(ctx, "space/1", "next", 25)
 	_, _ = client.CloudCustomer().RedeemLoyalty(ctx, "space/1", "WELCOME", "RU", "redeem-1")
 	_, _ = client.CloudCustomer().ListSupportCases(ctx, "space/1", "open", "cursor", 20)
@@ -39,6 +41,8 @@ func TestCloudCustomerAndOperationsCanonicalRoutes(t *testing.T) {
 	_, _ = client.CloudOperations().ProductAnalytics(ctx, 30)
 
 	want := []string{
+		"GET /api/v1/cloud/quota idem=",
+		"GET /api/v1/cloud/quota?space_id=space%2F1 idem=",
 		"GET /api/v1/cloud/spaces/space%2F1/loyalty/redemptions?cursor=next&limit=25 idem=",
 		"POST /api/v1/cloud/spaces/space%2F1/loyalty/redemptions idem=",
 		"GET /api/v1/cloud/spaces/space%2F1/support/cases?cursor=cursor&limit=20&status=open idem=",
@@ -56,6 +60,16 @@ func TestCloudCustomerAndOperationsCanonicalRoutes(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("routes = %#v, want %#v", got, want)
+	}
+}
+
+func TestCloudCustomerQuotaRejectsBlankSelectedSpace(t *testing.T) {
+	client := NewClient("http://127.0.0.1:1")
+	if _, err := client.CloudCustomer().GetQuota(context.Background(), " "); err == nil {
+		t.Fatal("GetQuota accepted blank selected Space")
+	}
+	if _, err := client.CloudCustomer().GetQuota(context.Background(), "a", "b"); err == nil {
+		t.Fatal("GetQuota accepted multiple selected Spaces")
 	}
 }
 

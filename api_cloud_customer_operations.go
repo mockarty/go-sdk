@@ -26,6 +26,25 @@ type CloudSupportOpenRequest struct {
 	Message        string `json:"message"`
 }
 
+// GetQuota reads the current Personal Space quota when no Space ID is given,
+// or the selected Space's host-account flow allowance when one is given.
+// The other quota rows retain their own counting scopes.
+func (a *CloudCustomerAPI) GetQuota(ctx context.Context, spaceIDs ...string) (map[string]any, error) {
+	if len(spaceIDs) > 1 {
+		return nil, fmt.Errorf("mockarty: provide at most one Space ID")
+	}
+	path := "/api/v1/cloud/quota"
+	if len(spaceIDs) == 1 {
+		if strings.TrimSpace(spaceIDs[0]) == "" {
+			return nil, fmt.Errorf("mockarty: Space ID is required when provided")
+		}
+		path += "?" + url.Values{"space_id": {spaceIDs[0]}}.Encode()
+	}
+	var out map[string]any
+	err := a.client.do(a.client.cloudContext(ctx), http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 func cloudProductPageQuery(status, cursor string, limit int) string {
 	values := url.Values{}
 	if cursor != "" {

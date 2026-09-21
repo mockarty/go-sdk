@@ -12,6 +12,11 @@ func main() {
 	client := mockarty.NewClient(os.Getenv("MOCKARTY_BASE_URL"), mockarty.WithAPIKey(os.Getenv("MOCKARTY_API_KEY")))
 	ctx := context.Background()
 	spaceID := os.Getenv("MOCKARTY_CLOUD_SPACE_ID")
+	quota, err := client.CloudCustomer().GetQuota(ctx, spaceID)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("selected Space quota: %#v\n", quota)
 
 	redemptions, err := client.CloudCustomer().ListLoyaltyRedemptions(ctx, spaceID, "", 25)
 	if err != nil {
