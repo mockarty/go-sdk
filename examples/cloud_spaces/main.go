@@ -64,6 +64,20 @@ func main() {
 			}
 		}
 		if organization.AccountKind == "team" {
+			if memberID := os.Getenv("MOCKARTY_TEAM_REMOVE_MEMBER_ID"); memberID != "" {
+				if err := client.CloudSpaces().RemoveTeamMember(context.Background(), space.ID, memberID,
+					os.Getenv("MOCKARTY_TEAM_MEMBER_REMOVE_KEY")); err != nil {
+					panic(err)
+				}
+				fmt.Println("Team member removed")
+			}
+			if successorID := os.Getenv("MOCKARTY_TEAM_SUCCESSOR_ID"); successorID != "" {
+				if err := client.CloudSpaces().TransferTeamOwner(context.Background(), space.ID, successorID,
+					os.Getenv("MOCKARTY_TEAM_OWNER_TRANSFER_KEY")); err != nil {
+					panic(err)
+				}
+				fmt.Println("Team ownership transferred")
+			}
 			if name := os.Getenv("MOCKARTY_TEAM_SPACE_NAME"); name != "" {
 				created, err := client.CloudSpaces().CreateTeamSpace(context.Background(), mockarty.CloudTeamSpaceRequest{
 					TeamID: organization.AccountID, Name: name, Audience: "team",

@@ -346,6 +346,34 @@ func (a *CloudSpacesAPI) RevokeTeamInvite(ctx context.Context, spaceID, inviteID
 	return a.client.do(a.requestContext(ctx, "", key), http.MethodDelete, path, nil, nil)
 }
 
+// RemoveTeamMember releases the person's Team Seat, Team Space access and Team
+// Desktop authority. A member can pass their own ID to leave. Personal Spaces
+// remain theirs; the current owner must transfer ownership before leaving.
+func (a *CloudSpacesAPI) RemoveTeamMember(ctx context.Context, spaceID, memberID, key string) error {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(memberID) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: Team member id and idempotency key are required")
+	}
+	path := "/api/v1/cloud/team/members/" + url.PathEscape(memberID) + "?space_id=" + url.QueryEscape(spaceID)
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodDelete, path, nil, nil)
+}
+
+// TransferTeamOwner appoints an active Team member to manage the Team account.
+// The payer and owners of individual Spaces do not change.
+func (a *CloudSpacesAPI) TransferTeamOwner(ctx context.Context, spaceID, successorUserID, key string) error {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(successorUserID) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: successor user id and idempotency key are required")
+	}
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodPost,
+		"/api/v1/cloud/team/owner-transfer",
+		map[string]string{"space_id": spaceID, "successor_user_id": successorUserID}, nil)
+}
+
 // Rename changes only the user-visible Space name and requires both revision
 // and idempotency fencing for exact retries.
 func (a *CloudSpacesAPI) Rename(ctx context.Context, spaceID, name, etag, key string) (*CloudSpace, error) {
