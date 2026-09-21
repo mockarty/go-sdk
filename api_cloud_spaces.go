@@ -105,18 +105,24 @@ type CloudOrganizationSpace struct {
 	Name       string `json:"name"`
 	Slug       string `json:"slug"`
 	Plan       string `json:"plan"`
+	Audience   string `json:"audience"`
 	SeatsUsed  int    `json:"seats_used"`
 	SeatsTotal int    `json:"seats_total"`
 }
 
 type CloudOrganizationMember struct {
-	CooldownUntil  *time.Time `json:"cooldown_until,omitempty"`
-	AffiliatedAt   time.Time  `json:"affiliated_at"`
-	UserID         string     `json:"user_id"`
-	Email          string     `json:"email"`
-	Status         string     `json:"status"`
-	Role           string     `json:"role,omitempty"`
-	SpendAuthority bool       `json:"spend_authority"`
+	CooldownUntil        *time.Time `json:"cooldown_until,omitempty"`
+	LastTeamActivityAt   *time.Time `json:"last_team_activity_at,omitempty"`
+	AffiliatedAt         time.Time  `json:"affiliated_at"`
+	UserID               string     `json:"user_id"`
+	Email                string     `json:"email"`
+	Status               string     `json:"status"`
+	Role                 string     `json:"role,omitempty"`
+	RemovalBlockedReason string     `json:"removal_blocked_reason,omitempty"`
+	SpendAuthority       bool       `json:"spend_authority"`
+	CanRemove            bool       `json:"can_remove"`
+	CanLeave             bool       `json:"can_leave"`
+	OwnsTeamSpace        bool       `json:"owns_team_space"`
 }
 
 type CloudOrganizationLimits struct {
@@ -142,20 +148,24 @@ type CloudOrganizationSyncStorage struct {
 }
 
 type CloudOrganization struct {
-	Spaces         []CloudOrganizationSpace      `json:"spaces"`
-	Members        []CloudOrganizationMember     `json:"members"`
-	PendingInvites []CloudOrganizationInvite     `json:"pending_invites"`
-	SyncStorage    *CloudOrganizationSyncStorage `json:"sync_storage,omitempty"`
-	AccountID      string                        `json:"account_id"`
-	AccountKind    string                        `json:"account_kind"`
-	ViewerRole     string                        `json:"viewer_role,omitempty"`
-	Status         string                        `json:"status"`
-	PlanKind       string                        `json:"plan_kind"`
-	Limits         CloudOrganizationLimits       `json:"limits"`
-	SeatsAssigned  int                           `json:"seats_assigned"`
-	SeatsReserved  int                           `json:"seats_reserved"`
-	SeatsUsed      int                           `json:"seats_used"`
-	SeatsTotal     int                           `json:"seats_total"`
+	Spaces           []CloudOrganizationSpace      `json:"spaces"`
+	Members          []CloudOrganizationMember     `json:"members"`
+	PendingInvites   []CloudOrganizationInvite     `json:"pending_invites"`
+	SyncStorage      *CloudOrganizationSyncStorage `json:"sync_storage,omitempty"`
+	AccountID        string                        `json:"account_id"`
+	AccountKind      string                        `json:"account_kind"`
+	ViewerRole       string                        `json:"viewer_role,omitempty"`
+	Status           string                        `json:"status"`
+	PlanKind         string                        `json:"plan_kind"`
+	Limits           CloudOrganizationLimits       `json:"limits"`
+	SeatsAssigned    int                           `json:"seats_assigned"`
+	SeatsReserved    int                           `json:"seats_reserved"`
+	SeatsUsed        int                           `json:"seats_used"`
+	SeatsTotal       int                           `json:"seats_total"`
+	CanManageTeam    bool                          `json:"can_manage_team"`
+	CanReadActivity  bool                          `json:"can_read_activity"`
+	CanTransferOwner bool                          `json:"can_transfer_owner"`
+	CanLeaveTeam     bool                          `json:"can_leave_team"`
 }
 
 // CloudTeamSpaceRequest creates a collaborative Space under an existing paid
@@ -277,8 +287,10 @@ func (a *CloudSpacesAPI) Get(ctx context.Context, spaceID string) (*CloudSpace, 
 	return &out.Space, err
 }
 
-// Organization reads the billing account of an explicit Space. Only that
-// account's owner can see its members, Seats and other Spaces.
+// Organization reads the billing account of an explicit Space. Team owners and
+// active admins receive the management roster. Other current Team members receive
+// only their own membership and already accessible Spaces; the capability fields
+// are the authority for management, activity, ownership transfer and self-leave UI.
 func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*CloudOrganization, error) {
 	if _, err := cloudSpacePath(spaceID); err != nil {
 		return nil, err
