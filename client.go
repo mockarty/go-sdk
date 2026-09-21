@@ -97,6 +97,8 @@ type Client struct {
 	cloudSpacesAPI          *CloudSpacesAPI
 	cloudEntitlementsAPI    *CloudEntitlementsAPI
 	cloudSharedProjectsAPI  *CloudSharedProjectsAPI
+	cloudServiceAccountsAPI *CloudServiceAccountsAPI
+	cloudServiceAccountAPI  *CloudServiceAccountAPI
 	cloudConnectorsAPI      *CloudConnectorsAPI
 	cloudOAuthProvidersAPI  *CloudOAuthProvidersAPI
 	cloudRiskAPI            *CloudRiskAPI
@@ -189,6 +191,8 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudSpacesAPI = &CloudSpacesAPI{client: c}
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
 	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
+	c.cloudServiceAccountsAPI = &CloudServiceAccountsAPI{client: c}
+	c.cloudServiceAccountAPI = &CloudServiceAccountAPI{client: c}
 	c.cloudConnectorsAPI = &CloudConnectorsAPI{client: c}
 	c.cloudOAuthProvidersAPI = &CloudOAuthProvidersAPI{client: c}
 	c.cloudRiskAPI = &CloudRiskAPI{client: c}
@@ -252,6 +256,12 @@ func (c *Client) CloudEntitlements() *CloudEntitlementsAPI { return c.cloudEntit
 
 // CloudSharedProjects returns the public Shared SaaS project CRUD API.
 func (c *Client) CloudSharedProjects() *CloudSharedProjectsAPI { return c.cloudSharedProjectsAPI }
+
+// CloudServiceAccounts returns the human management API for machine principals.
+func (c *Client) CloudServiceAccounts() *CloudServiceAccountsAPI { return c.cloudServiceAccountsAPI }
+
+// CloudServiceAccount returns the msa_ credential identity and workload API.
+func (c *Client) CloudServiceAccount() *CloudServiceAccountAPI { return c.cloudServiceAccountAPI }
 
 // CloudConnectors returns the operator-only platform connector API.
 func (c *Client) CloudConnectors() *CloudConnectorsAPI { return c.cloudConnectorsAPI }
