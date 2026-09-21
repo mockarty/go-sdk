@@ -21,6 +21,21 @@ func main() {
 		fmt.Printf("%s %s role=%s members=%d pending=%d revision=%d\n",
 			space.ID, space.Name, space.Role, space.Usage.AcceptedHumans, space.Usage.PendingInvites, space.Revision)
 	}
+	if personalSpaceID := os.Getenv("MOCKARTY_PERSONAL_SPACE_ID"); personalSpaceID != "" {
+		quotes, err := client.CloudSpaces().ListTeamPackages(context.Background(), personalSpaceID)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("published_team_packages=%d\n", len(quotes))
+	}
+	if teamBillingSpaceID := os.Getenv("MOCKARTY_TEAM_BILLING_SPACE_ID"); teamBillingSpaceID != "" {
+		billing, err := client.CloudSpaces().GetTeamBilling(context.Background(), teamBillingSpaceID)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Printf("team_billing=%s package_seats=%d assigned=%d reserved=%d invoices=%d\n",
+			billing.TeamID, billing.PackageSeats, billing.AssignedSeats, billing.ReservedSeats, len(billing.Invoices))
+	}
 	if teamSpaceID := os.Getenv("MOCKARTY_TEAM_AUDIT_SPACE_ID"); teamSpaceID != "" {
 		audit, err := client.CloudSpaces().ListTeamAudit(context.Background(), teamSpaceID,
 			os.Getenv("MOCKARTY_TEAM_AUDIT_BEFORE_ID"), 50)
