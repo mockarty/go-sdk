@@ -37,6 +37,16 @@ func main() {
 		}
 		fmt.Printf("team_transition=%s estimated_credit_minor=%d currency=%s\n",
 			transition.Status, transition.EstimatedCreditMinor, transition.Currency)
+		if os.Getenv("MOCKARTY_TEAM_CONFIRM_TRANSITION") == "1" {
+			if transition.Status != "ready_free" && transition.Status != "ready_credit" {
+				panic("Team transition is currently blocked")
+			}
+			key := os.Getenv("MOCKARTY_IDEMPOTENCY_KEY")
+			if err := client.CloudSpaces().AcceptTeamInvite(context.Background(), token, key, true); err != nil {
+				panic(err)
+			}
+			fmt.Println("Team invitation accepted")
+		}
 	}
 	if token := os.Getenv("MOCKARTY_INVITE_TOKEN"); token != "" {
 		preview, err := client.CloudSpaces().PreviewInvite(context.Background(), token)

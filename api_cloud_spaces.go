@@ -452,6 +452,20 @@ func (a *CloudSpacesAPI) PreviewTeamTransition(ctx context.Context, token string
 	return &out.Transition, nil
 }
 
+// AcceptTeamInvite joins the recipient to the paid Team. The caller must first
+// review PreviewTeamTransition and explicitly confirm any Personal Pro credit.
+// Reuse the same key after an uncertain response.
+func (a *CloudSpacesAPI) AcceptTeamInvite(ctx context.Context, token, key string, confirmTransition bool) error {
+	if !confirmTransition {
+		return fmt.Errorf("mockarty: Team transition must be explicitly confirmed")
+	}
+	if strings.TrimSpace(token) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: Team invite token and idempotency key are required")
+	}
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodPost,
+		"/api/v1/cloud/team/invite-links/"+url.PathEscape(token)+"/accept", nil, nil)
+}
+
 func (a *CloudSpacesAPI) CreateInvite(ctx context.Context, spaceID string, request CloudSpaceInviteRequest, etag, key string) (*CloudSpaceMutation, error) {
 	if err := requireCloudSpaceMutation(etag, key); err != nil {
 		return nil, err
