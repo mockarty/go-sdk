@@ -55,6 +55,14 @@ func main() {
 	if organization, err := client.CloudSpaces().Organization(context.Background(), space.ID); err == nil {
 		fmt.Printf("account=%s kind=%s occupied=%d/%d pending=%d\n", organization.AccountID,
 			organization.AccountKind, organization.SeatsUsed, organization.SeatsTotal, len(organization.PendingInvites))
+		if storage := organization.SyncStorage; storage != nil {
+			if storage.Reconciled {
+				fmt.Printf("team_sync_storage_bytes=%d/%d per_space_limit_bytes=%d\n",
+					storage.UsedBytes, storage.LimitBytes, storage.SpaceLimitBytes)
+			} else {
+				fmt.Println("team_sync_storage=pending_reconciliation")
+			}
+		}
 		if organization.AccountKind == "team" {
 			if name := os.Getenv("MOCKARTY_TEAM_SPACE_NAME"); name != "" {
 				created, err := client.CloudSpaces().CreateTeamSpace(context.Background(), mockarty.CloudTeamSpaceRequest{

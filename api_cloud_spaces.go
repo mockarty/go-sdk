@@ -132,19 +132,29 @@ type CloudOrganizationInvite struct {
 	Role      string    `json:"role"`
 }
 
+// CloudOrganizationSyncStorage is the Team's retained sync-data allowance.
+// UsedBytes is a trustworthy account total only after Reconciled is true.
+type CloudOrganizationSyncStorage struct {
+	UsedBytes       int64 `json:"used_bytes"`
+	LimitBytes      int64 `json:"limit_bytes"`
+	SpaceLimitBytes int64 `json:"space_limit_bytes"`
+	Reconciled      bool  `json:"reconciled"`
+}
+
 type CloudOrganization struct {
-	Spaces         []CloudOrganizationSpace  `json:"spaces"`
-	Members        []CloudOrganizationMember `json:"members"`
-	PendingInvites []CloudOrganizationInvite `json:"pending_invites"`
-	AccountID      string                    `json:"account_id"`
-	AccountKind    string                    `json:"account_kind"`
-	Status         string                    `json:"status"`
-	PlanKind       string                    `json:"plan_kind"`
-	Limits         CloudOrganizationLimits   `json:"limits"`
-	SeatsAssigned  int                       `json:"seats_assigned"`
-	SeatsReserved  int                       `json:"seats_reserved"`
-	SeatsUsed      int                       `json:"seats_used"`
-	SeatsTotal     int                       `json:"seats_total"`
+	Spaces         []CloudOrganizationSpace      `json:"spaces"`
+	Members        []CloudOrganizationMember     `json:"members"`
+	PendingInvites []CloudOrganizationInvite     `json:"pending_invites"`
+	SyncStorage    *CloudOrganizationSyncStorage `json:"sync_storage,omitempty"`
+	AccountID      string                        `json:"account_id"`
+	AccountKind    string                        `json:"account_kind"`
+	Status         string                        `json:"status"`
+	PlanKind       string                        `json:"plan_kind"`
+	Limits         CloudOrganizationLimits       `json:"limits"`
+	SeatsAssigned  int                           `json:"seats_assigned"`
+	SeatsReserved  int                           `json:"seats_reserved"`
+	SeatsUsed      int                           `json:"seats_used"`
+	SeatsTotal     int                           `json:"seats_total"`
 }
 
 // CloudTeamSpaceRequest creates a collaborative Space under an existing paid
