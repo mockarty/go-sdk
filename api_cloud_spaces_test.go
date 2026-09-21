@@ -108,6 +108,39 @@ func TestCloudSpacesRevokeTeamInviteUsesSelectedAccountAndStableKey(t *testing.T
 	}
 }
 
+func TestCloudSpacesSetTeamMemberStatusKeepsSeatAndUsesStableKey(t *testing.T) {
+	var gotPath, gotKey, gotStatus string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("method=%s", r.Method)
+		}
+		gotPath, gotKey = r.URL.RequestURI(), r.Header.Get("Idempotency-Key")
+		var body map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotStatus = body["status"]
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	api := NewClient(srv.URL, WithAPIKey("cloud-token")).CloudSpaces()
+	if err := api.SetTeamMemberStatus(context.Background(), "space-id", "member-id", " SUSPENDED ", "status-retry-key"); err != nil {
+		t.Fatal(err)
+	}
+	if gotPath != "/api/v1/cloud/team/members/member-id/status?space_id=space-id" ||
+		gotKey != "status-retry-key" || gotStatus != "suspended" {
+		t.Fatalf("Team status path=%q key=%q status=%q", gotPath, gotKey, gotStatus)
+	}
+	for _, status := range []string{"", "removed"} {
+		if err := api.SetTeamMemberStatus(context.Background(), "space-id", "member-id", status, "status-retry-key"); err == nil {
+			t.Fatalf("invalid Team status %q reached the network", status)
+		}
+	}
+	if err := api.SetTeamMemberStatus(context.Background(), "space-id", "member-id", "active", ""); err == nil {
+		t.Fatal("Team status without idempotency key reached the network")
+	}
+}
+
 func TestCloudSpacesNonPositiveLimitUsesServerDefault(t *testing.T) {
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

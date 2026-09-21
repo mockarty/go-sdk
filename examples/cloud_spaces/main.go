@@ -102,6 +102,13 @@ func main() {
 			}
 		}
 		if organization.AccountKind == "team" {
+			if memberID := os.Getenv("MOCKARTY_TEAM_STATUS_MEMBER_ID"); memberID != "" {
+				if err := client.CloudSpaces().SetTeamMemberStatus(context.Background(), space.ID, memberID,
+					os.Getenv("MOCKARTY_TEAM_MEMBER_STATUS"), os.Getenv("MOCKARTY_TEAM_MEMBER_STATUS_KEY")); err != nil {
+					panic(err)
+				}
+				fmt.Println("Team member status updated")
+			}
 			if memberID := os.Getenv("MOCKARTY_TEAM_REMOVE_MEMBER_ID"); memberID != "" {
 				if err := client.CloudSpaces().RemoveTeamMember(context.Background(), space.ID, memberID,
 					os.Getenv("MOCKARTY_TEAM_MEMBER_REMOVE_KEY")); err != nil {

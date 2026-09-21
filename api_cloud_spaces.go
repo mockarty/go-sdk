@@ -384,6 +384,25 @@ func (a *CloudSpacesAPI) RemoveTeamMember(ctx context.Context, spaceID, memberID
 	return a.client.do(a.requestContext(ctx, "", key), http.MethodDelete, path, nil, nil)
 }
 
+// SetTeamMemberStatus suspends or resumes one named Team member without
+// releasing their paid Seat. Existing Team Space assignments stay dormant
+// while suspended and become active again when the member is resumed.
+func (a *CloudSpacesAPI) SetTeamMemberStatus(ctx context.Context, spaceID, memberID, status, key string) error {
+	if _, err := cloudSpacePath(spaceID); err != nil {
+		return err
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	if strings.TrimSpace(memberID) == "" || strings.TrimSpace(key) == "" {
+		return fmt.Errorf("mockarty: Team member id and idempotency key are required")
+	}
+	if status != "active" && status != "suspended" {
+		return fmt.Errorf("mockarty: Team member status must be active or suspended")
+	}
+	path := "/api/v1/cloud/team/members/" + url.PathEscape(memberID) + "/status?space_id=" + url.QueryEscape(spaceID)
+	return a.client.do(a.requestContext(ctx, "", key), http.MethodPatch, path,
+		map[string]string{"status": status}, nil)
+}
+
 // TransferTeamOwner appoints an active Team member to manage the Team account.
 // The payer and owners of individual Spaces do not change.
 func (a *CloudSpacesAPI) TransferTeamOwner(ctx context.Context, spaceID, successorUserID, key string) error {
