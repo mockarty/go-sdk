@@ -22,7 +22,7 @@ func TestCloudTeamReadReportsUseExplicitSpaceAndBearerToken(t *testing.T) {
 		case "/api/v1/cloud/team/packages":
 			_, _ = w.Write([]byte(`{"packages":[{"seats":5,"discount_bps":0,"total_minor":50000,"currency":"RUB"}]}`))
 		case "/api/v1/cloud/team/billing":
-			_, _ = w.Write([]byte(`{"billing":{"team_id":"team-1","package_seats":5,"assigned_seats":3,"reserved_seats":1,"invoices":[],"wallets":[]}}`))
+			_, _ = w.Write([]byte(`{"billing":{"team_id":"team-1","payer_kind":"organization","payer_name":"Example Org","package_seats":5,"assigned_seats":3,"reserved_seats":1,"invoices":[],"wallets":[]}}`))
 		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -40,7 +40,8 @@ func TestCloudTeamReadReportsUseExplicitSpaceAndBearerToken(t *testing.T) {
 		t.Fatalf("quotes=%+v err=%v", quotes, err)
 	}
 	billing, err := api.GetTeamBilling(context.Background(), "team-space-1")
-	if err != nil || billing.TeamID != "team-1" || billing.PackageSeats != 5 || billing.ReservedSeats != 1 {
+	if err != nil || billing.TeamID != "team-1" || billing.PayerKind != "organization" ||
+		billing.PayerName != "Example Org" || billing.PackageSeats != 5 || billing.ReservedSeats != 1 {
 		t.Fatalf("billing=%+v err=%v", billing, err)
 	}
 	if len(paths) != 2 || paths[0] != "/api/v1/cloud/team/packages?space_id=personal-1" ||

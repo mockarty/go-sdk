@@ -59,6 +59,7 @@ type CloudTeamBilling struct {
 	Role           string                    `json:"role"`
 	Status         string                    `json:"status"`
 	PayerKind      string                    `json:"payer_kind"`
+	PayerName      string                    `json:"payer_name,omitempty"`
 	Currency       string                    `json:"currency"`
 	BillingPeriod  string                    `json:"billing_period"`
 	Invoices       []CloudTeamBillingInvoice `json:"invoices"`

@@ -304,7 +304,7 @@ func (a *CloudSpacesAPI) Organization(ctx context.Context, spaceID string) (*Clo
 }
 
 // ListTeamAudit reads a Team-wide, newest-first audit page through an explicit
-// Team Space. The caller needs an active Seat and owner or billing-manager role.
+// Team Space. The caller must be the Team owner with an assigned Seat.
 // Pass the returned NextBeforeID unchanged to fetch the next page; limit zero
 // uses the server default of 50.
 func (a *CloudSpacesAPI) ListTeamAudit(ctx context.Context, spaceID, beforeID string, limit int) (*CloudTeamAuditPage, error) {

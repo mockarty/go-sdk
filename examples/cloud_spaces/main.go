@@ -33,8 +33,12 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("team_billing=%s package_seats=%d assigned=%d reserved=%d invoices=%d\n",
-			billing.TeamID, billing.PackageSeats, billing.AssignedSeats, billing.ReservedSeats, len(billing.Invoices))
+		payer := billing.PayerName
+		if payer == "" {
+			payer = billing.PayerKind
+		}
+		fmt.Printf("team_billing=%s payer=%s package_seats=%d assigned=%d reserved=%d invoices=%d\n",
+			billing.TeamID, payer, billing.PackageSeats, billing.AssignedSeats, billing.ReservedSeats, len(billing.Invoices))
 	}
 	if teamSpaceID := os.Getenv("MOCKARTY_TEAM_AUDIT_SPACE_ID"); teamSpaceID != "" {
 		audit, err := client.CloudSpaces().ListTeamAudit(context.Background(), teamSpaceID,
