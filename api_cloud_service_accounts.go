@@ -328,3 +328,86 @@ func (a *CloudServiceAccountAPI) DeleteProject(ctx context.Context, spaceID, pro
 	}
 	return a.client.do(ctx, http.MethodDelete, path+"?revision="+strconv.FormatInt(revision, 10), nil, nil)
 }
+
+// CloudServiceAccountRunRequest dispatches one bounded Shared run. OperationID
+// is deliberately absent: Cloud derives it from Idempotency-Key and rejects a
+// second, conflicting identity in the JSON body.
+type CloudServiceAccountRunRequest struct {
+	Deadline   time.Time       `json:"deadline"`
+	Payload    json.RawMessage `json:"payload,omitempty"`
+	Capability string          `json:"capability"`
+	Class      string          `json:"class"`
+	ProjectID  string          `json:"project_id"`
+}
+
+type CloudServiceAccountRun struct {
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Deadline    time.Time       `json:"deadline"`
+	Result      json.RawMessage `json:"result,omitempty"`
+	ID          string          `json:"id"`
+	OperationID string          `json:"operation_id"`
+	Capability  string          `json:"capability"`
+	Class       string          `json:"class"`
+	State       string          `json:"state"`
+	ErrorCode   string          `json:"error_code,omitempty"`
+	Revision    int64           `json:"revision"`
+}
+
+func cloudServiceAccountRunPath(spaceID, runID string, cancel bool) (string, error) {
+	if strings.TrimSpace(spaceID) == "" {
+		return "", fmt.Errorf("mockarty: space id is required")
+	}
+	path := "/api/v1/cloud/service-account/spaces/" + url.PathEscape(spaceID) + "/shared/runs"
+	if runID != "" {
+		path += "/" + url.PathEscape(runID)
+	}
+	if cancel {
+		if runID == "" {
+			return "", fmt.Errorf("mockarty: run id is required")
+		}
+		path += "/cancel"
+	}
+	return path, nil
+}
+
+func (a *CloudServiceAccountAPI) DispatchRun(ctx context.Context, spaceID string, request CloudServiceAccountRunRequest, idempotencyKey string) (*CloudServiceAccountRun, error) {
+	path, err := cloudServiceAccountRunPath(spaceID, "", false)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = a.mutationContext(ctx, idempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	var out CloudServiceAccountRun
+	err = a.client.do(ctx, http.MethodPost, path, request, &out)
+	return &out, err
+}
+
+func (a *CloudServiceAccountAPI) GetRun(ctx context.Context, spaceID, runID string) (*CloudServiceAccountRun, error) {
+	path, err := cloudServiceAccountRunPath(spaceID, runID, false)
+	if err != nil {
+		return nil, err
+	}
+	var out CloudServiceAccountRun
+	err = a.client.do(a.client.cloudContext(ctx), http.MethodGet, path, nil, &out)
+	return &out, err
+}
+
+func (a *CloudServiceAccountAPI) CancelRun(ctx context.Context, spaceID, runID string, revision int64, idempotencyKey string) (*CloudServiceAccountRun, error) {
+	if revision < 1 {
+		return nil, fmt.Errorf("mockarty: revision must be positive")
+	}
+	path, err := cloudServiceAccountRunPath(spaceID, runID, true)
+	if err != nil {
+		return nil, err
+	}
+	ctx, err = a.mutationContext(ctx, idempotencyKey)
+	if err != nil {
+		return nil, err
+	}
+	var out CloudServiceAccountRun
+	err = a.client.do(ctx, http.MethodPost, path, map[string]any{"revision": revision}, &out)
+	return &out, err
+}

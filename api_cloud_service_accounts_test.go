@@ -46,10 +46,13 @@ func TestCloudServiceAccountsManagementAndWorkloadRoutes(t *testing.T) {
 	_, _ = client.CloudServiceAccount().CreateProject(ctx, "space-a", "A", json.RawMessage(`{}`), "project-create-1")
 	_, _ = client.CloudServiceAccount().UpdateProject(ctx, "space-a", CloudSharedProject{ID: "project-a", Name: "B", Revision: 1, Body: json.RawMessage(`{}`)}, "project-update-1")
 	_ = client.CloudServiceAccount().DeleteProject(ctx, "space-a", "project-a", 2, "project-delete-1")
-	if len(requests) != 14 {
+	_, _ = client.CloudServiceAccount().DispatchRun(ctx, "space-a", CloudServiceAccountRunRequest{ProjectID: "project-a", Capability: "execute", Class: "batch"}, "run-dispatch-1")
+	_, _ = client.CloudServiceAccount().GetRun(ctx, "space-a", "run-a")
+	_, _ = client.CloudServiceAccount().CancelRun(ctx, "space-a", "run-a", 1, "run-cancel-1")
+	if len(requests) != 17 {
 		t.Fatalf("requests=%v", requests)
 	}
-	if len(keys) != 8 {
+	if len(keys) != 10 {
 		t.Fatalf("idempotency keys=%v", keys)
 	}
 	for _, request := range requests[9:] {
