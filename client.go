@@ -93,7 +93,6 @@ type Client struct {
 	experienceAPI           *ExperienceAPI
 	economicsAPI            *EconomicsAPI
 	cloudWebhooksAPI        *CloudWebhooksAPI
-	cloudInstancesAPI       *CloudInstancesAPI
 	cloudSpacesAPI          *CloudSpacesAPI
 	cloudEntitlementsAPI    *CloudEntitlementsAPI
 	cloudSharedProjectsAPI  *CloudSharedProjectsAPI
@@ -187,7 +186,6 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.experienceAPI = &ExperienceAPI{client: c}
 	c.economicsAPI = &EconomicsAPI{client: c}
 	c.cloudWebhooksAPI = &CloudWebhooksAPI{client: c}
-	c.cloudInstancesAPI = &CloudInstancesAPI{client: c}
 	c.cloudSpacesAPI = &CloudSpacesAPI{client: c}
 	c.cloudEntitlementsAPI = &CloudEntitlementsAPI{client: c}
 	c.cloudSharedProjectsAPI = &CloudSharedProjectsAPI{client: c}
@@ -245,8 +243,6 @@ func (c *Client) Connections() *ConnectionAuthorityAPI { return c.connectionAuth
 // CloudWebhooks returns the curated Cloud webhook lifecycle API.
 func (c *Client) CloudWebhooks() *CloudWebhooksAPI { return c.cloudWebhooksAPI }
 
-// CloudInstances returns the dedicated Cloud contour lifecycle API.
-func (c *Client) CloudInstances() *CloudInstancesAPI { return c.cloudInstancesAPI }
 
 // CloudSpaces returns the explicit Space collaboration API.
 func (c *Client) CloudSpaces() *CloudSpacesAPI { return c.cloudSpacesAPI }
