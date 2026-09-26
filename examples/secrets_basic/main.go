@@ -31,7 +31,7 @@ func main() {
 	store, err := client.Secrets().CreateStore(ctx, mockarty.SecretStore{
 		Name:        "payments",
 		Description: "API keys for payment providers",
-		Backend:     "software",
+		Backend:     "inline",
 	})
 	if err != nil {
 		log.Fatalf("create store: %v", err)
@@ -76,6 +76,6 @@ func main() {
 
 	// In a mock response body, reference the secret as:
 	//   {"auth": "Bearer $.secrets.payments.stripe_api_key"}
-	// Only mocks whose API key has `secret:read` will resolve the value;
-	// others see a redacted placeholder.
+	// A resolved value is sent in the mock response, so use it only when
+	// the caller is meant to receive that value.
 }

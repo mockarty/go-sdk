@@ -16,9 +16,9 @@ import (
 // entries. Entry values are only exposed to callers with the `secret:read`
 // permission — list/get on the store itself never returns decrypted values.
 //
-// Stores may optionally be backed by HashiCorp Vault (or any compatible
-// KV v2 engine) via PUT /api/v1/namespaces/:ns/integrations/vault; in that
-// case entries are read-through proxies and writes are forwarded to Vault.
+// Stores may read values from HashiCorp Vault and other configured external
+// secret services. Create or rotate values in the external service; the entry
+// write methods below are for local inline stores.
 type SecretsAPI struct {
 	client *Client
 }
@@ -47,16 +47,22 @@ type SecretEntry struct {
 	Version     int       `json:"version"`
 }
 
-// VaultIntegration configures a namespace's optional HashiCorp Vault
-// backend. AuthMethod is one of "token", "approle", "kubernetes".
+// VaultIntegration creates a Vault-backed store using a token already saved
+// as a secret entry in the same namespace. Only token authentication is
+// supported by the current server.
 type VaultIntegration struct {
-	URL        string `json:"url"`
-	AuthMethod string `json:"authMethod"`
-	Token      string `json:"token,omitempty"`
-	RoleID     string `json:"roleId,omitempty"`
-	SecretID   string `json:"secretId,omitempty"`
-	MountPath  string `json:"mountPath,omitempty"`
-	Namespace  string `json:"namespace,omitempty"`
+	URL           string `json:"url"`
+	TokenSecretID string `json:"tokenSecretId,omitempty"`
+	Mount         string `json:"mount,omitempty"`
+	AuthMethod    string `json:"authMethod,omitempty"`
+	KVVersion     int    `json:"kvVersion,omitempty"`
+	// Deprecated fields remain for source compatibility; the server cannot
+	// use these authentication paths. ConfigureVault rejects them explicitly.
+	Token     string `json:"token,omitempty"`
+	RoleID    string `json:"roleId,omitempty"`
+	SecretID  string `json:"secretId,omitempty"`
+	MountPath string `json:"mountPath,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // ListStores returns every secret store visible to the caller in the
@@ -275,11 +281,32 @@ func (a *SecretsAPI) DeleteEntry(ctx context.Context, storeID, key string) error
 	return a.client.do(ctx, "DELETE", "/api/v1/stores/secrets/"+url.PathEscape(storeID)+"/entries/"+url.PathEscape(key)+a.nsQuery(), nil, nil)
 }
 
-// ConfigureVault registers or updates a Vault backend for the namespace.
-// Pass an empty VaultIntegration (or call with cfg.URL == "") to clear it.
+// ConfigureVault creates the namespace's first Vault-backed store. To change
+// an existing store, use UpdateStore with its ID.
 func (a *SecretsAPI) ConfigureVault(ctx context.Context, namespace string, cfg VaultIntegration) error {
 	if namespace == "" {
 		namespace = a.client.namespace
 	}
-	return a.client.do(ctx, "PUT", "/api/v1/namespaces/"+url.PathEscape(namespace)+"/integrations/vault", cfg, nil)
+	if namespace == "" || cfg.URL == "" || cfg.TokenSecretID == "" {
+		return fmt.Errorf("mockarty: namespace, Vault URL, and token secret ID are required")
+	}
+	if cfg.Token != "" || cfg.RoleID != "" || cfg.SecretID != "" || cfg.Namespace != "" ||
+		(cfg.AuthMethod != "" && cfg.AuthMethod != "token") {
+		return fmt.Errorf("mockarty: Vault integration requires a stored token; raw token, AppRole, and Vault namespace settings are unsupported")
+	}
+	mount := cfg.Mount
+	if mount == "" {
+		mount = cfg.MountPath
+	}
+	if mount == "" {
+		mount = "secret"
+	}
+	body := map[string]any{
+		"url": cfg.URL, "tokenSecretId": cfg.TokenSecretID,
+		"mount": mount, "authMethod": "token",
+	}
+	if cfg.KVVersion != 0 {
+		body["kvVersion"] = cfg.KVVersion
+	}
+	return a.client.do(ctx, "PUT", "/api/v1/namespaces/"+url.PathEscape(namespace)+"/integrations/vault", body, nil)
 }
