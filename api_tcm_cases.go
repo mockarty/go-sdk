@@ -20,7 +20,7 @@ import (
 // the client default.
 
 // TCMObject is a loosely-typed TCM record (case / case-run / defect). Field
-// names match the server JSON (e.g. obj["title"], obj["status"]).
+// names match the server JSON (e.g. obj["name"], obj["status"]).
 type TCMObject = map[string]any
 
 func (a *TCMAPI) nsBase(namespace, suffix string) (string, error) {
@@ -85,7 +85,7 @@ func (a *TCMAPI) listObjs(ctx context.Context, path string, keys ...string) ([]T
 
 // ── Cases ──────────────────────────────────────────────────────────────
 
-// CreateCase creates a test case (fields: title, folderId, steps, …).
+// CreateCase creates a test case (fields: name, folderId, steps, …).
 func (a *TCMAPI) CreateCase(ctx context.Context, namespace string, testCase TCMObject) (TCMObject, error) {
 	base, err := a.nsBase(namespace, "/test-cases")
 	if err != nil {
@@ -112,7 +112,7 @@ func (a *TCMAPI) ListCases(ctx context.Context, namespace string, filters map[st
 	return a.listObjs(ctx, base+encodeQuery(filters), "test_cases", "cases", "items")
 }
 
-// UpdateCase applies an update to a test case.
+// UpdateCase updates case metadata. Use SaveCaseSteps to publish edited steps.
 func (a *TCMAPI) UpdateCase(ctx context.Context, namespace, caseID string, fields TCMObject) (TCMObject, error) {
 	base, err := a.nsBase(namespace, "/test-cases/"+url.PathEscape(caseID))
 	if err != nil {
@@ -196,4 +196,37 @@ func (a *TCMAPI) DeleteDefect(ctx context.Context, namespace, defectID string) e
 		return err
 	}
 	return a.client.do(ctx, http.MethodDelete, base, nil, nil)
+}
+
+// ListCaseVersions lists saved versions; call GetCaseVersion to read their steps.
+func (a *TCMAPI) ListCaseVersions(ctx context.Context, namespace, caseID string) ([]TCMObject, error) {
+	base, err := a.nsBase(namespace, "/test-cases/"+url.PathEscape(caseID)+"/versions")
+	if err != nil {
+		return nil, err
+	}
+	return a.listObjs(ctx, base, "versions")
+}
+
+// GetCaseVersion returns a saved version including its steps.
+func (a *TCMAPI) GetCaseVersion(ctx context.Context, namespace, caseID, versionID string) (TCMObject, error) {
+	base, err := a.nsBase(namespace, "/test-cases/"+url.PathEscape(caseID)+"/versions/"+url.PathEscape(versionID))
+	if err != nil {
+		return nil, err
+	}
+	return a.sendObj(ctx, http.MethodGet, base, nil)
+}
+
+// SaveCaseSteps publishes a complete step list as a saved version. Read and
+// edit existing steps to preserve stepUid. Identical content returns the
+// existing version with dedupSkipped=true. An explicit empty slice clears
+// steps; nil is rejected to prevent accidental clearing.
+func (a *TCMAPI) SaveCaseSteps(ctx context.Context, namespace, caseID string, steps []TCMObject, notes string) (TCMObject, error) {
+	if steps == nil {
+		return nil, fmt.Errorf("tcm: steps must be an explicit list")
+	}
+	base, err := a.nsBase(namespace, "/test-cases/"+url.PathEscape(caseID)+"/versions")
+	if err != nil {
+		return nil, err
+	}
+	return a.sendObj(ctx, http.MethodPost, base, TCMObject{"steps": steps, "notes": notes})
 }

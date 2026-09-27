@@ -15,16 +15,23 @@ import (
 func TestTCMCases_Flow(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
+		if (r.Method == "POST" && p == "/api/v1/namespaces/mockarty-dev/test-cases") || (r.Method == "PUT" && p == "/api/v1/namespaces/mockarty-dev/test-cases/c1") {
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body["name"] == nil {
+				http.Error(w, "name is required by the case DTO", http.StatusBadRequest)
+				return
+			}
+		}
 		switch {
 		case r.Method == "POST" && p == "/api/v1/namespaces/mockarty-dev/test-cases":
 			w.WriteHeader(201)
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": "c1", "title": "Login case"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "c1", "name": "Login case"})
 		case r.Method == "GET" && p == "/api/v1/namespaces/mockarty-dev/test-cases/c1":
 			_ = json.NewEncoder(w).Encode(map[string]any{"id": "c1", "status": "active"})
 		case r.Method == "GET" && p == "/api/v1/namespaces/mockarty-dev/test-cases":
 			_ = json.NewEncoder(w).Encode(map[string]any{"test_cases": []any{map[string]any{"id": "c1"}}, "total": 1})
 		case r.Method == "PUT" && p == "/api/v1/namespaces/mockarty-dev/test-cases/c1":
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": "c1", "title": "t2"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "c1", "name": "t2"})
 		case r.Method == "POST" && p == "/api/v1/namespaces/mockarty-dev/test-cases/c1/run":
 			_ = json.NewEncoder(w).Encode(map[string]any{"runId": "r1", "status": "running"})
 		case r.Method == "GET" && p == "/api/v1/namespaces/mockarty-dev/test-cases/c1/runs":
@@ -49,7 +56,7 @@ func TestTCMCases_Flow(t *testing.T) {
 	ctx := context.Background()
 	tcm := c.TCM()
 
-	cs, err := tcm.CreateCase(ctx, "", TCMObject{"title": "Login case"})
+	cs, err := tcm.CreateCase(ctx, "", TCMObject{"name": "Login case"})
 	if err != nil || cs["id"] != "c1" {
 		t.Fatalf("CreateCase: %v %+v", err, cs)
 	}
@@ -59,7 +66,7 @@ func TestTCMCases_Flow(t *testing.T) {
 	if list, err := tcm.ListCases(ctx, "", nil); err != nil || len(list) != 1 {
 		t.Fatalf("ListCases: %v %+v", err, list)
 	}
-	if up, err := tcm.UpdateCase(ctx, "", "c1", TCMObject{"title": "t2"}); err != nil || up["title"] != "t2" {
+	if up, err := tcm.UpdateCase(ctx, "", "c1", TCMObject{"name": "t2"}); err != nil || up["name"] != "t2" {
 		t.Fatalf("UpdateCase: %v %+v", err, up)
 	}
 	if run, err := tcm.RunCase(ctx, "", "c1", nil); err != nil || run["runId"] != "r1" {
@@ -94,5 +101,64 @@ func TestTCMCases_NamespaceRequired(t *testing.T) {
 	_, err := c.TCM().ListCases(context.Background(), "", nil)
 	if err == nil || !strings.Contains(err.Error(), "namespace required") {
 		t.Fatalf("expected namespace-required, got %v", err)
+	}
+}
+
+func TestTCMCaseStepsReadEditSave(t *testing.T) {
+	saves := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		base := "/api/v1/namespaces/qa/test-cases/case-1/versions"
+		switch {
+		case r.Method == "GET" && r.URL.Path == base:
+			_, _ = w.Write([]byte(`{"versions":[{"id":"version-1","version":1}]}`))
+		case r.Method == "GET" && r.URL.Path == base+"/version-1":
+			_, _ = w.Write([]byte(`{"id":"version-1","steps":[{"stepUid":"login","mode":"manual","executorType":"manual","action":"Login","expectedResult":"Home"}]}`))
+		case r.Method == "POST" && r.URL.Path == base:
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Error(err)
+			}
+			if body["notes"] != "updated expectation" {
+				t.Errorf("notes lost: %v", body)
+			}
+			steps := body["steps"].([]any)
+			if steps[0].(map[string]any)["expectedResult"] != "Dashboard" {
+				t.Errorf("steps lost: %v", body)
+			}
+			saves++
+			if saves == 1 {
+				w.WriteHeader(201)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": "version-2", "version": 2, "dedupSkipped": saves > 1, "steps": steps})
+		default:
+			http.Error(w, "unexpected route", 404)
+		}
+	}))
+	defer srv.Close()
+	api := NewClient(srv.URL, WithNamespace("qa")).TCM()
+	ctx := context.Background()
+	versions, err := api.ListCaseVersions(ctx, "", "case-1")
+	if err != nil || len(versions) != 1 {
+		t.Fatalf("list: %v %v", versions, err)
+	}
+	version, err := api.GetCaseVersion(ctx, "", "case-1", "version-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := version["steps"].([]any)[0].(map[string]any)
+	step["expectedResult"] = "Dashboard"
+	first, err := api.SaveCaseSteps(ctx, "", "case-1", []TCMObject{step}, "updated expectation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := api.SaveCaseSteps(ctx, "", "case-1", []TCMObject{step}, "updated expectation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first["id"] != again["id"] || again["dedupSkipped"] != true {
+		t.Fatalf("stored response lost: %v", again)
+	}
+	if _, err := api.SaveCaseSteps(ctx, "", "case-1", nil, ""); err == nil {
+		t.Fatal("nil steps accepted")
 	}
 }

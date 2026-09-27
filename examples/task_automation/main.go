@@ -49,7 +49,7 @@ func main() {
 
 	// 2. TCM: create a case, run it, file a defect on failure.
 	tcm := client.TCM()
-	c, err := tcm.CreateCase(ctx, "", mockarty.TCMObject{"title": "Checkout smoke"})
+	c, err := tcm.CreateCase(ctx, "", mockarty.TCMObject{"name": "Checkout smoke"})
 	if err != nil {
 		log.Fatalf("create case: %v", err)
 	}
