@@ -179,3 +179,32 @@ func TestExternalRunsParametersSerialised(t *testing.T) {
 		t.Fatalf("parameters wrong on wire: %v", params)
 	}
 }
+
+func TestExternalRunsPlanRunAndBlobReferenceWireShape(t *testing.T) {
+	var received map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
+			t.Error(err)
+		}
+		_, _ = w.Write([]byte(`{"runId":"result"}`))
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, WithNamespace("qa"))
+	_, err := c.ExternalRuns().Report(context.Background(), "", ExternalRunRequest{
+		CaseName: "case", Status: "passed", PlanRunID: "11111111-1111-1111-1111-111111111111",
+		Attachments: []ExternalAttachment{{Name: "video", ContentType: "video/webm", BlobURI: "fs://qa/upload/video"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if received["planRunId"] != "11111111-1111-1111-1111-111111111111" {
+		t.Fatalf("launch binding lost: %v", received)
+	}
+	att := received["attachments"].([]any)[0].(map[string]any)
+	if att["blobUri"] != "fs://qa/upload/video" {
+		t.Fatalf("reference lost: %v", att)
+	}
+	if _, ok := att["bodyB64"]; ok {
+		t.Fatal("reference became an inline body")
+	}
+}

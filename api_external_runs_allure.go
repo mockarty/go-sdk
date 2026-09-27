@@ -5,7 +5,6 @@ package mockarty
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -26,12 +25,16 @@ type AllureUploadOptions struct {
 	AutoCreate bool
 	// OnError controls error policy: "warn" (default) skips a bad file and
 	// continues; "raise" returns on the first read/parse/upload error.
+	// Referenced media always fails preflight before any run is uploaded.
 	OnError string
 }
 
 // UploadAllureDir reads an allure-results directory, translates every
 // *-result.json into an external-run payload (via allureResultToExternalRun),
-// and reports each to TCM. Returns the per-result server responses.
+// and reports each to TCM. Recursive step media is retained; container
+// fixtures are not imported. Limits: 256 KiB/file, 1 MiB and 32 unique
+// attachments/result, 32 MiB/batch, 64 step levels and 5000 steps/result.
+// Returns the per-result server responses.
 //
 // Parity with Python upload_allure_dir / Java uploadAllureDir — the Go SDK was
 // missing the Allure-folder ingestion path used by CI pipelines.
@@ -51,8 +54,11 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 
 	out := make([]*ExternalRunResponse, 0, len(matches))
 	var skipped []string
+	var requests []ExternalRunRequest
+	var sources []string
+	totalMediaBytes := 0
 	for _, path := range matches {
-		data, err := os.ReadFile(path)
+		data, err := readAllureSource(directory, filepath.Base(path), 10<<20)
 		if err != nil {
 			if opts.OnError == "raise" {
 				return nil, fmt.Errorf("mockarty: read %s: %w", path, err)
@@ -68,7 +74,31 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 			skipped = append(skipped, filepath.Base(path)+": "+err.Error())
 			continue
 		}
-		resp, err := a.Report(ctx, opts.Namespace, allureResultToExternalRun(doc, directory, opts))
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		steps, attachments, paths, mediaBytes, err := collectAllureMedia(doc, directory)
+		if err != nil {
+			return nil, fmt.Errorf("mockarty: preflight %s: %w", filepath.Base(path), err)
+		}
+		totalMediaBytes += mediaBytes
+		if totalMediaBytes > allureInlineBatchLimit {
+			return nil, fmt.Errorf("mockarty: Allure batch attachments exceed 32 MiB")
+		}
+		req := allureResultToExternalRun(doc, directory, opts)
+		req.Steps, req.Attachments = steps, attachments
+		if len(paths) > 0 {
+			if req.Metadata == nil {
+				req.Metadata = map[string]any{}
+			}
+			req.Metadata["allureAttachmentPaths"] = paths
+		}
+		requests = append(requests, req)
+		sources = append(sources, path)
+	}
+	for i, req := range requests {
+		path := sources[i]
+		resp, err := a.Report(ctx, opts.Namespace, req)
 		if err != nil {
 			if opts.OnError == "raise" {
 				return nil, fmt.Errorf("mockarty: upload %s: %w", path, err)
@@ -161,60 +191,6 @@ func allureResultToExternalRun(doc map[string]any, directory string, opts Allure
 		}
 	}
 
-	var steps []ExternalStep
-	if ss, ok := doc["steps"].([]any); ok {
-		for _, s := range ss {
-			sm, ok := s.(map[string]any)
-			if !ok {
-				continue
-			}
-			st := strings.ToLower(strings.TrimSpace(allureStr(sm, "status")))
-			switch st {
-			case "passed", "failed", "skipped", "broken":
-			case "error":
-				st = "broken"
-			default:
-				st = "broken"
-			}
-			var stepErr string
-			if sd, ok := sm["statusDetails"].(map[string]any); ok {
-				stepErr, _ = sd["message"].(string)
-			}
-			steps = append(steps, ExternalStep{Name: allureStr(sm, "name"), Status: st, Error: stepErr})
-		}
-	}
-
-	var atts []ExternalAttachment
-	if as, ok := doc["attachments"].([]any); ok {
-		for _, at := range as {
-			am, ok := at.(map[string]any)
-			if !ok {
-				continue
-			}
-			src := allureStr(am, "source")
-			if src == "" {
-				continue
-			}
-			body, err := os.ReadFile(filepath.Join(directory, src))
-			if err != nil {
-				continue // skip a missing attachment rather than fail the upload
-			}
-			attName := allureStr(am, "name")
-			if attName == "" {
-				attName = src
-			}
-			ct := allureStr(am, "type")
-			if ct == "" {
-				ct = "application/octet-stream"
-			}
-			atts = append(atts, ExternalAttachment{
-				Name:        attName,
-				ContentType: ct,
-				BodyB64:     base64.StdEncoding.EncodeToString(body),
-			})
-		}
-	}
-
 	run := ExternalRunRequest{
 		Status:          status,
 		TestCaseID:      allureTestCaseID(doc, labels),
@@ -227,8 +203,6 @@ func allureResultToExternalRun(doc map[string]any, directory string, opts Allure
 		DurationMs:      durationMs,
 		Error:           errMsg,
 		FullName:        fullName,
-		Steps:           steps,
-		Attachments:     atts,
 	}
 	if len(labels) > 0 {
 		run.Labels = labels

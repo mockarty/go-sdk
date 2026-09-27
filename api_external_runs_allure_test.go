@@ -5,8 +5,10 @@ package mockarty
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -172,5 +174,96 @@ func TestUploadAllureDir_EmptyAndMissingDirAreErrors(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope")
 	if _, err := c.ExternalRuns().UploadAllureDir(context.Background(), missing, AllureUploadOptions{}); err == nil {
 		t.Error("a missing allure-results directory must be an error")
+	}
+}
+
+func TestUploadAllureDir_NestedMediaAndPreflight(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "image.png"), []byte("synthetic image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	writeResult(t, dir, "a-result.json", `{"uuid":"a","name":"a","status":"passed","steps":[{"name":"outer","status":"passed","steps":[{"name":"inner","status":"passed","attachments":[{"source":"image.png","name":"screen","type":"image/png"}]}]}]}`)
+	var bodies []map[string]any
+	srv := allureUploadServer(t, &bodies)
+	defer srv.Close()
+	c := NewClient(srv.URL, WithNamespace("qa"))
+	if _, err := c.ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies[0]["steps"].([]any)) != 2 {
+		t.Fatal("nested step lost")
+	}
+	atts, _ := bodies[0]["attachments"].([]any)
+	if len(atts) != 1 {
+		t.Fatalf("nested media lost: %v", bodies[0])
+	}
+	body, _ := base64.StdEncoding.DecodeString(atts[0].(map[string]any)["bodyB64"].(string))
+	if string(body) != "synthetic image" {
+		t.Fatalf("media bytes: %q", body)
+	}
+	writeResult(t, dir, "b-result.json", `{"uuid":"b","name":"b","status":"passed","steps":[{"name":"step","attachments":[{"source":"missing.png"}]}]}`)
+	bodies = nil
+	if _, err := c.ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{}); err == nil {
+		t.Fatal("missing media accepted")
+	}
+	if len(bodies) != 0 {
+		t.Fatalf("preflight sent %d partial uploads", len(bodies))
+	}
+}
+
+func TestAllureMediaRejectsUnsafeAndOversizedReferences(t *testing.T) {
+	for _, kind := range []string{"parent", "absolute", "symlink", "empty", "large", "count", "total", "deep"} {
+		t.Run(kind, func(t *testing.T) {
+			dir := t.TempDir()
+			source := "artifact"
+			size := 1
+			count := 1
+			switch kind {
+			case "parent":
+				source = "../outside"
+			case "absolute":
+				source = "/outside"
+			case "empty":
+				size = 0
+			case "large":
+				size = 256<<10 + 1
+			case "count":
+				count = 33
+			case "total":
+				size = 256 << 10
+				count = 5
+			}
+			if kind == "symlink" {
+				target := filepath.Join(t.TempDir(), "target")
+				if err := os.WriteFile(target, []byte("x"), 0600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, filepath.Join(dir, source)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			refs := []any{}
+			for i := 0; i < count; i++ {
+				name := source
+				if count > 1 {
+					name = fmt.Sprintf("artifact-%d", i)
+				}
+				if kind != "parent" && kind != "absolute" && kind != "symlink" {
+					if err := os.WriteFile(filepath.Join(dir, name), make([]byte, size), 0600); err != nil {
+						t.Fatal(err)
+					}
+				}
+				refs = append(refs, map[string]any{"source": name})
+			}
+			doc := map[string]any{"attachments": refs}
+			if kind == "deep" {
+				for i := 0; i < 66; i++ {
+					doc = map[string]any{"steps": []any{doc}}
+				}
+			}
+			if _, _, _, _, err := collectAllureMedia(doc, dir); err == nil {
+				t.Fatal("invalid media accepted")
+			}
+		})
 	}
 }
