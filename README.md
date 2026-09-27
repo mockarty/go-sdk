@@ -203,7 +203,7 @@ attachments:
 
 ```go
 tcm := client.TCM()
-c, _ := tcm.CreateCase(ctx, "", mockarty.TCMObject{"folderId": fid, "title": "Checkout smoke"})
+c, _ := tcm.CreateCase(ctx, "", mockarty.TCMObject{"folderId": fid, "name": "Checkout smoke"})
 run, _ := tcm.RunCase(ctx, "", c["id"].(string), nil)
 cr, _ := tcm.GetCaseRun(ctx, "", run["runId"].(string))
 if cr["status"] == "failed" {
