@@ -205,11 +205,17 @@ attachments:
 tcm := client.TCM()
 c, _ := tcm.CreateCase(ctx, "", mockarty.TCMObject{"folderId": fid, "name": "Checkout smoke"})
 run, _ := tcm.RunCase(ctx, "", c["id"].(string), nil)
-cr, _ := tcm.GetCaseRun(ctx, "", run["runId"].(string))
+cr, _ := tcm.GetCaseRun(ctx, "", run["id"].(string))
 if cr["status"] == "failed" {
-    _, _ = tcm.CreateDefect(ctx, "", mockarty.TCMObject{"title": "checkout broke", "caseRunId": run["runId"]})
+    _, _ = tcm.CreateDefect(ctx, "", mockarty.TCMObject{"title": "checkout broke", "caseRunId": run["id"]})
 }
 ```
+
+The [TCM case workflow](./examples/tcm_case_steps/main.go) also saves structured
+steps and custom fields, verifies PNG attachment bytes, and starts a manual run.
+Set `MOCKARTY_SOURCE_CASE_ID` to a stable source identity so later creates
+resolve to the same case; wait for an active run to finish before editing its
+steps. Use a unique `MOCKARTY_CASE_NAME` if source cases share a title.
 
 ## Mock Builder
 

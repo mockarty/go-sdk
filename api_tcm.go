@@ -9,9 +9,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // TCMAPI groups the Test Case Management endpoints — folders, cases
@@ -160,25 +165,39 @@ type TCMAttachment struct {
 // upload sizes are bounded by the server (25 MiB default), so single-shot
 // is safe.
 func (a *TCMAPI) UploadAttachment(ctx context.Context, namespace, parentKind, parentID, filename, mediaType string, body io.Reader) (*TCMAttachment, error) {
-	buf, err := io.ReadAll(body)
+	path, err := a.nsBase(namespace, "/tcm/attachments/upload")
 	if err != nil {
 		return nil, err
 	}
-	boundary := fmt.Sprintf("mockarty-%x", time.Now().UnixNano())
+	if body == nil || filename == "" || strings.IndexFunc(filename, unicode.IsControl) >= 0 {
+		return nil, fmt.Errorf("tcm: attachment requires a body and safe filename")
+	}
+	if mediaType == "" {
+		mediaType = "application/octet-stream"
+	}
+	if _, _, err := mime.ParseMediaType(mediaType); err != nil {
+		return nil, fmt.Errorf("tcm: invalid attachment media type: %w", err)
+	}
 	var mp bytes.Buffer
-	mp.WriteString("--" + boundary + "\r\n")
-	mp.WriteString(`Content-Disposition: form-data; name="file"; filename="` + filename + "\"\r\n")
-	mp.WriteString("Content-Type: " + mediaType + "\r\n\r\n")
-	mp.Write(buf)
-	mp.WriteString("\r\n--" + boundary + "--\r\n")
-
-	path := fmt.Sprintf("/api/v1/namespaces/%s/tcm/attachments/upload?parentKind=%s&parentId=%s",
-		url.PathEscape(namespace), url.QueryEscape(parentKind), url.QueryEscape(parentID))
+	writer := multipart.NewWriter(&mp)
+	part, err := writer.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": {mime.FormatMediaType("form-data", map[string]string{"name": "file", "filename": filename})},
+		"Content-Type":        {mediaType},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tcm: create attachment part: %w", err)
+	}
+	if _, err := io.Copy(part, body); err != nil {
+		return nil, fmt.Errorf("tcm: read attachment body: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("tcm: close attachment multipart: %w", err)
+	}
+	path += "?parentKind=" + url.QueryEscape(parentKind) + "&parentId=" + url.QueryEscape(parentID)
 
 	// multipart body needs the matching Content-Type + boundary; the default
 	// doRaw forces application/json, which makes the server's c.FormFile fail.
-	contentType := "multipart/form-data; boundary=" + boundary
-	reader, err := a.client.doRawCT(ctx, http.MethodPost, path, mp.Bytes(), contentType)
+	reader, err := a.client.doRawCT(ctx, http.MethodPost, path, mp.Bytes(), writer.FormDataContentType())
 	if err != nil {
 		return nil, err
 	}
@@ -192,26 +211,33 @@ func (a *TCMAPI) UploadAttachment(ctx context.Context, namespace, parentKind, pa
 
 // ListAttachments returns attachments attached to a (parentKind, parentID).
 func (a *TCMAPI) ListAttachments(ctx context.Context, namespace, parentKind, parentID string) ([]TCMAttachment, error) {
-	path := fmt.Sprintf("/api/v1/namespaces/%s/tcm/attachments?parentKind=%s&parentId=%s",
-		url.PathEscape(namespace), url.QueryEscape(parentKind), url.QueryEscape(parentID))
+	path, err := a.nsBase(namespace, "/tcm/attachments")
+	if err != nil {
+		return nil, err
+	}
+	path += "?parentKind=" + url.QueryEscape(parentKind) + "&parentId=" + url.QueryEscape(parentID)
 	var resp struct {
 		Items []TCMAttachment `json:"items"`
 	}
-	err := a.client.do(ctx, http.MethodGet, path, nil, &resp)
+	err = a.client.do(ctx, http.MethodGet, path, nil, &resp)
 	return resp.Items, err
 }
 
 // DeleteAttachment soft-deletes the row and schedules the blob for removal.
 func (a *TCMAPI) DeleteAttachment(ctx context.Context, namespace, id string) error {
-	path := fmt.Sprintf("/api/v1/namespaces/%s/tcm/attachments/%s",
-		url.PathEscape(namespace), url.PathEscape(id))
+	path, err := a.nsBase(namespace, "/tcm/attachments/"+url.PathEscape(id))
+	if err != nil {
+		return err
+	}
 	return a.client.do(ctx, http.MethodDelete, path, nil, nil)
 }
 
 // DownloadAttachment streams the raw blob. Caller must Close the returned
 // reader.
 func (a *TCMAPI) DownloadAttachment(ctx context.Context, namespace, id string) (io.ReadCloser, error) {
-	path := fmt.Sprintf("/api/v1/namespaces/%s/tcm/attachments/%s/raw",
-		url.PathEscape(namespace), url.PathEscape(id))
+	path, err := a.nsBase(namespace, "/tcm/attachments/"+url.PathEscape(id)+"/raw")
+	if err != nil {
+		return nil, err
+	}
 	return a.client.doRaw(ctx, http.MethodGet, path, nil)
 }
