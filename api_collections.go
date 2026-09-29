@@ -59,10 +59,11 @@ type TestResult struct {
 // Assertion represents a single test assertion.
 type Assertion struct {
 	Name     string `json:"name"`
-	Passed   bool   `json:"passed"`
 	Expected string `json:"expected,omitempty"`
 	Actual   string `json:"actual,omitempty"`
 	Message  string `json:"message,omitempty"`
+	Passed   bool   `json:"passed"`
+	Skipped  bool   `json:"skipped,omitempty"`
 }
 
 // List returns all collections accessible in the configured namespace.

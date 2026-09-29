@@ -130,6 +130,15 @@ func main() {
 					icon = "FAIL"
 				}
 				fmt.Printf("  [%s] %s (%d ms)\n", icon, tr.RequestName, tr.Duration)
+				for _, assertion := range tr.Assertions {
+					status := "FAIL"
+					if assertion.Skipped {
+						status = "SKIP"
+					} else if assertion.Passed {
+						status = "PASS"
+					}
+					fmt.Printf("    [%s] %s\n", status, assertion.Name)
+				}
 			}
 		}
 	}
