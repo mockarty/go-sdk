@@ -104,6 +104,25 @@ func TestAutonomousMissionsValidateBeforeNetwork(t *testing.T) {
 	}
 }
 
+func TestAutonomousMissionsFullAutonomyWire(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body["autonomy"] != "full" || body["productUrl"] != "https://shop.example" {
+			t.Fatalf("full body=%v", body)
+		}
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"missionId":"full-1","status":"accepted"}`))
+	}))
+	defer srv.Close()
+	result, err := NewClient(srv.URL).AutonomousMissions().Submit(t.Context(), AutonomousMissionSubmitRequest{Goal: "verify own target", Autonomy: "full", ProductURL: "https://shop.example"})
+	if err != nil || result.MissionID != "full-1" {
+		t.Fatalf("full result=%v err=%v", result, err)
+	}
+}
+
 func TestAutonomousMissionsEffectiveSettingsAndStart(t *testing.T) {
 	const digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	var calls int

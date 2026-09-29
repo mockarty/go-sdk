@@ -43,6 +43,14 @@ func main() {
 		BudgetTokensTotal:      100000,
 		ExpectedSettingsDigest: settings.SettingsDigest,
 	}
+	// Opt in deliberately: full preapproves testing of this declared product;
+	// chaos and paid effects still need approval.
+	if autonomy := os.Getenv("MOCKARTY_EXAMPLE_AUTONOMY"); autonomy != "" {
+		request.Autonomy = autonomy
+	}
+	if targetURL := os.Getenv("MOCKARTY_PRODUCT_URL"); targetURL != "" {
+		request.Data = map[string]any{"contextRefs": []map[string]string{{"kind": "product_url", "value": targetURL}}}
+	}
 	if targetDigest := os.Getenv("MOCKARTY_TARGET_DIGEST"); targetDigest != "" {
 		targetRevision, parseErr := strconv.ParseInt(os.Getenv("MOCKARTY_TARGET_REVISION"), 10, 64)
 		if parseErr != nil {

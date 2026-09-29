@@ -274,8 +274,8 @@ func (a *AutonomousMissionsAPI) Submit(ctx context.Context, req AutonomousMissio
 	if req.Goal == "" {
 		return AutonomousMissionSubmitResponse{}, fmt.Errorf("mockarty: autonomous mission submit: goal is required")
 	}
-	if req.Autonomy != "" && req.Autonomy != "recon" && req.Autonomy != "propose" && req.Autonomy != "auto" {
-		return AutonomousMissionSubmitResponse{}, fmt.Errorf("mockarty: autonomous mission submit: autonomy must be recon, propose, or auto")
+	if req.Autonomy != "" && req.Autonomy != "recon" && req.Autonomy != "propose" && req.Autonomy != "auto" && req.Autonomy != "full" {
+		return AutonomousMissionSubmitResponse{}, fmt.Errorf("mockarty: autonomous mission submit: autonomy must be recon, propose, auto, or full")
 	}
 	if req.Budget.TokensTotal < 0 || req.Budget.TokensPerDay < 0 || req.Budget.USDCap < 0 ||
 		math.IsNaN(req.Budget.USDCap) || math.IsInf(req.Budget.USDCap, 0) {
