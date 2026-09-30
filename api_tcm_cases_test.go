@@ -112,7 +112,7 @@ func TestTCMCaseStepsReadEditSave(t *testing.T) {
 		case r.Method == "GET" && r.URL.Path == base:
 			_, _ = w.Write([]byte(`{"versions":[{"id":"version-1","version":1}]}`))
 		case r.Method == "GET" && r.URL.Path == base+"/version-1":
-			_, _ = w.Write([]byte(`{"id":"version-1","steps":[{"stepUid":"login","mode":"manual","executorType":"manual","action":"Login","expectedResult":"Home"}]}`))
+			_, _ = w.Write([]byte(`{"id":"version-1","steps":[{"stepUid":"login","mode":"manual","executorType":"manual","action":"Login","expectedResult":"Home","expectedAttachmentId":"3b41b6d0-7f0b-49cb-9b69-f7007e00c2b4","executorConfig":{"kind":"inline_copy","sourceSharedCopyInstanceId":"captured-instance"}}]}`))
 		case r.Method == "POST" && r.URL.Path == base:
 			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -122,7 +122,7 @@ func TestTCMCaseStepsReadEditSave(t *testing.T) {
 				t.Errorf("notes lost: %v", body)
 			}
 			steps := body["steps"].([]any)
-			if steps[0].(map[string]any)["expectedResult"] != "Dashboard" {
+			if steps[0].(map[string]any)["expectedResult"] != "Dashboard" || steps[0].(map[string]any)["expectedAttachmentId"] != "3b41b6d0-7f0b-49cb-9b69-f7007e00c2b4" || steps[0].(map[string]any)["executorConfig"].(map[string]any)["sourceSharedCopyInstanceId"] != "captured-instance" {
 				t.Errorf("steps lost: %v", body)
 			}
 			saves++

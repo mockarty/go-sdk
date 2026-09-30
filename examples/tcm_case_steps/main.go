@@ -53,6 +53,7 @@ func main() {
 		}
 		steps = append(steps, step)
 	}
+	// Edit the loaded object so expectedAttachmentId and executorConfig survive.
 	steps[0]["expectedResult"] = "Dashboard displays the signed-in user"
 	saved, err := api.SaveCaseSteps(ctx, "", caseID, steps, "Clarify expected result")
 	if err != nil {
