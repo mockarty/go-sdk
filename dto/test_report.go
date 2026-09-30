@@ -21,10 +21,14 @@ type TestReport struct {
 	RequestID        string                `json:"requestId,omitempty"`
 	RequestName      string                `json:"requestName,omitempty"`
 	Status           string                `json:"status,omitempty"`
-	Logs             []string              `json:"logs,omitempty"`
-	Tests            []TestResult          `json:"tests,omitempty"`
-	Duration         Duration              `json:"duration,omitempty"`
-	FailedTests      int64                 `json:"failedTests,omitempty"`
-	PassedTests      int64                 `json:"passedTests,omitempty"`
-	TotalTests       int64                 `json:"totalTests,omitempty"`
+	// Interactions is the full chain of protocol-level exchanges the script under test fired inside this step — pm.http / pm.kafka / pm.rabbitmq / pm.ws / pm.sse / pm.grpc / pm.db / pm.redis pushes one entry per call. Owner directive 2026-05-13: every run report MUST carry this chain so the user can reconstruct exactly what happened end-to-end (every request, every response, every body, every event) — both for HTML preview and for Allure export. See internal/model/run_interaction.go for the schema.  The slice is ordered by StartedAt — same as the chronological execution order — so renderers can walk it as a timeline without re-sorting.
+	Interactions []RunInteraction `json:"interactions,omitempty"`
+	Logs         []string         `json:"logs,omitempty"`
+	Tests        []TestResult     `json:"tests,omitempty"`
+	Duration     Duration         `json:"duration,omitempty"`
+	FailedTests  int64            `json:"failedTests,omitempty"`
+	PassedTests  int64            `json:"passedTests,omitempty"`
+	// SkippedTests counts assertions the script itself skipped (pm.test.skip). They used to be folded into FailedTests — a deliberately skipped test turned the whole request, and therefore the run, red — while the export ALSO counted them as skipped, so a report with 3 skips claimed 3 failures and 3 skips at once.
+	SkippedTests int64 `json:"skippedTests,omitempty"`
+	TotalTests   int64 `json:"totalTests,omitempty"`
 }

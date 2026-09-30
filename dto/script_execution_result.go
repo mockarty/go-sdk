@@ -9,10 +9,21 @@ package dto
 
 // ScriptExecutionResult mirrors swagger definition "mockarty_internal_model.ScriptExecutionResult".
 type ScriptExecutionResult struct {
+	// CollectionVars holds values written via pm.collectionVariables.set during the script. Keyed on the bare variable name (no prefix).
+	CollectionVars map[string]any `json:"collectionVars,omitempty"`
+	// EnvironmentVars holds values written via pm.environment.set during the script. Keyed on the bare variable name (no prefix).
+	EnvironmentVars map[string]any `json:"environmentVars,omitempty"`
+	// RequestVars holds values written via pm.variables.set during the script (script-local / per-request scope). Keyed on the bare variable name (no prefix).
+	RequestVars map[string]any `json:"requestVars,omitempty"`
+	// Variables is the legacy flat map with `env_` / `col_` / `req_` prefix encoding. Retained so old saved reports continue to load. New runtime code reads from EnvironmentVars / CollectionVars / RequestVars first and only falls back to Variables when the typed maps are nil (i.e. a report persisted before the A-7 landing).
 	Variables map[string]any `json:"variables,omitempty"`
 	Error     string         `json:"error,omitempty"`
-	Logs      []string       `json:"logs,omitempty"`
-	Tests     []TestResult   `json:"tests,omitempty"`
-	Duration  Duration       `json:"duration,omitempty"`
-	Success   bool           `json:"success,omitempty"`
+	// Interactions captured by the script's pm.* helpers (http, kafka, rabbitmq, ws, sse, grpc, db, redis). Empty for scripts that never made an outbound call. The collector copies this chain into the enclosing TestReport so the report renderer can show every request/response with bodies.
+	Interactions []RunInteraction `json:"interactions,omitempty"`
+	Logs         []string         `json:"logs,omitempty"`
+	Tests        []TestResult     `json:"tests,omitempty"`
+	Duration     Duration         `json:"duration,omitempty"`
+	// SkipRequest suppresses the current transport and post-response scripts. NextRequest remains independent, so a collection can advance or jump.
+	SkipRequest bool `json:"skipRequest,omitempty"`
+	Success     bool `json:"success,omitempty"`
 }

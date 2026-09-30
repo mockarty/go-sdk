@@ -122,7 +122,15 @@ func main() {
 			fmt.Printf("  Status: %s\n", result.Status)
 			fmt.Printf("  Total:  %d, Passed: %d, Failed: %d, Skipped: %d\n",
 				result.TotalTests, result.PassedTests, result.FailedTests, result.SkippedTests)
-			fmt.Printf("  Duration: %d ms\n", result.Duration)
+			fmt.Printf("  Duration: %d ms\n", time.Duration(result.Duration).Milliseconds())
+			if result.Report != nil {
+				for _, step := range result.Report.RequestReports {
+					fmt.Printf("  %s: %s, skipped assertions: %d\n", step.RequestName, step.Status, step.SkippedTests)
+					if step.PreRequestResult.SkipRequest {
+						fmt.Println("    Primary request skipped by pre-script")
+					}
+				}
+			}
 
 			for _, tr := range result.Results {
 				icon := "PASS"

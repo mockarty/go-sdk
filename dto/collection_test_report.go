@@ -17,14 +17,15 @@ type CollectionTestReport struct {
 	ExecutorID     string         `json:"executorId,omitempty"`
 	ID             string         `json:"id,omitempty"`
 	Name           string         `json:"name,omitempty"`
+	PerfReport     any            `json:"perfReport,omitempty"`
 	Status         string         `json:"status,omitempty"`
-	PerfReport     []int64        `json:"perfReport,omitempty"`
 	RequestReports []TestReport   `json:"requestReports,omitempty"`
 	Duration       Duration       `json:"duration,omitempty"`
 	FailedRequests int64          `json:"failedRequests,omitempty"`
 	FailedTests    int64          `json:"failedTests,omitempty"`
 	PassedRequests int64          `json:"passedRequests,omitempty"`
 	PassedTests    int64          `json:"passedTests,omitempty"`
+	SkippedTests   int64          `json:"skippedTests,omitempty"`
 	TotalRequests  int64          `json:"totalRequests,omitempty"`
 	TotalTests     int64          `json:"totalTests,omitempty"`
 }

@@ -6,6 +6,8 @@ package mockarty
 import (
 	"context"
 	"net/url"
+
+	"github.com/mockarty/mockarty-go/dto"
 )
 
 // CollectionAPI provides methods for managing API Tester collections.
@@ -30,18 +32,19 @@ type Collection struct {
 
 // TestRunResult represents the result of executing a test collection.
 type TestRunResult struct {
-	ID           string         `json:"id"`
-	CollectionID string         `json:"collectionId"`
-	Status       string         `json:"status"` // "running", "completed", "failed"
-	TotalTests   int            `json:"totalTests"`
-	PassedTests  int            `json:"passedTests"`
-	FailedTests  int            `json:"failedTests"`
-	SkippedTests int            `json:"skippedTests"`
-	Duration     int64          `json:"duration"` // milliseconds
-	Results      []TestResult   `json:"results,omitempty"`
-	Metadata     map[string]any `json:"metadata,omitempty"`
-	StartedAt    string         `json:"startedAt"`
-	CompletedAt  string         `json:"completedAt,omitempty"`
+	ID           string                    `json:"id"`
+	CollectionID string                    `json:"collectionId"`
+	Status       string                    `json:"status"` // "running", "completed", "failed"
+	TotalTests   int                       `json:"totalTests"`
+	PassedTests  int                       `json:"passedTests"`
+	FailedTests  int                       `json:"failedTests"`
+	SkippedTests int                       `json:"skippedTests"`
+	Duration     int64                     `json:"duration"` // nanoseconds (collection report wire format)
+	Results      []TestResult              `json:"results,omitempty"`
+	Metadata     map[string]any            `json:"metadata,omitempty"`
+	Report       *dto.CollectionTestReport `json:"report,omitempty"`
+	StartedAt    string                    `json:"startedAt"`
+	CompletedAt  string                    `json:"completedAt,omitempty"`
 }
 
 // TestResult represents the result of a single test step.

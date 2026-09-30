@@ -268,3 +268,44 @@ func unmarshalRoundTrip(t *testing.T, in any, into any) any {
 	}
 	return into
 }
+
+func TestScriptOutcome_RetainsSkipRequestAndCounters(t *testing.T) {
+	var result CollectionTestReport
+	if err := json.Unmarshal([]byte(`{"skippedTests":1,"requestReports":[{"skippedTests":1,"preRequestResult":{"success":true,"skipRequest":true},"tests":[{"name":"optional","passed":false,"skipped":true}]}]}`), &result); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded["skippedTests"] != float64(1) {
+		t.Fatalf("collection skipped counter lost: %s", raw)
+	}
+	step := decoded["requestReports"].([]any)[0].(map[string]any)
+	pre := step["preRequestResult"].(map[string]any)
+	if pre["skipRequest"] != true || step["skippedTests"] != float64(1) {
+		t.Fatalf("script skip outcome lost: %s", raw)
+	}
+}
+
+func TestInteractionKindStableProtocolValues(t *testing.T) {
+	for _, tc := range []struct {
+		kind InteractionKind
+		wire string
+	}{
+		{InteractionKindHTTP, "http"}, {InteractionKindGRPC, "grpc"}, {InteractionKindGraphQL, "graphql"}, {InteractionKindSOAP, "soap"},
+		{InteractionKindSMTP, "smtp"}, {InteractionKindNATS, "nats"}, {InteractionKindKafkaPublish, "kafka_publish"}, {InteractionKindKafkaConsume, "kafka_consume"},
+		{InteractionKindRabbitMQPublish, "rabbitmq_publish"}, {InteractionKindRabbitMQConsume, "rabbitmq_consume"}, {InteractionKindWebSocket, "websocket"},
+		{InteractionKindSSEMessage, "sse_message"}, {InteractionKindMockerCall, "mocker_call"}, {InteractionKindRedis, "redis"}, {InteractionKindDB, "db"}, {InteractionKindLogEntry, "log"},
+	} {
+		t.Run(tc.wire, func(t *testing.T) {
+			if string(tc.kind) != tc.wire {
+				t.Fatalf("protocol enum changed: got %q want %q", tc.kind, tc.wire)
+			}
+		})
+	}
+}
