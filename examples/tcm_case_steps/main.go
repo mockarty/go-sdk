@@ -78,6 +78,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Imported launch files: ListAttachments(ctx, namespace, "test_plan_run", runID) reads all pages (up to 10,000), keeping report ownership.
 	media, err := api.ListAttachments(ctx, "", "tcm_case", caseID)
 	namePreserved := false
 	for _, item := range media {

@@ -216,6 +216,13 @@ func (a *TCMAPI) ListAttachments(ctx context.Context, namespace, parentKind, par
 		return nil, err
 	}
 	path += "?parentKind=" + url.QueryEscape(parentKind) + "&parentId=" + url.QueryEscape(parentID)
+	if parentKind == "test_plan_run" {
+		ns := namespace
+		if ns == "" {
+			ns = a.client.namespace
+		}
+		return a.listLaunchAttachments(ctx, path, ns, parentID)
+	}
 	var resp struct {
 		Items []TCMAttachment `json:"items"`
 	}
