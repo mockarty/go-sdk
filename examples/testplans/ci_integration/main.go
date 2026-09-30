@@ -50,6 +50,10 @@ func main() {
 	// 2. Trigger.
 	run, err := api.Run(ctx, planID, mockarty.RunOptions{})
 	if err != nil {
+		var apiErr *mockarty.APIError
+		if errors.As(err, &apiErr) && apiErr.RunID != "" {
+			log.Printf("Saved launch %s (reason=%s): inspect it and its CI job before launching again", apiErr.RunID, apiErr.Reason)
+		}
 		log.Fatalf("trigger: %v", err)
 	}
 	fmt.Printf("Triggered run %s\n", run.ID)

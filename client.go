@@ -586,8 +586,12 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 			Message   string `json:"message"`
 			Code      string `json:"code"`
 			RequestID string `json:"request_id"`
+			Reason    any    `json:"reason"`
+			RunID     any    `json:"runId"`
 		}
 		if json.Unmarshal(errBody, &errResp) == nil {
+			apiErr.Reason, _ = errResp.Reason.(string)
+			apiErr.RunID, _ = errResp.RunID.(string)
 			if errResp.Error != "" {
 				apiErr.Message = errResp.Error
 			} else if errResp.Message != "" {
@@ -608,6 +612,14 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 		}
 
 		lastErr = apiErr
+
+		// A saved CI launch already owns this request. Replaying its POST
+		// would create another parent even when CI submission was refused.
+		if method == http.MethodPost && apiErr.RunID != "" &&
+			((resp.StatusCode == 409 && apiErr.Reason == "ci_dispatch_uncertain") ||
+				(resp.StatusCode == 503 && apiErr.Reason == "ci_dispatch_failed")) {
+			return nil, apiErr
+		}
 
 		// Only retry on 5xx or 429
 		if resp.StatusCode >= 500 || resp.StatusCode == 429 {

@@ -49,6 +49,12 @@ type APIError struct {
 	// RequestID is the server-side correlation ID for this request. Include
 	// it in support tickets so operators can find the matching log entry.
 	RequestID string `json:"requestId,omitempty"`
+
+	// Reason identifies the specific operation failure, when supplied.
+	Reason string `json:"reason,omitempty"`
+
+	// RunID identifies an already saved launch. Inspect it before launching again.
+	RunID string `json:"runId,omitempty"`
 }
 
 // Error implements the error interface.
