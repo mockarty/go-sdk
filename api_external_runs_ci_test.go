@@ -129,3 +129,26 @@ func TestSelectedCIRejectsDuplicateAndTrailingJSON(t *testing.T) {
 		t.Fatal("diagnostic formatting leaked capability")
 	}
 }
+
+func TestSelectedCIReportPreservesExactJSONNumbers(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	const exact = "9007199254740993"
+	var body []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var value json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
+			t.Error(err)
+		}
+		body = append([]byte(nil), value...)
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	run := ExternalRunRequest{ExternalID: "selected", FullName: "suite.test", Status: "passed", Metadata: map[string]any{"integer": json.Number(exact), "nested": map[string]any{"number": int64(9007199254740993)}}}
+	_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().Report(context.Background(), "", run)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(string(body), exact) != 2 {
+		t.Fatal("selected outgoing payload changed exact integer values")
+	}
+}

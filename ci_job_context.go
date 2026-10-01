@@ -195,7 +195,9 @@ func prepareCIReport(namespace string, run ExternalRunRequest) (ExternalRunReque
 		return run, errors.New("invalid report payload")
 	}
 	var value any
-	if e = json.Unmarshal(b, &value); e != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if e = decoder.Decode(&value); e != nil {
 		return run, errors.New("invalid report payload")
 	}
 	secrets := []string{cb.Token}
@@ -211,7 +213,9 @@ func prepareCIReport(namespace string, run ExternalRunRequest) (ExternalRunReque
 		return run, ErrCIContext
 	}
 	run = ExternalRunRequest{}
-	if e = json.Unmarshal(b, &run); e != nil {
+	decoder = json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if e = decoder.Decode(&run); e != nil {
 		return run, ErrCIContext
 	}
 	run.CIContext = &cb
