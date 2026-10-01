@@ -82,6 +82,33 @@ type CISelector struct {
 	FullName string `json:"selector,omitempty"`
 }
 
+// Optional selector members, when present, must be JSON strings; null is
+// not an omitted identity and must not silently erase a frozen selector.
+func (selector *CISelector) UnmarshalJSON(raw []byte) error {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil || fields == nil || len(fields) > 2 {
+		return ErrCIContext
+	}
+	*selector = CISelector{}
+	for key, value := range fields {
+		if len(value) == 0 || value[0] != '"' {
+			return ErrCIContext
+		}
+		var text string
+		if json.Unmarshal(value, &text) != nil {
+			return ErrCIContext
+		}
+		switch key {
+		case "id":
+			selector.ID = text
+		case "selector":
+			selector.FullName = text
+		default:
+			return ErrCIContext
+		}
+	}
+	return nil
+}
 func (CIJobContext) Format(state fmt.State, verb rune) {
 	_, _ = io.WriteString(state, "CIJobContext([REDACTED])")
 }

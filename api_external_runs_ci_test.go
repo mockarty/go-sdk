@@ -152,3 +152,21 @@ func TestSelectedCIReportPreservesExactJSONNumbers(t *testing.T) {
 		t.Fatal("selected outgoing payload changed exact integer values")
 	}
 }
+
+func TestSelectedCISelectorPresentTypes(t *testing.T) {
+	for _, key := range []string{"id", "selector"} {
+		for _, value := range []string{"null", "false", "0", "[]", "{}"} {
+			t.Run(key+value, func(t *testing.T) {
+				b, _ := base64.RawURLEncoding.DecodeString(ciTestEnvelope())
+				var body map[string]any
+				json.Unmarshal(b, &body)
+				selector := body["items"].([]any)[0].(map[string]any)["selector"].(map[string]any)
+				selector[key] = json.RawMessage(value)
+				b, _ = json.Marshal(body)
+				if _, e := LoadCIJobContext(base64.RawURLEncoding.EncodeToString(b)); e == nil {
+					t.Fatal("nonstring selector accepted")
+				}
+			})
+		}
+	}
+}
