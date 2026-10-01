@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -212,6 +213,11 @@ func (c *Client) applyAuthHeaders(req *http.Request) {
 // execute performs the round-trip and decodes the body. The response
 // body is always drained-and-closed so connections return to the pool.
 func (c *Client) execute(req *http.Request, respOut any) error {
+	// Selected CI accepts one finalized report, not incremental lifecycle writes.
+	// Refuse before transport so a selected job cannot create an ordinary run.
+	if req.Method != http.MethodGet && req.Method != http.MethodHead && os.Getenv("MOCKARTY_CI_CONTEXT") != "" {
+		return fmt.Errorf("%w: selected CI jobs require finalized ExternalRuns.Report", ErrInvalidRequest)
+	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", req.Method, req.URL.Path, err)

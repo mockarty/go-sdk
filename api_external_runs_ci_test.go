@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -168,5 +170,172 @@ func TestSelectedCISelectorPresentTypes(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSelectedCIAllureDirectoryFiltersBeforeMedia(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "selected-result.json"), []byte(`{"uuid":"selected","fullName":"suite.test","name":"case","status":"passed"}`), 0600)
+	os.WriteFile(filepath.Join(dir, "outsider-result.json"), []byte(`{"uuid":"other","fullName":"other.test","name":"other","status":"passed","attachments":[{"name":"absent","source":"missing.txt"}]}`), 0600)
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+	defer srv.Close()
+	out, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{AutoCreate: true})
+	if err != nil || len(out) != 1 || calls != 1 {
+		t.Fatal("unselected missing media affected selected upload")
+	}
+}
+
+func TestSelectedCIAllureDirectoryRejectsDuplicateBeforeHTTP(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	dir := t.TempDir()
+	doc := []byte(`{"uuid":"selected","fullName":"suite.test","name":"case","status":"passed"}`)
+	for _, name := range []string{"a-result.json", "b-result.json"} {
+		os.WriteFile(filepath.Join(dir, name), doc, 0600)
+	}
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+	defer srv.Close()
+	_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{})
+	if err == nil || calls != 0 {
+		t.Fatal("duplicate selected occurrence dispatched")
+	}
+}
+
+func TestSelectedCIAllureDirectoryPreflightsAllSelectedMedia(t *testing.T) {
+	raw, _ := base64.RawURLEncoding.DecodeString(ciTestEnvelope())
+	var job map[string]any
+	if err := json.Unmarshal(raw, &job); err != nil {
+		t.Fatal(err)
+	}
+	first := job["items"].([]any)[0].(map[string]any)
+	second := map[string]any{}
+	for key, value := range first {
+		second[key] = value
+	}
+	second["itemUid"] = "22222222-2222-4222-8222-222222222222"
+	second["selector"] = map[string]string{"id": "second", "selector": "suite.second"}
+	job["items"] = []any{first, second}
+	raw, _ = json.Marshal(job)
+	t.Setenv(CIContextEnvironment, base64.RawURLEncoding.EncodeToString(raw))
+	dir := t.TempDir()
+	for name, body := range map[string]string{
+		"a-result.json": `{"uuid":"selected","fullName":"suite.test","name":"first","status":"passed"}`,
+		"b-result.json": `{"uuid":"second","fullName":"suite.second","name":"second","status":"passed","attachments":[{"name":"secret","source":"secret.txt"}]}`,
+		"secret.txt":    job["token"].(string),
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+	defer srv.Close()
+	_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{})
+	if err == nil || calls != 0 {
+		t.Fatal("later selected secret permitted an earlier HTTP report")
+	}
+}
+
+func TestSelectedCIAllureDirectoryRejectsTrailingJSON(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	dir := t.TempDir()
+	if e := os.WriteFile(filepath.Join(dir, "a-result.json"), []byte(`{"uuid":"selected","fullName":"suite.test","name":"case","status":"passed"} {}`), 0600); e != nil {
+		t.Fatal(e)
+	}
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+	defer srv.Close()
+	_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().UploadAllureDir(context.Background(), dir, AllureUploadOptions{})
+	if err == nil || calls != 0 {
+		t.Fatal("trailing Allure JSON was reported")
+	}
+}
+
+func TestSelectedCIReportBatchValidatesEveryBodyBeforeHTTP(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	for _, kind := range []string{"status", "step", "inline"} {
+		t.Run(kind, func(t *testing.T) {
+			good := ExternalRunRequest{ExternalID: "selected", FullName: "suite.test", Status: "passed"}
+			bad := good
+			switch kind {
+			case "status":
+				bad.Status = "invalid"
+			case "step":
+				bad.Steps = []ExternalStep{{Name: " ", Status: "passed"}}
+			case "inline":
+				bad.Attachments = []ExternalAttachment{{Name: "large", BodyB64: base64.StdEncoding.EncodeToString(make([]byte, (256<<10)+1))}}
+			}
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+			defer srv.Close()
+			_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().ReportBatch(context.Background(), "", []ExternalRunRequest{good, bad})
+			if err == nil || calls != 0 {
+				t.Fatal("invalid later selected body reached HTTP")
+			}
+		})
+	}
+}
+
+func TestSelectedCIReportBatchStepBoundary(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	for _, count := range []int{1000, 1001} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			good := ExternalRunRequest{ExternalID: "selected", FullName: "suite.test", Status: "passed"}
+			bad := good
+			for i := 0; i < count; i++ {
+				bad.Steps = append(bad.Steps, ExternalStep{Name: "step", Status: "passed"})
+			}
+			calls := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.Write([]byte(`{}`)) }))
+			defer srv.Close()
+			_, err := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().ReportBatch(context.Background(), "", []ExternalRunRequest{good, bad})
+			if count == 1000 {
+				if err != nil || calls != 1 {
+					t.Fatal("valid selected step limit refused")
+				}
+			} else if err == nil || calls != 0 {
+				t.Fatal("oversized later selected steps reached HTTP")
+			}
+		})
+	}
+}
+
+func TestSelectedCIExactInlineAggregateLimit(t *testing.T) {
+	t.Setenv(CIContextEnvironment, ciTestEnvelope())
+	run := ExternalRunRequest{ExternalID: "selected", FullName: "suite.test", Status: "passed"}
+	for i := 0; i < 4; i++ {
+		run.Attachments = append(run.Attachments, ExternalAttachment{Name: fmt.Sprint(i), BodyB64: base64.StdEncoding.EncodeToString(make([]byte, 256<<10))})
+	}
+	run.Metadata = map[string]any{"bodyB64": "customer notes", "nested": map[string]any{"bodyB64": run.Attachments[0].BodyB64}}
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var outgoing ExternalRunRequest
+		if e := json.NewDecoder(r.Body).Decode(&outgoing); e != nil {
+			t.Error(e)
+		}
+		if outgoing.Metadata["bodyB64"] != "customer notes" {
+			t.Error("arbitrary metadata changed")
+		}
+		metadata, _ := json.Marshal(outgoing.Metadata)
+		job, _ := LoadCIJobContext(ciTestEnvelope())
+		if strings.Contains(string(metadata), job.Token) {
+			t.Error("metadata escaped redaction")
+		}
+		if len(outgoing.Attachments) != 4 {
+			t.Error("attachment count changed")
+		}
+		for _, attachment := range outgoing.Attachments {
+			if attachment.BodyB64 != run.Attachments[0].BodyB64 {
+				t.Error("opaque bytes changed")
+			}
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	if _, e := NewClient(srv.URL, WithNamespace("qa")).ExternalRuns().Report(context.Background(), "", run); e != nil || calls != 1 {
+		t.Fatal("valid exact decoded aggregate limit refused")
 	}
 }

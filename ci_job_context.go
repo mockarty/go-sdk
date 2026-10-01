@@ -159,6 +159,28 @@ func (j *CIJobContext) Callback() CICallback {
 	return CICallback{Token: j.Token, LaunchID: j.LaunchID, ItemUID: uuid.Nil.String(), GroupID: j.GroupID, AttemptID: j.AttemptID, InvocationID: j.InvocationID}
 }
 
+// matchesReport is a local directory prefilter. Ambiguous frozen occurrences
+// are refused; an unmatched source file can be skipped before reading its media.
+func (j *CIJobContext) matchesReport(run ExternalRunRequest) (bool, error) {
+	if j == nil {
+		return false, ErrCIContext
+	}
+	matches := 0
+	for _, i := range j.Items {
+		if i.Selector.ID != "" && i.Selector.ID != run.ExternalID && i.Selector.ID != run.TestCaseID {
+			continue
+		}
+		if i.Selector.FullName != "" && i.Selector.FullName != run.FullName {
+			continue
+		}
+		matches++
+	}
+	if matches > 1 {
+		return false, ErrCIContext
+	}
+	return matches == 1, nil
+}
+
 // BindReport requires exactly one frozen occurrence; it never falls back to name
 // lookup, creates cases, or joins an ordinary launch.
 func (j *CIJobContext) BindReport(run ExternalRunRequest) (ExternalRunRequest, error) {
@@ -246,9 +268,15 @@ func prepareCIReport(namespace string, run ExternalRunRequest) (ExternalRunReque
 		return run, ErrCIContext
 	}
 	run.CIContext = &cb
+	if e := validateSelectedCIReport(run); e != nil {
+		return run, e
+	}
 	return run, nil
 }
 func cleanCIValue(v any, secrets []string, depth int) (any, error) {
+	return cleanCIValueAt(v, secrets, depth, false)
+}
+func cleanCIValueAt(v any, secrets []string, depth int, attachment bool) (any, error) {
 	if depth > 64 {
 		return nil, ErrCIContext
 	}
@@ -262,7 +290,7 @@ func cleanCIValue(v any, secrets []string, depth int) (any, error) {
 				delete(x, k)
 				continue
 			}
-			if k == "bodyB64" {
+			if k == "bodyB64" && attachment && depth == 2 {
 				s, _ := item.(string)
 				b, e := base64.StdEncoding.DecodeString(s)
 				if e != nil {
@@ -273,8 +301,10 @@ func cleanCIValue(v any, secrets []string, depth int) (any, error) {
 						return nil, errors.New("attachment contains private CI capability")
 					}
 				}
+				// Only the typed root attachment field contains opaque file bytes.
+				continue
 			}
-			clean, e := cleanCIValue(item, secrets, depth+1)
+			clean, e := cleanCIValueAt(item, secrets, depth+1, depth == 0 && k == "attachments")
 			if e != nil {
 				return nil, e
 			}
@@ -284,7 +314,7 @@ func cleanCIValue(v any, secrets []string, depth int) (any, error) {
 	case []any:
 		out := make([]any, 0, len(x))
 		for _, item := range x {
-			clean, e := cleanCIValue(item, secrets, depth+1)
+			clean, e := cleanCIValueAt(item, secrets, depth+1, attachment)
 			if e != nil {
 				return nil, e
 			}
@@ -373,4 +403,51 @@ func uniqueCIJSON(d *json.Decoder, depth int) error {
 	}
 	_, err = d.Token()
 	return err
+}
+
+// Validate the detached selected body before any batch/directory HTTP effect.
+func validateSelectedCIReport(run ExternalRunRequest) error {
+	if run.SchemaVersion != 0 && run.SchemaVersion != ExternalRunSchemaVersion {
+		return ErrCIContext
+	}
+	switch run.Status {
+	case "passed", "failed", "skipped", "cancelled", "broken", "error":
+	default:
+		return ErrCIContext
+	}
+	if len(run.Steps) > 1000 || len(run.Attachments) > 32 {
+		return ErrCIContext
+	}
+	for _, step := range run.Steps {
+		if strings.TrimSpace(step.Name) == "" {
+			return ErrCIContext
+		}
+		switch step.Status {
+		case "passed", "failed", "skipped", "broken", "error":
+		default:
+			return ErrCIContext
+		}
+	}
+	total := 0
+	for _, a := range run.Attachments {
+		inline, ref := strings.TrimSpace(a.BodyB64) != "", strings.TrimSpace(a.BlobURI) != ""
+		if strings.TrimSpace(a.Name) == "" || inline == ref {
+			return ErrCIContext
+		}
+		if ref {
+			continue
+		}
+		if len(a.BodyB64) > (256<<10)*4/3+4 {
+			return ErrCIContext
+		}
+		body, e := base64.StdEncoding.DecodeString(a.BodyB64)
+		if e != nil || len(body) > 256<<10 {
+			return ErrCIContext
+		}
+		total += len(body)
+		if total > 1<<20 {
+			return ErrCIContext
+		}
+	}
+	return nil
 }

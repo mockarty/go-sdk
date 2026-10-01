@@ -297,6 +297,12 @@ var resp map[string]any
 _ = conn.InvokeJSON(ctx, "acme.UserService/GetUser", map[string]any{"id": "u-42"}, &resp)
 ```
 
+For selected CI jobs carrying `MOCKARTY_CI_CONTEXT`, use the main client's
+`ExternalRuns().Report` with a finalized outcome, or `UploadAllureDir`, followed
+by `CompleteGroup`. The incremental `externalruns.Client` write methods refuse
+that private context before HTTP; they cannot submit a selected outcome one
+partial step at a time. Ordinary lifecycle scripts remain available.
+
 Full cross-language reference (Go / Python / Java side-by-side, every
 protocol, options, classification rules, troubleshooting):
 **[SDK Protocol Clients](https://mockarty.ru/docs/sdk-protocol-clients)**.

@@ -4,9 +4,11 @@
 package mockarty
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +41,18 @@ type AllureUploadOptions struct {
 // Parity with Python upload_allure_dir / Java uploadAllureDir — the Go SDK was
 // missing the Allure-folder ingestion path used by CI pipelines.
 func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string, opts AllureUploadOptions) ([]*ExternalRunResponse, error) {
+	ns := opts.Namespace
+	if ns == "" {
+		ns = a.client.namespace
+	}
+	var job *CIJobContext
+	if raw := os.Getenv(CIContextEnvironment); raw != "" {
+		var err error
+		job, err = LoadCIJobContext(raw)
+		if err != nil || job.Namespace != ns {
+			return nil, ErrCIContext
+		}
+	}
 	info, err := os.Stat(directory)
 	if err != nil || !info.IsDir() {
 		return nil, fmt.Errorf("mockarty: allure-results directory not found: %s", directory)
@@ -57,6 +71,7 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 	var requests []ExternalRunRequest
 	var sources []string
 	totalMediaBytes := 0
+	selectedItems := map[string]bool{}
 	for _, path := range matches {
 		data, err := readAllureSource(directory, filepath.Base(path), 10<<20)
 		if err != nil {
@@ -67,7 +82,16 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 			continue
 		}
 		var doc map[string]any
-		if err := json.Unmarshal(data, &doc); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.UseNumber()
+		decodeErr := decoder.Decode(&doc)
+		if decodeErr == nil {
+			var extra any
+			if decoder.Decode(&extra) != io.EOF {
+				decodeErr = fmt.Errorf("trailing Allure JSON")
+			}
+		}
+		if err := decodeErr; err != nil {
 			if opts.OnError == "raise" {
 				return nil, fmt.Errorf("mockarty: parse %s: %w", path, err)
 			}
@@ -77,6 +101,16 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		req := allureResultToExternalRun(doc, directory, opts)
+		if job != nil {
+			matches, e := job.matchesReport(req)
+			if e != nil {
+				return nil, e
+			}
+			if !matches {
+				continue
+			}
+		}
 		steps, attachments, paths, mediaBytes, err := collectAllureMedia(doc, directory)
 		if err != nil {
 			return nil, fmt.Errorf("mockarty: preflight %s: %w", filepath.Base(path), err)
@@ -85,7 +119,6 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 		if totalMediaBytes > allureInlineBatchLimit {
 			return nil, fmt.Errorf("mockarty: Allure batch attachments exceed 32 MiB")
 		}
-		req := allureResultToExternalRun(doc, directory, opts)
 		req.Steps, req.Attachments = steps, attachments
 		if len(paths) > 0 {
 			if req.Metadata == nil {
@@ -93,8 +126,21 @@ func (a *ExternalRunsAPI) UploadAllureDir(ctx context.Context, directory string,
 			}
 			req.Metadata["allureAttachmentPaths"] = paths
 		}
+		if job != nil {
+			req, err = prepareCIReport(ns, req)
+			if err != nil {
+				return nil, err
+			}
+			if selectedItems[req.CIContext.ItemUID] {
+				return nil, ErrCIContext
+			}
+			selectedItems[req.CIContext.ItemUID] = true
+		}
 		requests = append(requests, req)
 		sources = append(sources, path)
+	}
+	if job != nil && (len(requests) == 0 || len(skipped) > 0) {
+		return nil, fmt.Errorf("mockarty: selected Allure preflight did not produce a complete result set")
 	}
 	for i, req := range requests {
 		path := sources[i]
