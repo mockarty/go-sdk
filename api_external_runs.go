@@ -56,6 +56,7 @@ type CustomField struct {
 // the server's internal/testcase/external_run.go shape verbatim — DO
 // NOT rename JSON keys without bumping SchemaVersion.
 type ExternalRunRequest struct {
+	CIContext  *CICallback       `json:"ciContext,omitempty"`
 	StartedAt  *time.Time        `json:"startedAt,omitempty"`
 	FinishedAt *time.Time        `json:"finishedAt,omitempty"`
 	Labels     map[string]string `json:"labels,omitempty"`
@@ -114,6 +115,13 @@ func (a *ExternalRunsAPI) Report(ctx context.Context, namespace string, run Exte
 	}
 	if ns == "" {
 		return nil, fmt.Errorf("external_runs.Submit: namespace required")
+	}
+	run, err := prepareCIReport(ns, run)
+	if err != nil {
+		return nil, err
+	}
+	if run.CIContext != nil {
+		ctx = context.WithValue(ctx, nonReplayableRequestKey{}, true)
 	}
 	path := "/api/v1/namespaces/" + url.PathEscape(ns) + "/tcm/external-runs"
 	body, err := a.client.doJSON(ctx, "POST", path, run)
@@ -195,6 +203,18 @@ func (a *ExternalRunsAPI) ReportBatch(ctx context.Context, namespace string, run
 	if ns == "" {
 		return nil, fmt.Errorf("external_runs.SubmitBatch: namespace required")
 	}
+	prepared := make([]ExternalRunRequest, len(runs))
+	for i, run := range runs {
+		var err error
+		prepared[i], err = prepareCIReport(ns, run)
+		if err != nil {
+			return nil, err
+		}
+		if prepared[i].CIContext != nil {
+			ctx = context.WithValue(ctx, nonReplayableRequestKey{}, true)
+		}
+	}
+	runs = prepared
 	path := "/api/v1/namespaces/" + url.PathEscape(ns) + "/tcm/external-runs/batch"
 
 	out := &ExternalRunsBatchResponse{}

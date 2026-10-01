@@ -160,6 +160,7 @@ func (w *FileWriter) WriteCategories(cats []Category) error {
 //
 // Reference: https://allurereport.org/docs/how-it-works-environment-file/
 func (w *FileWriter) WriteEnvironment(env map[string]string) error {
+	env = ciEnvironment(env)
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := os.MkdirAll(w.dir, 0o755); err != nil {
