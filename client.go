@@ -577,6 +577,7 @@ func (c *Client) doRawCT(ctx context.Context, method, path string, body any, con
 			StatusCode: resp.StatusCode,
 			RequestID:  resp.Header.Get(headerRequestID),
 		}
+		apiErr.OperationID, apiErr.CaptureID, apiErr.State = commentCaptureMetadata(errBody, resp.StatusCode)
 
 		// Parse the server's uniform error envelope:
 		//   {"error": "...", "code": "...", "request_id": "..."}

@@ -175,11 +175,16 @@ func (a *IssueTrackerAPI) DeleteIssue(ctx context.Context, namespace, issueID st
 	return a.client.do(ctx, "DELETE", base+"/issues/"+url.PathEscape(issueID), nil, nil)
 }
 
-// AddComment posts a comment to an issue.
+// AddComment posts a comment once, without replay after an ambiguous failure.
+// A 202 result contains pending operation/capture IDs, not a saved comment.
+// Keep any unknown APIError handles and do not blindly call AddComment again.
 func (a *IssueTrackerAPI) AddComment(ctx context.Context, namespace, issueID, body string) (Issue, error) {
 	base, err := a.base(namespace)
 	if err != nil {
 		return nil, err
+	}
+	if ctx != nil {
+		ctx = context.WithValue(ctx, nonReplayableRequestKey{}, true)
 	}
 	return a.sendObject(ctx, "POST", base+"/issues/"+url.PathEscape(issueID)+"/comments",
 		map[string]any{"body": body})

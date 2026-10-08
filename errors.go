@@ -4,8 +4,11 @@
 package mockarty
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 )
 
 // Sentinel errors for common error categories returned by the Mockarty API.
@@ -55,6 +58,79 @@ type APIError struct {
 
 	// RunID identifies an already saved launch. Inspect it before launching again.
 	RunID string `json:"runId,omitempty"`
+
+	// OperationID and CaptureID are opaque handles from an exact unknown
+	// comment capture error. Neither handle proves the comment was applied.
+	OperationID string `json:"operationId,omitempty"`
+	CaptureID   string `json:"captureId,omitempty"`
+	State       string `json:"state,omitempty"`
+}
+
+// commentCaptureMetadata leaves legacy error parsing untouched. Metadata is
+// retained only from the bounded exact shape, not from partial or mixed claims.
+func commentCaptureMetadata(body []byte, status int) (operation, capture, state string) {
+	if status != 503 || len(body) > 2048 {
+		return "", "", ""
+	}
+	d := json.NewDecoder(bytes.NewReader(body))
+	token, err := d.Token()
+	if err != nil || token != json.Delim('{') {
+		return "", "", ""
+	}
+	fields := make(map[string]string, 5)
+	for d.More() {
+		token, err = d.Token()
+		key, ok := token.(string)
+		if err != nil || !ok {
+			return "", "", ""
+		}
+		switch key {
+		case "error", "state", "operation_id", "capture_id", "code":
+		default:
+			return "", "", ""
+		}
+		if _, exists := fields[key]; exists {
+			return "", "", ""
+		}
+		token, err = d.Token()
+		value, ok := token.(string)
+		if err != nil || !ok {
+			return "", "", ""
+		}
+		fields[key] = value
+	}
+	if token, err = d.Token(); err != nil || token != json.Delim('}') {
+		return "", "", ""
+	}
+	if _, err = d.Token(); err != io.EOF {
+		return "", "", ""
+	}
+	if fields["error"] != "collaboration_capture_outcome_unknown" || fields["state"] != "unknown" ||
+		(fields["code"] != "" && fields["code"] != "unavailable") ||
+		!commentCaptureUUID(fields["operation_id"]) || !commentCaptureUUID(fields["capture_id"]) {
+		return "", "", ""
+	}
+	return fields["operation_id"], fields["capture_id"], "unknown"
+}
+
+func commentCaptureUUID(value string) bool {
+	if len(value) != 36 {
+		return false
+	}
+	nonzero := false
+	for i := 0; i < len(value); i++ {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if value[i] != '-' {
+				return false
+			}
+			continue
+		}
+		if (value[i] < '0' || value[i] > '9') && (value[i] < 'a' || value[i] > 'f') {
+			return false
+		}
+		nonzero = nonzero || value[i] != '0'
+	}
+	return nonzero
 }
 
 // Error implements the error interface.

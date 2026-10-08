@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -44,7 +45,17 @@ func main() {
 	}
 	issueID := fmt.Sprint(issue["id"])
 	fmt.Printf("filed issue %v\n", issue["issueKey"])
-	_, _ = it.AddComment(ctx, "", issueID, "reproduced on staging")
+	comment, err := it.AddComment(ctx, "", issueID, "reproduced on staging")
+	if err != nil {
+		var apiErr *mockarty.APIError
+		if errors.As(err, &apiErr) && apiErr.State == "unknown" {
+			fmt.Printf("comment outcome unknown; keep handles without posting again: %s %s\n", apiErr.OperationID, apiErr.CaptureID)
+		}
+		log.Fatalf("add comment: %v", err)
+	}
+	if comment["state"] == "pending" {
+		fmt.Printf("comment awaits confirmation; keep handles without posting again: %v %v\n", comment["operation_id"], comment["capture_id"])
+	}
 	_, _ = it.MoveIssue(ctx, "", issueID, "in_progress", "")
 
 	// 2. TCM: create a case, run it, file a defect on failure.
