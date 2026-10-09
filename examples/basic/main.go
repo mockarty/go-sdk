@@ -78,4 +78,9 @@ func main() {
 	}
 
 	fmt.Println("Mock deleted successfully.")
+	deleted, err := client.Mocks().Get(ctx, "hello-world")
+	if err != nil {
+		log.Fatalf("Failed to read the deleted mock: %v", err)
+	}
+	fmt.Printf("Soft-deleted mock closedAt: %d\n", deleted.ClosedAt)
 }
