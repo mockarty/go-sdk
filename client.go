@@ -57,6 +57,7 @@ type Client struct {
 
 	// Sub-API singletons, all eagerly initialized in NewClient.
 	mockAPI                 *MockAPI
+	deviceMeshAPI *DeviceMeshAPI
 	namespaceAPI            *NamespaceAPI
 	storeAPI                *StoreAPI
 	collectionAPI           *CollectionAPI
@@ -200,6 +201,7 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	c.cloudOperationsAPI = &CloudOperationsAPI{client: c}
 	c.delegatedCredentialsAPI = &DelegatedCredentialsAPI{client: c}
 	c.autonomousMissionsAPI = &AutonomousMissionsAPI{client: c}
+	c.deviceMeshAPI = &DeviceMeshAPI{client: c}
 	c.workflowDefinitionsAPI = &WorkflowDefinitionsAPI{client: c}
 	c.connectionAuthorityAPI = &ConnectionAuthorityAPI{client: c}
 	c.coderDeliveryAPI = &CoderDeliveryAPI{client: c}
@@ -279,6 +281,10 @@ func (c *Client) CloudCustomer() *CloudCustomerAPI { return c.cloudCustomerAPI }
 
 // CloudOperations returns least-privilege operator support and analytics APIs.
 func (c *Client) CloudOperations() *CloudOperationsAPI { return c.cloudOperationsAPI }
+
+// DeviceMesh returns the API that lends machines to a workspace and places work
+// on them — the CI path from "submit a command" to "read the receipt".
+func (c *Client) DeviceMesh() *DeviceMeshAPI { return c.deviceMeshAPI }
 
 // AutonomousMissions returns the API used to submit and supervise autonomous
 // testing missions.
