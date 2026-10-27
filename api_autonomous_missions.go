@@ -125,8 +125,22 @@ type MissionCancelRequest struct {
 // MissionAnswerRequest is the durable answer accepted while a mission waits
 // for human input. Reuse IdempotencyKey after a lost response.
 type MissionAnswerRequest struct {
-	Answer         string `json:"answer"`
-	IdempotencyKey string `json:"idempotencyKey,omitempty"`
+	Entity         *MissionAnswerEntity `json:"entity,omitempty"`
+	Selected       []string             `json:"selected,omitempty"`
+	QuestionID     string               `json:"questionId,omitempty"`
+	Text           string               `json:"text,omitempty"`
+	Answer         string               `json:"answer,omitempty"`
+	IdempotencyKey string               `json:"idempotencyKey,omitempty"`
+	Revision       int64                `json:"revision,omitempty"`
+	Generation     int64                `json:"generation,omitempty"`
+}
+
+// MissionAnswerEntity identifies an entity offered by the captured question;
+// it grants no authority beyond the server's current question scope.
+type MissionAnswerEntity struct {
+	Kind      string `json:"kind"`
+	ID        string `json:"id"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // MissionControlReceipt is the public, restart-stable control projection.
@@ -373,8 +387,8 @@ func (a *AutonomousMissionsAPI) Answer(ctx context.Context, missionID string, re
 	if missionID == "" {
 		return MissionControlResponse{}, fmt.Errorf("mockarty: mission answer: mission id is required")
 	}
-	if req.Answer == "" {
-		return MissionControlResponse{}, fmt.Errorf("mockarty: mission answer: answer is required")
+	if err := validateMissionAnswer(req); err != nil {
+		return MissionControlResponse{}, err
 	}
 	var out MissionControlResponse
 	path := "/api/v1/missions/" + url.PathEscape(missionID) + "/answer"

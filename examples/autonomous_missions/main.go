@@ -19,6 +19,40 @@ func main() {
 		mockarty.WithNamespace(os.Getenv("MOCKARTY_NAMESPACE")))
 	api := client.AutonomousMissions()
 	ctx := context.Background()
+	if os.Getenv("MOCKARTY_EXAMPLE_ANSWER") != "" {
+		missionID := os.Getenv("MOCKARTY_ANSWER_MISSION_ID")
+		if missionID == "" {
+			log.Fatal("MOCKARTY_ANSWER_MISSION_ID must identify the mission that asked the captured question")
+		}
+		retryKey := os.Getenv("MOCKARTY_ANSWER_IDEMPOTENCY_KEY")
+		if retryKey == "" {
+			log.Fatal("MOCKARTY_ANSWER_IDEMPOTENCY_KEY must be unique per answered question and reused on retry")
+		}
+		answerRequest := mockarty.MissionAnswerRequest{Answer: os.Getenv("MOCKARTY_EXAMPLE_ANSWER"), IdempotencyKey: retryKey}
+		// Capture data.question.id/revision/generation from the question the user
+		// actually answered. Preserve these values and the retry key on retry.
+		if questionID := os.Getenv("MOCKARTY_QUESTION_ID"); questionID != "" {
+			revision, parseErr := strconv.ParseInt(os.Getenv("MOCKARTY_QUESTION_REVISION"), 10, 64)
+			if parseErr != nil {
+				log.Fatal("MOCKARTY_QUESTION_REVISION must be the captured integer revision")
+			}
+			answerRequest.QuestionID, answerRequest.Revision = questionID, revision
+			answerRequest.Text, answerRequest.Answer = answerRequest.Answer, ""
+			if generation := os.Getenv("MOCKARTY_QUESTION_GENERATION"); generation != "" {
+				answerRequest.Generation, parseErr = strconv.ParseInt(generation, 10, 64)
+				if parseErr != nil {
+					log.Fatal("MOCKARTY_QUESTION_GENERATION must be an integer")
+				}
+			}
+			// Choice/entity questions use Selected and Entity from the offered schema.
+		}
+		answered, answerErr := api.Answer(ctx, missionID, answerRequest)
+		if answerErr != nil {
+			log.Fatal(answerErr)
+		}
+		fmt.Printf("answer receipt=%s outcome=%s\n", answered.Control.ID, answered.Control.Outcome)
+		return
+	}
 	productID := os.Getenv("MOCKARTY_PRODUCT_ID")
 	if archiveMissionID := os.Getenv("MOCKARTY_ARCHIVE_MISSION_ID"); archiveMissionID != "" {
 		archive, archiveErr := api.ExportArchive(ctx, archiveMissionID)
@@ -65,15 +99,6 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Printf("mission=%s status=%s created=%t\n", started.Mission.ID, started.Mission.Status, started.Created)
-	if os.Getenv("MOCKARTY_EXAMPLE_ANSWER") != "" {
-		answered, answerErr := api.Answer(ctx, started.Mission.ID, mockarty.MissionAnswerRequest{
-			Answer: os.Getenv("MOCKARTY_EXAMPLE_ANSWER"), IdempotencyKey: "autonomous-missions-example-answer",
-		})
-		if answerErr != nil {
-			log.Fatal(answerErr)
-		}
-		fmt.Printf("answer receipt=%s outcome=%s\n", answered.Control.ID, answered.Control.Outcome)
-	}
 	if os.Getenv("MOCKARTY_EXAMPLE_CANCEL") == "1" {
 		cancelled, cancelErr := api.Cancel(ctx, started.Mission.ID, mockarty.MissionCancelRequest{
 			Reason: "example run no longer needed", IdempotencyKey: "autonomous-missions-example-cancel",
