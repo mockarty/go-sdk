@@ -164,10 +164,10 @@ func (a *DeviceMeshAPI) RevokeGrant(ctx context.Context, namespace, deviceID, gr
 	return a.client.do(ctx, http.MethodDelete, path, nil, nil)
 }
 
-// SubmitCommand queues work. The boolean reports whether the idempotency key
+// Submit queues work. The boolean reports whether the idempotency key
 // replayed an existing command — a retry after a lost response must not place a
 // second piece of work.
-func (a *DeviceMeshAPI) SubmitCommand(ctx context.Context, namespace string, in MeshSubmitInput) (MeshCommand, bool, error) {
+func (a *DeviceMeshAPI) Submit(ctx context.Context, namespace string, in MeshSubmitInput) (MeshCommand, bool, error) {
 	base, err := a.base(namespace)
 	if err != nil {
 		return MeshCommand{}, false, err
@@ -217,9 +217,9 @@ func (a *DeviceMeshAPI) GetCommand(ctx context.Context, namespace, commandID str
 	return out, nil
 }
 
-// ReportCommand records the outcome as the executing device. Only the device
+// Report records the outcome as the executing device. Only the device
 // that holds the lease may report; a terminal report is final.
-func (a *DeviceMeshAPI) ReportCommand(ctx context.Context, namespace, deviceID, commandID string, report MeshCommandReport) (MeshCommand, error) {
+func (a *DeviceMeshAPI) Report(ctx context.Context, namespace, deviceID, commandID string, report MeshCommandReport) (MeshCommand, error) {
 	base, err := a.base(namespace)
 	if err != nil {
 		return MeshCommand{}, err

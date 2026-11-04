@@ -70,7 +70,7 @@ func TestDeviceMeshRequestShapes(t *testing.T) {
 		t.Fatalf("revoke grant: %v", err)
 	}
 
-	command, replayed, err := client.DeviceMesh().SubmitCommand(ctx, "team-a", MeshSubmitInput{
+	command, replayed, err := client.DeviceMesh().Submit(ctx, "team-a", MeshSubmitInput{
 		Kind:                 "api_test.collection",
 		Payload:              json.RawMessage(`{"collectionId":"11111111-1111-4111-8111-111111111111"}`),
 		TargetDeviceID:       "desk-1",
@@ -84,7 +84,7 @@ func TestDeviceMeshRequestShapes(t *testing.T) {
 		t.Fatalf("submit result: %+v replayed=%v (a replayed key must be reported, not hidden)", command, replayed)
 	}
 
-	if _, err := client.DeviceMesh().ReportCommand(ctx, "team-a", "desk-1", "cmd-1", MeshCommandReport{
+	if _, err := client.DeviceMesh().Report(ctx, "team-a", "desk-1", "cmd-1", MeshCommandReport{
 		State: "failed", ResultSummary: "0 of 3 passed", FailureReason: "engine exited 2",
 	}); err != nil {
 		t.Fatalf("report: %v", err)
@@ -140,7 +140,7 @@ func TestDeviceMeshRequiresNamespace(t *testing.T) {
 	if _, err := client.DeviceMesh().ListDevices(context.Background(), ""); err == nil {
 		t.Fatal("a missing namespace must be refused before the request")
 	}
-	if _, _, err := client.DeviceMesh().SubmitCommand(context.Background(), "", MeshSubmitInput{Kind: "ping", IdempotencyKey: "k"}); err == nil {
+	if _, _, err := client.DeviceMesh().Submit(context.Background(), "", MeshSubmitInput{Kind: "ping", IdempotencyKey: "k"}); err == nil {
 		t.Fatal("submit without a namespace must be refused")
 	}
 }
