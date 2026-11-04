@@ -21,11 +21,12 @@ func main() {
 	}
 	credential, err := client.CloudWebhooks().CreateWithIdempotencyKey(
 		context.Background(), os.Getenv("MOCKARTY_WORKSPACE_ID"), "Build events",
-		"https://hooks.example.com/mockarty", []string{"instance.created", "instance.running"}, requestID,
+		"https://hooks.example.com/mockarty", []string{"space.deleted"}, requestID,
 	)
 	if err != nil {
 		panic(err)
 	}
-	// Persist this one-time value in your secret manager; it is not returned by list calls.
-	fmt.Printf("webhook=%s one_time_secret=%s\n", credential.Webhook.ID, credential.Secret)
+	// Store credential.Secret in your secret manager; never print it to logs.
+	// This example only reports whether the credential was received.
+	fmt.Printf("webhook=%s signing_secret_received=%t\n", credential.Webhook.ID, credential.Secret != "")
 }
