@@ -22,7 +22,7 @@ func TestCloudWebhookNamedCreateRefusesBlankKeyBeforeRequest(t *testing.T) {
 	}))
 	defer peer.Close()
 	api := NewClient(peer.URL).CloudWebhooks()
-	for _, key := range []string{"", " ", "\t"} {
+	for _, key := range []string{"", " ", "\t", "\u00a0", "\u0085"} {
 		t.Run(fmt.Sprintf("key=%q", key), func(t *testing.T) {
 			before := calls.Load()
 			_, err := api.CreateWithIdempotencyKey(context.Background(), "owned-space", "owned-hook", "https://example.invalid/hook", []string{"instance.created"}, key)
@@ -60,7 +60,7 @@ func TestCloudWebhookOrdinaryCreateAndStableRetryRemainCompatible(t *testing.T) 
 		t.Fatal("ordinary Create must remain unkeyed")
 	}
 	before := len(seen)
-	for _, key := range []string{"", " ", "\t"} {
+	for _, key := range []string{"", " ", "\t", "\u00a0", "\u0085"} {
 		if _, err := api.RotateSecret(context.Background(), "owned-space", "owned-hook", key); err == nil {
 			t.Errorf("blank rotate key accepted: %q", key)
 		}
