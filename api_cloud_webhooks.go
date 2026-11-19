@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -70,19 +69,12 @@ func (a *CloudWebhooksAPI) List(ctx context.Context, workspaceID string) ([]Clou
 }
 
 func (a *CloudWebhooksAPI) Create(ctx context.Context, workspaceID, name, targetURL string, events []string) (*CloudWebhookCredential, error) {
-	return a.create(ctx, workspaceID, name, targetURL, events, "")
+	return a.CreateWithIdempotencyKey(ctx, workspaceID, name, targetURL, events, "")
 }
 
 // CreateWithIdempotencyKey returns the same signing secret when an ambiguous
 // create is retried with the same key and unchanged request.
 func (a *CloudWebhooksAPI) CreateWithIdempotencyKey(ctx context.Context, workspaceID, name, targetURL string, events []string, idempotencyKey string) (*CloudWebhookCredential, error) {
-	if strings.TrimSpace(idempotencyKey) == "" {
-		return nil, fmt.Errorf("mockarty: idempotency key is required")
-	}
-	return a.create(ctx, workspaceID, name, targetURL, events, idempotencyKey)
-}
-
-func (a *CloudWebhooksAPI) create(ctx context.Context, workspaceID, name, targetURL string, events []string, idempotencyKey string) (*CloudWebhookCredential, error) {
 	var out CloudWebhookCredential
 	err := a.client.do(a.cloudContext(ctx, idempotencyKey), "POST", "/api/v1/cloud/webhooks?"+cloudWorkspaceQuery(workspaceID), map[string]any{
 		"name": name, "url": targetURL, "events": events,
@@ -120,7 +112,7 @@ func (a *CloudWebhooksAPI) ListDeliveries(ctx context.Context, workspaceID, webh
 }
 
 func (a *CloudWebhooksAPI) RotateSecret(ctx context.Context, workspaceID, webhookID, idempotencyKey string) (*CloudWebhookCredential, error) {
-	if webhookID == "" || strings.TrimSpace(idempotencyKey) == "" {
+	if webhookID == "" || idempotencyKey == "" {
 		return nil, fmt.Errorf("mockarty: webhook id and idempotency key are required")
 	}
 	var out CloudWebhookCredential
