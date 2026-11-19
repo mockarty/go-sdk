@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/mockarty/mockarty-go/tester"
+	"github.com/mockarty/go-sdk/tester"
 )
 
 // Example shows the canonical chain shape: login → extract token →

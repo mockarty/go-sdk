@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // doPOST helps drive strict-matcher tests with one-liner round-trips.

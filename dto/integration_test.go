@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/dto"
+	"github.com/mockarty/go-sdk/dto"
 )
 
 type liveAdmin struct {

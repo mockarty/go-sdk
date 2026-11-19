@@ -1,8 +1,8 @@
-module github.com/mockarty/mockarty-go/examples/kitchen_sink
+module github.com/mockarty/go-sdk/examples/kitchen_sink
 
 go 1.25.0
 
-require github.com/mockarty/mockarty-go v0.0.0
+require github.com/mockarty/go-sdk v0.0.0
 
 require (
 	github.com/antchfx/xmlquery v1.5.1 // indirect
@@ -18,4 +18,4 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 )
 
-replace github.com/mockarty/mockarty-go => ../..
+replace github.com/mockarty/go-sdk => ../..

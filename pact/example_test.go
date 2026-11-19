@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // Example shows the canonical consumer test pattern: declare the

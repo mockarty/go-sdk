@@ -48,7 +48,7 @@
 //     today; async messaging is on the follow-up backlog).
 //
 // V4 plugin runtime is wired through the `pact/plugins` subpackage:
-// import `_ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"`
+// import `_ "github.com/mockarty/go-sdk/pact/plugins/protobuf"`
 // (or `.../grpc`) to enable runtime payload validation for the
 // `application/x-protobuf` / `application/grpc` content types.
 // Third-party plugins implement `pact/plugins.Plugin` and call

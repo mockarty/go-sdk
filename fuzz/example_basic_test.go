@@ -12,7 +12,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/mockarty/mockarty-go/fuzz"
+	"github.com/mockarty/go-sdk/fuzz"
 )
 
 // Example_basic shows the full DSL + Submit flow against an in-process

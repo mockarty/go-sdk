@@ -8,7 +8,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+	"github.com/mockarty/go-sdk/pact/plugins/protobuf"
 )
 
 // These tests drive the integer-coercion helpers in the protobuf

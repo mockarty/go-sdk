@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mockarty/mockarty-go/allure"
+	"github.com/mockarty/go-sdk/allure"
 )
 
 // Wrap runs fn inside a parent Allure step named `name`. Any chains

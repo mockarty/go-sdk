@@ -2,7 +2,7 @@ module example
 
 go 1.25.0
 
-require github.com/mockarty/mockarty-go v0.0.0
+require github.com/mockarty/go-sdk v0.0.0
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -50,4 +50,4 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 )
 
-replace github.com/mockarty/mockarty-go => ../../
+replace github.com/mockarty/go-sdk => ../../

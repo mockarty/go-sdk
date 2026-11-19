@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
+	"github.com/mockarty/go-sdk/externalruns"
 )
 
 // ExampleClient_endToEnd walks the typical CI/CD lifecycle: create →

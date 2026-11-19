@@ -2,7 +2,7 @@ module example
 
 go 1.25.0
 
-require github.com/mockarty/mockarty-go v0.0.0
+require github.com/mockarty/go-sdk v0.0.0
 
 require (
 	github.com/klauspost/compress v1.16.0 // indirect
@@ -10,4 +10,4 @@ require (
 	github.com/segmentio/kafka-go v0.4.51 // indirect
 )
 
-replace github.com/mockarty/mockarty-go => ../../
+replace github.com/mockarty/go-sdk => ../../

@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/allure"
+	"github.com/mockarty/go-sdk/allure"
 )
 
 // resultsFromDir loads every `*-result.json` produced under dir into the

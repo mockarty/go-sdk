@@ -12,7 +12,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 func TestNewClient_EmptyURL(t *testing.T) {

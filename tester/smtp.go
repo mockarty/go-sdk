@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/smtp"
+	"github.com/mockarty/go-sdk/protocols/smtp"
 )
 
 // SMTPSender is the minimal contract the SMTP facet needs. `*smtp.Client`

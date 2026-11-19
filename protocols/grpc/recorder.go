@@ -4,8 +4,8 @@
 package grpc
 
 import (
-	"github.com/mockarty/mockarty-go/externalruns"
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/externalruns"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 // Step is re-exported from protocols/telemetry. The protocol-agnostic

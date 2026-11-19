@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/allure"
-	"github.com/mockarty/mockarty-go/tester"
+	"github.com/mockarty/go-sdk/allure"
+	"github.com/mockarty/go-sdk/tester"
 )
 
 // TestAllureIntegrationEndToEnd proves Tester chains land as Allure step

@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+	"github.com/mockarty/go-sdk/pact/plugins/protobuf"
 )
 
 // makeVarint produces the byte sequence for one VARINT tag+value.

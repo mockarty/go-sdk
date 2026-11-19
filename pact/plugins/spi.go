@@ -16,7 +16,7 @@
 // The SPI is intentionally narrow — the SDK is a thin client (see
 // feedback_sdk_thin_layer.md): a plugin validates and matches; it does
 // NOT embed a transport server. gRPC, for example, is matched at the
-// payload level by [github.com/mockarty/mockarty-go/pact/plugins/grpc],
+// payload level by [github.com/mockarty/go-sdk/pact/plugins/grpc],
 // not by spinning up a `google.golang.org/grpc` server.
 //
 // # Architecture

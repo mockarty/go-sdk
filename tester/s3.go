@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/s3"
+	"github.com/mockarty/go-sdk/protocols/s3"
 )
 
 // S3Client is the minimal contract the S3 facet needs. `*s3.Client` from

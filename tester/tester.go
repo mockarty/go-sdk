@@ -58,7 +58,7 @@ type StepRecord struct {
 type Option func(*Tester)
 
 // WithContext binds a parent context. If the context carries an Allure
-// scope (see github.com/mockarty/mockarty-go/allure) every step is
+// scope (see github.com/mockarty/go-sdk/allure) every step is
 // recorded into the scope automatically.
 func WithContext(ctx context.Context) Option { return func(t *Tester) { t.ctx = ctx } }
 

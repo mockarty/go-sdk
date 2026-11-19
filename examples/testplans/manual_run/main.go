@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mockarty/mockarty-go"
+	"github.com/mockarty/go-sdk"
 )
 
 func main() {

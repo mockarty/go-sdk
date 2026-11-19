@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact/plugins/grpc"
+	"github.com/mockarty/go-sdk/pact/plugins/grpc"
 )
 
 func TestGRPCGenerateResponseRespectsInnerNil(t *testing.T) {

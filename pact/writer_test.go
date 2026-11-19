@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // buildChargeContract is the V3/V4 "charge" example shared by the V3 and

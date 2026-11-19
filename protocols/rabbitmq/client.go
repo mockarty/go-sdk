@@ -15,7 +15,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 // Client is a goroutine-safe RabbitMQ test client. One connection +

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/s3"
-	"github.com/mockarty/mockarty-go/protocols/smtp"
+	"github.com/mockarty/go-sdk/protocols/s3"
+	"github.com/mockarty/go-sdk/protocols/smtp"
 )
 
 // These tests exercise the s3 / smtp / socket.io facets against a live

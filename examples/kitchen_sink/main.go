@@ -56,8 +56,8 @@ import (
 	"strings"
 	"time"
 
-	mockarty "github.com/mockarty/mockarty-go"
-	"github.com/mockarty/mockarty-go/tester"
+	mockarty "github.com/mockarty/go-sdk"
+	"github.com/mockarty/go-sdk/tester"
 )
 
 func main() {
@@ -237,7 +237,7 @@ func uploadExternalRun(cfg config, t *tester.Tester) {
 		CaseName:   "kitchen-sink",
 		Framework:  "mockarty-go-tester",
 		AutoCreate: true,
-		FullName:   "github.com/mockarty/mockarty-go/examples/kitchen_sink",
+		FullName:   "github.com/mockarty/go-sdk/examples/kitchen_sink",
 	})
 	resp, err := client.ExternalRuns().Report(context.Background(), cfg.Namespace, run)
 	if err != nil {

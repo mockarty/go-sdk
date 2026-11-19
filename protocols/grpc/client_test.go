@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
+	"github.com/mockarty/go-sdk/externalruns"
 )
 
 // --- splitMethod ---

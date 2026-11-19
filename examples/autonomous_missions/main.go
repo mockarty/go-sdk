@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mockarty/mockarty-go"
+	"github.com/mockarty/go-sdk"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/mockarty/mockarty-go
+module github.com/mockarty/go-sdk
 
 go 1.25.0
 

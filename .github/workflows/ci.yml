@@ -50,7 +50,7 @@ jobs:
           body: |
             ## Mockarty Go SDK ${{ github.ref_name }}
 
-            Install: `go get github.com/mockarty/mockarty-go@${{ github.ref_name }}`
+            Install: `go get github.com/mockarty/go-sdk@${{ github.ref_name }}`
 
             ### Changes
             ${{ steps.notes.outputs.notes }}

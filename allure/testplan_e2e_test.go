@@ -90,7 +90,7 @@ func TestE2ENoPlanRunsEverything(t *testing.T) {
 func TestE2EPlanSelectorRunsOnlyListedTest(t *testing.T) {
 	bin := buildProbe(t)
 	plan := writePlan(t, `{"version":"1.0","tests":[
-		{"selector":"github.com/mockarty/mockarty-go/allure/internal/testplanprobe::TestAlpha"}
+		{"selector":"github.com/mockarty/go-sdk/allure/internal/testplanprobe::TestAlpha"}
 	]}`)
 	run := runProbe(t, bin, map[string]string{EnvTestPlanPath: plan})
 	if run.code != 0 {

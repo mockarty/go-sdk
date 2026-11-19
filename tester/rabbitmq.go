@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/rabbitmq"
+	"github.com/mockarty/go-sdk/protocols/rabbitmq"
 )
 
 // RabbitMQBroker is the minimal contract the Tester needs from a

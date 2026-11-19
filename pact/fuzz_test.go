@@ -13,7 +13,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // FuzzRenderPactFileDoesNotPanic feeds arbitrary descriptions / paths

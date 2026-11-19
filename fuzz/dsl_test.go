@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/fuzz"
+	"github.com/mockarty/go-sdk/fuzz"
 )
 
 // fullHTTPTarget builds a representative HTTP target every test in this

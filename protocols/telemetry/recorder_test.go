@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
+	"github.com/mockarty/go-sdk/externalruns"
 )
 
 func TestNopRecorder_NeverPanics(t *testing.T) {

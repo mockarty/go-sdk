@@ -117,7 +117,7 @@ func WithLogger(l *log.Logger) Option { return func(c *Consumer) { c.logger = l 
 //
 // Plugin lookup is performed via the package-level
 // `pact/plugins.Default` registry: import the relevant plugin
-// subpackage (e.g. `_ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"`)
+// subpackage (e.g. `_ "github.com/mockarty/go-sdk/pact/plugins/protobuf"`)
 // once and it will self-register through its init().
 //
 // If the plugin name is not registered when this option is applied the

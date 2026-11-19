@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	mockarty "github.com/mockarty/mockarty-go"
+	mockarty "github.com/mockarty/go-sdk"
 )
 
 func main() {

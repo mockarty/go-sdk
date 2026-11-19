@@ -7,7 +7,7 @@ package tester
 import (
 	"time"
 
-	mockarty "github.com/mockarty/mockarty-go"
+	mockarty "github.com/mockarty/go-sdk"
 )
 
 // ExternalRunOptions controls the case/plan binding when converting a

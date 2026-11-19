@@ -10,7 +10,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact/plugins/grpc"
+	"github.com/mockarty/go-sdk/pact/plugins/grpc"
 )
 
 // gframe wraps payload into a gRPC length-prefixed frame.

@@ -24,8 +24,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
-	mgrpc "github.com/mockarty/mockarty-go/protocols/grpc"
+	"github.com/mockarty/go-sdk/externalruns"
+	mgrpc "github.com/mockarty/go-sdk/protocols/grpc"
 )
 
 func main() {

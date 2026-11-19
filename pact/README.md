@@ -19,7 +19,7 @@ import (
     "net/http"
     "testing"
 
-    "github.com/mockarty/mockarty-go/pact"
+    "github.com/mockarty/go-sdk/pact"
 )
 
 func TestPaymentClient(t *testing.T) {
@@ -152,7 +152,7 @@ into the in-process mock server. Two plugins ship in the SDK:
 Side-effect import the plugin once:
 
 ```go
-import _ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+import _ "github.com/mockarty/go-sdk/pact/plugins/protobuf"
 ```
 
 then declare:

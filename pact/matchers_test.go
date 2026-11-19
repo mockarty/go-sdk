@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 func TestLikeBuildsTypeMatcher(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/socketio"
+	"github.com/mockarty/go-sdk/protocols/socketio"
 )
 
 // SocketIOFacet is the Socket.IO entry point reached via

@@ -16,7 +16,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/allure"
+	"github.com/mockarty/go-sdk/allure"
 )
 
 func TestMain(m *testing.M) {

@@ -7,7 +7,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/mockarty/mockarty-go/dto"
+	"github.com/mockarty/go-sdk/dto"
 )
 
 // CollectionAPI provides methods for managing API Tester collections.

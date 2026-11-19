@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/fuzz"
+	"github.com/mockarty/go-sdk/fuzz"
 )
 
 // fakeAdmin emulates the subset of admin endpoints the Runner uses.

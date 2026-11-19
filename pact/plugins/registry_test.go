@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact/plugins"
+	"github.com/mockarty/go-sdk/pact/plugins"
 )
 
 // stubPlugin is a goroutine-safe Plugin used to drive Registry tests.

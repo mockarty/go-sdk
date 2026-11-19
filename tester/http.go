@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/allure"
+	"github.com/mockarty/go-sdk/allure"
 )
 
 // HTTPFacet is the HTTP entry point reached via Tester.HTTP().

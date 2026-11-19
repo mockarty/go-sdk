@@ -6,7 +6,7 @@ package main
 
 import (
 	"context"
-	mockarty "github.com/mockarty/mockarty-go"
+	mockarty "github.com/mockarty/go-sdk"
 	"log"
 	"os"
 	"time"

@@ -24,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/mockarty/mockarty-go/mockartycontainer"
+	"github.com/mockarty/go-sdk/mockartycontainer"
 )
 
 func main() {

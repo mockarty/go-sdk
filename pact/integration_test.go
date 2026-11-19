@@ -30,7 +30,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // runConsumerTest is the boilerplate-free consumer-test driver: builds

@@ -12,9 +12,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
-	"github.com/mockarty/mockarty-go/protocols/rabbitmq"
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/externalruns"
+	"github.com/mockarty/go-sdk/protocols/rabbitmq"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 func main() {

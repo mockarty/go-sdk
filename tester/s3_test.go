@@ -9,7 +9,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/protocols/s3"
+	"github.com/mockarty/go-sdk/protocols/s3"
 )
 
 // fakeS3 is an in-memory S3Client — no real endpoint required.

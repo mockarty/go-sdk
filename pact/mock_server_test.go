@@ -15,7 +15,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 func TestMockServerMatchesPOSTWithJSONBody(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/protocols/smtp"
+	"github.com/mockarty/go-sdk/protocols/smtp"
 )
 
 // fakeSMTP is an in-memory SMTPSender. Captures sent messages; can be

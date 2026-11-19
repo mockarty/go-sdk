@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // These tests fill coverage gaps for matcher constructors that have no

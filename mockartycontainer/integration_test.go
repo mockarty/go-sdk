@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/mockartycontainer"
+	"github.com/mockarty/go-sdk/mockartycontainer"
 )
 
 func requireDocker(t *testing.T) {

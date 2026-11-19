@@ -29,7 +29,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/mockarty/mockarty-go/externalruns"
+	"github.com/mockarty/go-sdk/externalruns"
 )
 
 // Step is the protocol-agnostic record produced for each captured

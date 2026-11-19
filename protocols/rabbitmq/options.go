@@ -3,7 +3,7 @@
 
 package rabbitmq
 
-import "github.com/mockarty/mockarty-go/protocols/telemetry"
+import "github.com/mockarty/go-sdk/protocols/telemetry"
 
 // Option mutates dial-time configuration.
 type Option func(*config)

@@ -14,7 +14,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 // Client is a goroutine-safe Kafka test client. One Client wires a

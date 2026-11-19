@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 func TestNewConsumerDefaults(t *testing.T) {

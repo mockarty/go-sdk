@@ -9,7 +9,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 // Option mutates dial-time configuration. Functional-options pattern,

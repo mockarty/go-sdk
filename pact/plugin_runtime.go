@@ -7,7 +7,7 @@ package pact
 import (
 	"context"
 
-	"github.com/mockarty/mockarty-go/pact/plugins"
+	"github.com/mockarty/go-sdk/pact/plugins"
 )
 
 // pluginRuntimeAdapter wraps a plugins.Plugin so it satisfies the

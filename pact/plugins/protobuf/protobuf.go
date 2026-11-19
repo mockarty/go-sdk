@@ -52,7 +52,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/mockarty/mockarty-go/pact/plugins"
+	"github.com/mockarty/go-sdk/pact/plugins"
 )
 
 // Name is the manifest key written into pact.json (`metadata.plugins[]`).

@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mockarty/mockarty-go/mockartycontainer"
+	"github.com/mockarty/go-sdk/mockartycontainer"
 )
 
 // Example shows the canonical user pattern: spawn the CLI mock image,

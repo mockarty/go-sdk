@@ -18,7 +18,7 @@ import (
     "context"
     "time"
 
-    "github.com/mockarty/mockarty-go/fuzz"
+    "github.com/mockarty/go-sdk/fuzz"
 )
 
 target := fuzz.NewTarget("login-stress",

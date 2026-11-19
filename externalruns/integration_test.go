@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/externalruns"
+	"github.com/mockarty/go-sdk/externalruns"
 )
 
 // requireLiveAdmin returns (baseURL, token, namespace) or skips. Mirrors

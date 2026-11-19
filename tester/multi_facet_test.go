@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/protocols/kafka"
+	"github.com/mockarty/go-sdk/protocols/kafka"
 )
 
 // TestMultiFacetFlow drives every protocol facet in one chain to prove

@@ -34,8 +34,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/mockarty/mockarty-go/pact/plugins"
-	"github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+	"github.com/mockarty/go-sdk/pact/plugins"
+	"github.com/mockarty/go-sdk/pact/plugins/protobuf"
 )
 
 // Name is the manifest key written into pact.json.

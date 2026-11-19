@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/fuzz"
+	"github.com/mockarty/go-sdk/fuzz"
 )
 
 func requireLiveAdmin(t *testing.T) (baseURL, token, namespace string) {

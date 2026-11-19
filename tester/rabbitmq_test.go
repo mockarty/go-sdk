@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/protocols/rabbitmq"
+	"github.com/mockarty/go-sdk/protocols/rabbitmq"
 )
 
 // fakeRabbit is an in-memory RabbitMQBroker keyed by routing key. Each

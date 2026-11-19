@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	mockarty "github.com/mockarty/mockarty-go"
+	mockarty "github.com/mockarty/go-sdk"
 )
 
 func TestToExternalRunHappyPath(t *testing.T) {

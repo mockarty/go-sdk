@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/protocols/kafka"
+	"github.com/mockarty/go-sdk/protocols/kafka"
 )
 
 // fakeBroker is an in-memory KafkaBroker used by the test suite — no

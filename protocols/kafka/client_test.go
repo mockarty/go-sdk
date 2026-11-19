@@ -13,7 +13,7 @@ import (
 
 	"github.com/segmentio/kafka-go"
 
-	"github.com/mockarty/mockarty-go/protocols/telemetry"
+	"github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 func TestNewClient_EmptyBrokers(t *testing.T) {

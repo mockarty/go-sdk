@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
-	_ "github.com/mockarty/mockarty-go/pact/plugins/grpc"
-	_ "github.com/mockarty/mockarty-go/pact/plugins/protobuf"
+	"github.com/mockarty/go-sdk/pact"
+	_ "github.com/mockarty/go-sdk/pact/plugins/grpc"
+	_ "github.com/mockarty/go-sdk/pact/plugins/protobuf"
 )
 
 // protoVarint inline helper — keeps test file independent.

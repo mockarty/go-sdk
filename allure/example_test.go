@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/allure"
+	"github.com/mockarty/go-sdk/allure"
 )
 
 // TestLogin_AllureBasic mirrors the canonical Allure-pytest "happy path"

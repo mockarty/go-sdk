@@ -18,7 +18,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 const samplePact = `{

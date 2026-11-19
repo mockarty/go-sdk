@@ -6,7 +6,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	mockarty "github.com/mockarty/mockarty-go"
+	mockarty "github.com/mockarty/go-sdk"
 	"io"
 	"log"
 	"os"

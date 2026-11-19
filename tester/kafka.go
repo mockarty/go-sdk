@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mockarty/mockarty-go/allure"
-	"github.com/mockarty/mockarty-go/protocols/kafka"
+	"github.com/mockarty/go-sdk/allure"
+	"github.com/mockarty/go-sdk/protocols/kafka"
 )
 
 // KafkaBroker is the minimal contract the Tester needs from a Kafka

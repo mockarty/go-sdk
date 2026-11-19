@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mockarty/mockarty-go/main/logo.svg" alt="Mockarty" width="400">
+  <img src="https://raw.githubusercontent.com/mockarty/go-sdk/main/logo.svg" alt="Mockarty" width="400">
 </p>
 
 <h1 align="center">Go SDK</h1>
@@ -9,14 +9,14 @@
 </p>
 
 <p align="center">
-  <a href="https://pkg.go.dev/github.com/mockarty/mockarty-go"><img src="https://pkg.go.dev/badge/github.com/mockarty/mockarty-go.svg" alt="Go Reference"></a>
-  <a href="https://github.com/mockarty/mockarty-go/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mockarty/mockarty-go" alt="License"></a>
+  <a href="https://pkg.go.dev/github.com/mockarty/go-sdk"><img src="https://pkg.go.dev/badge/github.com/mockarty/go-sdk.svg" alt="Go Reference"></a>
+  <a href="https://github.com/mockarty/go-sdk/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mockarty/go-sdk" alt="License"></a>
 </p>
 
 ## Installation
 
 ```bash
-go get github.com/mockarty/mockarty-go
+go get github.com/mockarty/go-sdk
 ```
 
 **Requirements:** Go 1.21+ | Zero external dependencies (stdlib only)
@@ -31,7 +31,7 @@ import (
     "fmt"
     "log"
 
-    mockarty "github.com/mockarty/mockarty-go"
+    mockarty "github.com/mockarty/go-sdk"
 )
 
 func main() {
@@ -281,9 +281,9 @@ preview) so the external run shows a per-call timeline at the end:
 
 ```go
 import (
-    "github.com/mockarty/mockarty-go/externalruns"
-    mgrpc "github.com/mockarty/mockarty-go/protocols/grpc"
-    "github.com/mockarty/mockarty-go/protocols/telemetry"
+    "github.com/mockarty/go-sdk/externalruns"
+    mgrpc "github.com/mockarty/go-sdk/protocols/grpc"
+    "github.com/mockarty/go-sdk/protocols/telemetry"
 )
 
 runs, _ := externalruns.NewClient(adminURL, "sandbox", apiToken)
@@ -343,8 +343,8 @@ supported transports:
 
 ```go
 import (
-    "github.com/mockarty/mockarty-go/tester"
-    "github.com/mockarty/mockarty-go/protocols/kafka"
+    "github.com/mockarty/go-sdk/tester"
+    "github.com/mockarty/go-sdk/protocols/kafka"
 )
 
 func TestUserSignupFlow(t *testing.T) {
@@ -387,8 +387,8 @@ Upload a Tester chain as a TCM external run in one call:
 
 ```go
 import (
-    mockarty "github.com/mockarty/mockarty-go"
-    "github.com/mockarty/mockarty-go/tester"
+    mockarty "github.com/mockarty/go-sdk"
+    "github.com/mockarty/go-sdk/tester"
 )
 
 t := tester.New(tester.WithBaseURL("http://localhost:8080"))

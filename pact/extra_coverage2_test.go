@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // Drive every dispatch branch in the strict matcher engine to push

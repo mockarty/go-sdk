@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/mockarty/mockarty-go/fuzz"
+	"github.com/mockarty/go-sdk/fuzz"
 )
 
 // FuzzFromJSONDoesNotPanic feeds arbitrary bytes through the parser and

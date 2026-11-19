@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 type closeIdleSpyTransport struct {

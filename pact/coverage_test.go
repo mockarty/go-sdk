@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mockarty/mockarty-go/pact"
+	"github.com/mockarty/go-sdk/pact"
 )
 
 // This file deliberately drives the matcher / path-splitter / encoder
