@@ -230,11 +230,11 @@ func TestTestPlans_Run(t *testing.T) {
 		}
 		var opts RunOptions
 		_ = json.NewDecoder(r.Body).Decode(&opts)
-		if len(opts.Items) != 2 || opts.Items[0] != 1 {
-			t.Fatalf("unexpected items: %v", opts.Items)
+		if opts.ExecutionModeOverride != "manual" || !opts.RecordDetailed || !opts.NotifyOnCompletion {
+			t.Fatalf("unexpected run options: %+v", opts)
 		}
-		if opts.Mode != "parallel" {
-			t.Fatalf("expected mode=parallel, got %q", opts.Mode)
+		if len(opts.NotifyEmails) != 1 || opts.NotifyEmails[0] != "qa@example.com" {
+			t.Fatalf("unexpected notifyEmails: %v", opts.NotifyEmails)
 		}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]any{
@@ -247,8 +247,10 @@ func TestTestPlans_Run(t *testing.T) {
 
 	c := NewClient(srv.URL)
 	run, err := c.TestPlans().Run(context.Background(), "plan-1", RunOptions{
-		Items: []int{1, 3},
-		Mode:  "parallel",
+		ExecutionModeOverride: "manual",
+		RecordDetailed:        true,
+		NotifyOnCompletion:    true,
+		NotifyEmails:          []string{"qa@example.com"},
 	})
 	if err != nil {
 		t.Fatal(err)

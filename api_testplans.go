@@ -289,12 +289,19 @@ type ListPlansOptions struct {
 
 // RunOptions configures a Run trigger.
 type RunOptions struct {
-	// Items optionally restricts the run to a subset of item orders (1-based).
-	// nil / empty runs every item in the plan.
-	Items []int `json:"items,omitempty"`
-	// Mode overrides the plan-level mode for this run (sequential / parallel
-	// / dag / timed). Empty string uses the plan default.
-	Mode string `json:"mode,omitempty"`
+	// ExecutionModeOverride forces every test-case item to gate for a human
+	// verdict ("manual") or to run unattended ("auto"). Empty keeps each
+	// item's configured mode.
+	ExecutionModeOverride string `json:"executionModeOverride,omitempty"`
+	// RecordDetailed persists per-item HAR-shaped traces for this run.
+	RecordDetailed bool `json:"recordDetailed,omitempty"`
+	// NotifyOnCompletion sends a completion email at the end of the run.
+	NotifyOnCompletion bool `json:"notifyOnCompletion,omitempty"`
+	// NotifyEmails lists completion-email recipients; empty uses the plan's
+	// subscribers.
+	NotifyEmails []string `json:"notifyEmails,omitempty"`
+	// ConfigurationIDs dispatches one independent run per TCM configuration.
+	ConfigurationIDs []string `json:"configurationIds,omitempty"`
 }
 
 // PatchPlanRequest is the partial-update payload for TestPlansAPI.Patch. Any
