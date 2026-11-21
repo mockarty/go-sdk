@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty Software License Agreement.
+// SPDX-License-Identifier: MIT
 // See LICENSE file in the project root for full license text.
 
 // testplan.go — consumption of the Allure test plan (ALLURE_TESTPLAN_PATH).

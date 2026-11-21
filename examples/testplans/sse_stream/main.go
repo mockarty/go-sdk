@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: testplans/sse_stream — subscribe to a live run and render each
 // event as it arrives.

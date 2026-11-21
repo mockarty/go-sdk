@@ -460,13 +460,8 @@ if errors.As(err, &apiErr) {
 
 ## License
 
-This SDK is proprietary software, **not** open source. It is licensed under the
-**Mockarty SDK License Agreement** — see [LICENSE](LICENSE) for the full terms.
+The SDK is available under the MIT License. See [LICENSE](LICENSE). Access to
+a connected Mockarty server uses that server's terms and workspace permissions.
 
-- **Free** for evaluation, learning, and non-commercial / community use.
-- **Commercial use requires a valid, paid Mockarty subscription.** Using this
-  SDK in production or for commercial advantage without a subscription is not
-  permitted.
-
-For commercial subscriptions and licensing inquiries, see
-[mockarty.ru](https://mockarty.ru) or contact orlovich.artem@gmail.com.
+SDK распространяется по лицензии MIT. См. [LICENSE](LICENSE). При подключении
+к серверу Mockarty действуют условия сервера и права доступа в пространстве.

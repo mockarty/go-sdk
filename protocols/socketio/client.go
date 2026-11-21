@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Package socketio is the Mockarty Go SDK's minimal Socket.IO v4
 // (Engine.IO v4) test client over the WebSocket transport. It lets

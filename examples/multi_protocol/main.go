@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: multi_protocol — showcase Tester DSL across protocols
 // that don't need external infrastructure.

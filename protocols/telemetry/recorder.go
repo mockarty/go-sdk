@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Package telemetry is the shared step-capture vocabulary used by every
 // mockarty-go protocol client (gRPC, Kafka, RabbitMQ, SOAP, GraphQL,

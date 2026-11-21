@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // ns_models.go holds payload types used by NamespaceSettingsAPI (members,
 // cleanup policy). Do not add platform-admin payloads here — the SDK is

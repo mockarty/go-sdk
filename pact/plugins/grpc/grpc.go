@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty Software License Agreement.
+// SPDX-License-Identifier: MIT
 // See LICENSE file in the project root for full license text.
 
 // Package grpc is the built-in Pact V4 plugin for the gRPC transport.

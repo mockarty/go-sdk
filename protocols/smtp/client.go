@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Package smtp is the Mockarty Go SDK's minimal SMTP test client. It
 // sends a mail over SMTP (plain or AUTH PLAIN) and reports the server's

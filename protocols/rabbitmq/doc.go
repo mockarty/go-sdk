@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Package rabbitmq is the Mockarty Go SDK's RabbitMQ test client. It
 // is built for CI/CD test scripts that exercise an AMQP 0.9.1

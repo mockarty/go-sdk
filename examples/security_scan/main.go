@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: security_scan — kick off a Mockarty Security Agent scan
 // from a CI/CD pipeline, wait for completion, then download the SARIF

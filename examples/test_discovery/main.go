@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: test_discovery — sync a test framework's collected case list
 // into the Mockarty TCM catalogue. Run this as a CI "collect" step (after

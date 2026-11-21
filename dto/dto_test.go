@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Package dto's tests live next to the generated code (CLAUDE.md "Testing
 // Rules": tests co-located with the package). They verify JSON marshalling

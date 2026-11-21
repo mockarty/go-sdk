@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: kafka_client — produce + consume against a Kafka broker
 // (real or Mockarty-mocked) with auto-step capture into a TCM run.

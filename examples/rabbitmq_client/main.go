@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Mockarty. All rights reserved.
-// Licensed under the Mockarty SDK License Agreement. See LICENSE file for details.
+// SPDX-License-Identifier: MIT
 
 // Example: rabbitmq_client — declare + publish + consume against a
 // RabbitMQ broker (real or Mockarty-mocked) with auto-step capture.
