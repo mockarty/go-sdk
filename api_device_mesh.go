@@ -77,19 +77,19 @@ type MeshCommand struct {
 // MeshExecutionReport is the durable receipt of a finished command. It is what a
 // CI job cites: who ran what, where, and how it ended.
 type MeshExecutionReport struct {
-	RecordedAt   time.Time  `json:"recordedAt"`
-	StartedAt    *time.Time `json:"startedAt,omitempty"`
-	FinishedAt   *time.Time `json:"finishedAt,omitempty"`
-	ID           string     `json:"id"`
-	Ref          string     `json:"ref"`
-	Namespace    string     `json:"namespace"`
-	DeviceID     string     `json:"deviceId"`
-	SubmitterID  string     `json:"submitterUserId"`
-	State        string     `json:"state"`
-	Summary      string     `json:"summary"`
-	FailureCode  string     `json:"failureCode,omitempty"`
-	ReportKind   string     `json:"reportKind,omitempty"`
-	SubjectID    string     `json:"subjectId,omitempty"`
+	RecordedAt  time.Time  `json:"recordedAt"`
+	StartedAt   *time.Time `json:"startedAt,omitempty"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
+	ID          string     `json:"id"`
+	Ref         string     `json:"ref"`
+	Namespace   string     `json:"namespace"`
+	DeviceID    string     `json:"deviceId"`
+	SubmitterID string     `json:"submitterUserId"`
+	State       string     `json:"state"`
+	Summary     string     `json:"summary"`
+	FailureCode string     `json:"failureCode,omitempty"`
+	ReportKind  string     `json:"reportKind,omitempty"`
+	SubjectID   string     `json:"subjectId,omitempty"`
 }
 
 // MeshSubmitInput describes work to place. RequiredCapabilities is the closed
@@ -199,6 +199,13 @@ func (a *DeviceMeshAPI) Submit(ctx context.Context, namespace string, in MeshSub
 	return out.Command, out.Replayed, nil
 }
 
+// SubmitCommand queues work and reports whether the command was replayed.
+//
+// Deprecated: use Submit.
+func (a *DeviceMeshAPI) SubmitCommand(ctx context.Context, namespace string, in MeshSubmitInput) (MeshCommand, bool, error) {
+	return a.Submit(ctx, namespace, in)
+}
+
 // GetCommand reads one command's current state, including the terminal state and
 // the failure reason when it ended badly.
 func (a *DeviceMeshAPI) GetCommand(ctx context.Context, namespace, commandID string) (MeshCommand, error) {
@@ -215,6 +222,13 @@ func (a *DeviceMeshAPI) GetCommand(ctx context.Context, namespace, commandID str
 		return MeshCommand{}, err
 	}
 	return out, nil
+}
+
+// ReportCommand records the executing device's outcome.
+//
+// Deprecated: use Report.
+func (a *DeviceMeshAPI) ReportCommand(ctx context.Context, namespace, deviceID, commandID string, report MeshCommandReport) (MeshCommand, error) {
+	return a.Report(ctx, namespace, deviceID, commandID, report)
 }
 
 // Report records the outcome as the executing device. Only the device

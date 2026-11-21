@@ -166,6 +166,7 @@ type TestPlanRun struct {
 	Status         string          `json:"status,omitempty"`
 	TriggeredBy    string          `json:"triggeredBy,omitempty"`
 	ReportURL      string          `json:"reportUrl,omitempty"`
+	RunIDs         []string        `json:"runIds,omitempty"`
 	ItemsState     []PlanItemState `json:"itemsState,omitempty"`
 	TotalItems     int             `json:"totalItems,omitempty"`
 	CompletedItems int             `json:"completedItems,omitempty"`
@@ -541,9 +542,10 @@ func (a *TestPlansAPI) Run(ctx context.Context, idOrNumeric string, opts RunOpti
 	}
 	// Server emits {runId, planId, status}; decode into a typed run shape.
 	var env struct {
-		RunID  string `json:"runId"`
-		PlanID string `json:"planId"`
-		Status string `json:"status"`
+		RunID  string   `json:"runId"`
+		PlanID string   `json:"planId"`
+		Status string   `json:"status"`
+		RunIDs []string `json:"runIds"`
 	}
 	if err := a.client.do(ctx, http.MethodPost, testPlansBase+"/"+url.PathEscape(key)+"/run", opts, &env); err != nil {
 		return nil, err
@@ -552,6 +554,7 @@ func (a *TestPlansAPI) Run(ctx context.Context, idOrNumeric string, opts RunOpti
 		ID:     env.RunID,
 		PlanID: env.PlanID,
 		Status: env.Status,
+		RunIDs: env.RunIDs,
 	}, nil
 }
 

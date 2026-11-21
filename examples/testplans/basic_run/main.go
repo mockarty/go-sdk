@@ -47,7 +47,7 @@ func main() {
 	}
 	fmt.Printf("Created plan %s (#%d)\n", plan.ID, plan.NumericID)
 
-	run, err := client.TestPlans().Run(ctx, plan.ID, mockarty.RunOptions{})
+	run, err := client.TestPlans().Run(ctx, plan.ID, mockarty.RunOptions{RecordDetailed: true})
 	if err != nil {
 		log.Fatalf("run plan: %v", err)
 	}

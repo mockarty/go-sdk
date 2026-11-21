@@ -233,12 +233,16 @@ func TestTestPlans_Run(t *testing.T) {
 		if opts.ExecutionModeOverride != "manual" || !opts.RecordDetailed || !opts.NotifyOnCompletion {
 			t.Fatalf("unexpected run options: %+v", opts)
 		}
+		if len(opts.ConfigurationIDs) != 2 || opts.ConfigurationIDs[1] != "config-b" {
+			t.Fatalf("unexpected configurationIds: %v", opts.ConfigurationIDs)
+		}
 		if len(opts.NotifyEmails) != 1 || opts.NotifyEmails[0] != "qa@example.com" {
 			t.Fatalf("unexpected notifyEmails: %v", opts.NotifyEmails)
 		}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"runId":  "run-1",
+			"runIds": []string{"run-1", "run-2"},
 			"planId": "plan-1",
 			"status": "pending",
 		})
@@ -251,11 +255,12 @@ func TestTestPlans_Run(t *testing.T) {
 		RecordDetailed:        true,
 		NotifyOnCompletion:    true,
 		NotifyEmails:          []string{"qa@example.com"},
+		ConfigurationIDs:      []string{"config-a", "config-b"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.ID != "run-1" || run.Status != "pending" {
+	if run.ID != "run-1" || run.Status != "pending" || len(run.RunIDs) != 2 || run.RunIDs[1] != "run-2" {
 		t.Fatalf("unexpected run: %+v", run)
 	}
 }
